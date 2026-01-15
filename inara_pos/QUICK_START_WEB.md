@@ -89,7 +89,7 @@ Your app: `https://YOUR_PROJECT_ID.web.app`
 **If your Vercel project root is `inara_pos/`:**
 
 - Root Directory: `inara_pos`
-- Build Command: `flutter build web --release`
+- Build Command: `bash scripts/vercel_build.sh`
 - Output Directory: `build/web`
 
 **SPA routing fix**: this repo includes `vercel.json` (and `inara_pos/vercel.json`) to rewrite all routes to `index.html`.
