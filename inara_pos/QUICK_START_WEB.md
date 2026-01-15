@@ -79,6 +79,21 @@ Your app: `https://YOUR_PROJECT_ID.web.app`
 4. Build command: `flutter build web --release`
 5. Publish directory: `build/web`
 
+### Vercel (Recommended for your setup)
+
+**Important**: Vercel does not include Flutter by default, so you must either:
+
+- Build web using CI (GitHub Actions) and deploy the built output, or
+- Use a Vercel build environment that has Flutter installed.
+
+**If your Vercel project root is `inara_pos/`:**
+
+- Root Directory: `inara_pos`
+- Build Command: `flutter build web --release`
+- Output Directory: `build/web`
+
+**SPA routing fix**: this repo includes `vercel.json` (and `inara_pos/vercel.json`) to rewrite all routes to `index.html`.
+
 ### Any Web Server
 
 Just upload the contents of `build/web/` to your hosting provider.
