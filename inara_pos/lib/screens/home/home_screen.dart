@@ -239,16 +239,44 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildMobileBottomNav(AuthProvider authProvider) {
     // Mobile: Show only 4 most important items
-    final isMoreSelected = _selectedIndex > 3;
+    // In our screen list: 0=Dashboard, 1=Orders, 2=Tables, 3=Menu, 4+=More screens.
+    // But mobile bottom nav shows: Home, Orders, Menu, More.
+    final isMoreSelected = _selectedIndex == 2 || _selectedIndex > 3;
+
+    int mobileIndexFromSelectedIndex(int selectedIndex) {
+      switch (selectedIndex) {
+        case 0:
+          return 0; // Home
+        case 1:
+          return 1; // Orders
+        case 3:
+          return 2; // Menu
+        default:
+          return 3; // More
+      }
+    }
+
+    int selectedIndexFromMobileIndex(int mobileIndex) {
+      switch (mobileIndex) {
+        case 0:
+          return 0; // Home
+        case 1:
+          return 1; // Orders
+        case 2:
+          return 3; // Menu (NOT tables)
+        default:
+          return _selectedIndex;
+      }
+    }
     return NavigationBar(
-      selectedIndex: isMoreSelected ? 3 : _selectedIndex,
+      selectedIndex: isMoreSelected ? 3 : mobileIndexFromSelectedIndex(_selectedIndex),
       onDestinationSelected: (index) {
         if (index == 3) {
           // Show "More" bottom sheet
           _showMoreOptionsSheet(context, authProvider);
         } else {
           setState(() {
-            _selectedIndex = index;
+            _selectedIndex = selectedIndexFromMobileIndex(index);
           });
         }
       },

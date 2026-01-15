@@ -545,10 +545,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       },
     ];
 
-    // Responsive grid: 2 columns on mobile, 3 on tablet, 4+ on desktop
-    final crossAxisCount = kIsWeb
-        ? (MediaQuery.of(context).size.width > 1200 ? 4 : 3)
-        : 2;
+    final width = MediaQuery.of(context).size.width;
+    // Treat web-on-phone like mobile so tiles don't overlap.
+    final isCompact = width < 700;
+
+    // Responsive grid: compact phones = 3 columns, tablets = 3, desktop = 4
+    final crossAxisCount = isCompact
+        ? 3
+        : (kIsWeb ? (width > 1200 ? 4 : 3) : 2);
     
     return GridView.builder(
       shrinkWrap: true,
@@ -557,7 +561,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         crossAxisCount: crossAxisCount,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: 1.5, // Smaller boxes (wider tiles)
+        // Compact screens need taller tiles so the icon + label never overlap.
+        childAspectRatio: isCompact ? 0.95 : 1.5,
       ),
       itemCount: tiles.length,
       itemBuilder: (context, index) {
@@ -567,6 +572,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           label: tile['label'] as String,
           color: tile['color'] as Color,
           onTap: tile['onTap'] as VoidCallback,
+          isCompact: isCompact,
         );
       },
     );
@@ -577,6 +583,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required String label,
     required Color color,
     required VoidCallback onTap,
+    required bool isCompact,
   }) {
     return MouseRegion(
       cursor: kIsWeb ? SystemMouseCursors.click : MouseCursor.defer,
@@ -595,12 +602,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ],
           ),
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+          padding: EdgeInsets.symmetric(
+            vertical: isCompact ? 10 : 8,
+            horizontal: 6,
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(isCompact ? 10 : 12),
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.1),
                   shape: BoxShape.circle,
@@ -608,7 +618,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Icon(
                   icon,
                   color: color,
-                  size: 48,
+                  size: isCompact ? 34 : 48,
                 ),
               ),
               const SizedBox(height: 6),
