@@ -3,6 +3,11 @@ set -euo pipefail
 
 echo "==> Vercel Flutter build script"
 
+# Ensure git can write a global config in this environment (Vercel can run as root
+# and $HOME may not be writable/persistent).
+export HOME="${HOME:-$PWD}"
+export GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-$HOME/.gitconfig}"
+
 # Install Flutter SDK (stable) if not already present.
 # We install into a local folder so Vercel caching (if enabled) can reuse it.
 FLUTTER_DIR="${FLUTTER_DIR:-.flutter}"
@@ -26,6 +31,7 @@ export PATH="$PWD/${FLUTTER_DIR}/flutter/bin:$PATH"
 # "dubious ownership" protection. Flutter SDK is a git repo internally, so we
 # must mark it as safe or Flutter can't determine its version (shows 0.0.0-unknown).
 git config --global --add safe.directory "$PWD/${FLUTTER_DIR}/flutter" || true
+git config --global --add safe.directory "$PWD/${FLUTTER_DIR}/flutter/.git" || true
 
 flutter --version
 
