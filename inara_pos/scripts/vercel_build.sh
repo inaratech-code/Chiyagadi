@@ -21,6 +21,12 @@ else
 fi
 
 export PATH="$PWD/${FLUTTER_DIR}/flutter/bin:$PATH"
+
+# Vercel sometimes runs builds in a container/user setup that triggers Git's
+# "dubious ownership" protection. Flutter SDK is a git repo internally, so we
+# must mark it as safe or Flutter can't determine its version (shows 0.0.0-unknown).
+git config --global --add safe.directory "$PWD/${FLUTTER_DIR}/flutter" || true
+
 flutter --version
 
 echo "==> Flutter config"
