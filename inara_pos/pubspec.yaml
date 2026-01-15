@@ -20,7 +20,7 @@ dependencies:
   # Database
   sqflite: ^2.3.0
   path: ^1.8.3
-  sqflite_common_ffi: ^2.3.4
+  sqflite_common_ffi: ^2.3.3
 
   # Firebase (Storage removed - not needed for POS, can add later if needed)
   firebase_core: ^2.24.2

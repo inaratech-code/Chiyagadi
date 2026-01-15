@@ -11,7 +11,9 @@ export GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-$HOME/.gitconfig}"
 # Install Flutter SDK (stable) if not already present.
 # We install into a local folder so Vercel caching (if enabled) can reuse it.
 FLUTTER_DIR="${FLUTTER_DIR:-.flutter}"
-FLUTTER_VERSION="${FLUTTER_VERSION:-3.19.6}"  # Dart 3.3.x, compatible with sdk >=3.0.0 <4.0.0
+# Use a Flutter release with Dart >=3.5 (required by some dependencies like sqflite_common_ffi).
+# You can override this in Vercel env vars: FLUTTER_VERSION=...
+FLUTTER_VERSION="${FLUTTER_VERSION:-3.24.0}"
 FLUTTER_ARCHIVE="flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
 FLUTTER_URL="https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/${FLUTTER_ARCHIVE}"
 

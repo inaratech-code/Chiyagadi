@@ -81,7 +81,7 @@ Your app: `https://YOUR_PROJECT_ID.web.app`
 
 ### Vercel (Recommended for your setup)
 
-**Important**: Vercel does not include Flutter by default, so you must either:
+**Important**: Vercel does not include Flutter by default, so this repo uses a build script that downloads Flutter during the build.
 
 - Build web using CI (GitHub Actions) and deploy the built output, or
 - Use a Vercel build environment that has Flutter installed.
@@ -89,7 +89,7 @@ Your app: `https://YOUR_PROJECT_ID.web.app`
 **If your Vercel project root is `inara_pos/`:**
 
 - Root Directory: `inara_pos`
-- Build Command: `bash scripts/vercel_build.sh`
+- Build Command: `bash scripts/vercel_build.sh` (downloads Flutter automatically)
 - Output Directory: `build/web`
 
 **SPA routing fix**: this repo includes `vercel.json` (and `inara_pos/vercel.json`) to rewrite all routes to `index.html`.
