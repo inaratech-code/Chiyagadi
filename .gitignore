@@ -1,0 +1,11 @@
+.gradle/
+**/.dart_tool/
+**/.pub/
+**/.pub-cache/
+**/build/
+**/ios/Pods/
+**/ios/Flutter/.last_build_id
+**/android/.gradle/
+**/android/local.properties
+**/*.log
+**/.DS_Store

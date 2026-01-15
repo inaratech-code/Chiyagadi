@@ -1,0 +1,76 @@
+name: inara_pos
+description: InaraPOS - Single Café Edition. Offline-first POS system for small cafés in Nepal.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # UI
+  cupertino_icons: ^1.0.6
+  flutter_svg: ^1.1.6
+  google_fonts: ^6.2.1
+  intl: ^0.18.1
+  flutter_launcher_icons: ^0.13.1
+
+  # Database
+  sqflite: ^2.3.0
+  path: ^1.8.3
+  sqflite_common_ffi: ^2.3.4
+
+  # Firebase (Storage removed - not needed for POS, can add later if needed)
+  firebase_core: ^2.24.2
+  cloud_firestore: ^4.13.6
+  # firebase_storage: ^11.5.6  # Removed - causes web compatibility issues
+
+  # State Management
+  provider: ^6.1.1
+  shared_preferences: ^2.2.2
+
+  # Network & Connectivity
+  connectivity_plus: ^5.0.2
+  dio: ^5.4.0
+
+  # Printing (commented out - can add later when printer is available)
+  # esc_pos_utils: ^1.1.0
+  # esc_pos_bluetooth: ^0.5.0
+  # network_info_plus: ^4.0.2
+  # Alternative: bluetooth_print: ^4.0.0 or esc_pos_printer: ^1.0.0
+
+  # Utils
+  uuid: ^4.2.1
+  csv: ^6.0.0
+  path_provider: ^2.1.1
+  share_plus: ^7.2.1
+  file_picker: ^6.1.1
+  image_picker: ^1.0.7
+  crypto: ^3.0.3
+
+  # QR Code
+  qr_flutter: ^4.1.0
+  
+  # Charts
+  fl_chart: ^0.66.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/logo.jpeg"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/logo.jpeg"

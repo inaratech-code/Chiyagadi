@@ -1,0 +1,490 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../utils/theme.dart';
+
+class UsersManagementScreen extends StatefulWidget {
+  const UsersManagementScreen({super.key});
+
+  @override
+  State<UsersManagementScreen> createState() => _UsersManagementScreenState();
+}
+
+class _UsersManagementScreenState extends State<UsersManagementScreen> {
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _users = [];
+  String _search = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUsers();
+  }
+
+  Future<void> _loadUsers() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    try {
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final users = await auth.getAllUsers();
+      if (!mounted) return;
+      setState(() => _users = users);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading users: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredUsers {
+    final q = _search.trim().toLowerCase();
+    final list = _users;
+    if (q.isEmpty) return list;
+    return list.where((u) {
+      final username = (u['username'] as String? ?? '').toLowerCase();
+      final role = (u['role'] as String? ?? '').toLowerCase();
+      return username.contains(q) || role.contains(q);
+    }).toList();
+  }
+
+  int _isActive(Map<String, dynamic> u) => (u['is_active'] as num?)?.toInt() ?? 1;
+
+  Future<void> _showAddUserDialog() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final usernameController = TextEditingController();
+    final pinController = TextEditingController();
+    final confirmPinController = TextEditingController();
+    String selectedRole = 'cashier';
+    bool obscurePin = true;
+    bool obscureConfirmPin = true;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Create User'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: usernameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Username',
+                    border: OutlineInputBorder(),
+                  ),
+                  autofocus: true,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: selectedRole,
+                  decoration: const InputDecoration(
+                    labelText: 'Role',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                    DropdownMenuItem(value: 'cashier', child: Text('Cashier')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setDialogState(() => selectedRole = value);
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: pinController,
+                  decoration: InputDecoration(
+                    labelText: 'PIN',
+                    border: const OutlineInputBorder(),
+                    helperText: '4-6 digits',
+                    suffixIcon: IconButton(
+                      icon: Icon(obscurePin ? Icons.visibility : Icons.visibility_off),
+                      onPressed: () => setDialogState(() => obscurePin = !obscurePin),
+                    ),
+                  ),
+                  obscureText: obscurePin,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmPinController,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm PIN',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureConfirmPin ? Icons.visibility : Icons.visibility_off),
+                      onPressed: () => setDialogState(() => obscureConfirmPin = !obscureConfirmPin),
+                    ),
+                  ),
+                  obscureText: obscureConfirmPin,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Create')),
+          ],
+        ),
+      ),
+    );
+
+    if (result != true) return;
+
+    final username = usernameController.text.trim();
+    final pin = pinController.text.trim();
+    final confirm = confirmPinController.text.trim();
+
+    if (username.isEmpty) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Username is required')));
+      return;
+    }
+    if (pin.length < 4 || pin.length > 6) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PIN must be 4-6 digits')));
+      return;
+    }
+    if (pin != confirm) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PINs do not match')));
+      return;
+    }
+
+    final ok = await auth.createUser(username, pin, selectedRole);
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('User "$username" created'), backgroundColor: AppTheme.successColor),
+      );
+      await _loadUsers();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to create user (username may exist)'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _showResetPinDialog(Map<String, dynamic> user) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final userId = user['id'];
+    final username = user['username'] as String? ?? '';
+    final pinController = TextEditingController();
+    final confirmController = TextEditingController();
+    bool obscurePin = true;
+    bool obscureConfirm = true;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Reset PIN: $username'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: pinController,
+                decoration: InputDecoration(
+                  labelText: 'New PIN',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(obscurePin ? Icons.visibility : Icons.visibility_off),
+                    onPressed: () => setDialogState(() => obscurePin = !obscurePin),
+                  ),
+                ),
+                obscureText: obscurePin,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: confirmController,
+                decoration: InputDecoration(
+                  labelText: 'Confirm PIN',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(obscureConfirm ? Icons.visibility : Icons.visibility_off),
+                    onPressed: () => setDialogState(() => obscureConfirm = !obscureConfirm),
+                  ),
+                ),
+                obscureText: obscureConfirm,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Reset')),
+          ],
+        ),
+      ),
+    );
+
+    if (result != true) return;
+    final pin = pinController.text.trim();
+    final confirm = confirmController.text.trim();
+    if (pin.length < 4 || pin.length > 6) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PIN must be 4-6 digits')));
+      return;
+    }
+    if (pin != confirm) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PINs do not match')));
+      return;
+    }
+
+    final ok = await auth.resetUserPin(userId: userId, newPin: pin);
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('PIN reset for "$username"'), backgroundColor: AppTheme.successColor),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to reset PIN'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _showChangeRoleDialog(Map<String, dynamic> user) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final userId = user['id'];
+    final username = user['username'] as String? ?? '';
+    String role = user['role'] as String? ?? 'cashier';
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Change Role: $username'),
+          content: DropdownButtonFormField<String>(
+            value: role,
+            decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Role'),
+            items: const [
+              DropdownMenuItem(value: 'admin', child: Text('Admin')),
+              DropdownMenuItem(value: 'cashier', child: Text('Cashier')),
+            ],
+            onChanged: (v) => setDialogState(() => role = v ?? role),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save')),
+          ],
+        ),
+      ),
+    );
+
+    if (result != true) return;
+    final ok = await auth.updateUserRole(userId: userId, role: role);
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Role updated for "$username"'), backgroundColor: AppTheme.successColor),
+      );
+      await _loadUsers();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to update role'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _toggleActive(Map<String, dynamic> user) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final userId = user['id'];
+    final username = user['username'] as String? ?? '';
+    final isActive = _isActive(user) == 1;
+
+    // Don't allow disabling yourself
+    if (auth.currentUserId != null && auth.currentUserId == userId.toString() && isActive) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You cannot disable your own account'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(isActive ? 'Disable User?' : 'Enable User?'),
+        content: Text(isActive
+            ? 'Disable "$username"? They will not be able to login.'
+            : 'Enable "$username"? They will be able to login again.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: isActive ? AppTheme.warningColor : AppTheme.successColor),
+            child: Text(isActive ? 'Disable' : 'Enable'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+    final ok = await auth.setUserActive(userId: userId, isActive: !isActive);
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isActive ? 'User disabled' : 'User enabled'),
+          backgroundColor: AppTheme.successColor,
+        ),
+      );
+      await _loadUsers();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to update user status'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
+    if (!auth.isAdmin) {
+      return const Scaffold(
+        body: Center(child: Text('Admin access required')),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFFFFEF5),
+      appBar: AppBar(
+        title: const Text('User Management'),
+        actions: [
+          IconButton(
+            onPressed: _loadUsers,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddUserDialog,
+        backgroundColor: AppTheme.logoPrimary,
+        foregroundColor: AppTheme.logoAccent,
+        icon: const Icon(Icons.person_add),
+        label: const Text('Add User'),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: TextField(
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search),
+                      labelText: 'Search users',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (v) => setState(() => _search = v),
+                  ),
+                ),
+                Expanded(
+                  child: _filteredUsers.isEmpty
+                      ? const Center(child: Text('No users found'))
+                      : ListView.builder(
+                          itemCount: _filteredUsers.length,
+                          itemBuilder: (context, index) {
+                            final u = _filteredUsers[index];
+                            final username = u['username'] as String? ?? 'Unknown';
+                            final role = u['role'] as String? ?? 'cashier';
+                            final active = _isActive(u) == 1;
+                            final isMe = auth.currentUserId != null && auth.currentUserId == u['id'].toString();
+
+                            final roleColor = role == 'admin' ? AppTheme.logoPrimary : const Color(0xFF6C5CE7);
+                            final statusColor = active ? AppTheme.successColor : AppTheme.warningColor;
+
+                            return Card(
+                              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                              color: Colors.white,
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: roleColor.withOpacity(0.15),
+                                  child: Icon(
+                                    role == 'admin' ? Icons.admin_panel_settings : Icons.point_of_sale,
+                                    color: roleColor,
+                                  ),
+                                ),
+                                title: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        username,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontWeight: FontWeight.w700),
+                                      ),
+                                    ),
+                                    if (isMe)
+                                      Container(
+                                        margin: const EdgeInsets.only(left: 8),
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.logoLight.withOpacity(0.25),
+                                          borderRadius: BorderRadius.circular(999),
+                                        ),
+                                        child: const Text('You', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                      ),
+                                  ],
+                                ),
+                                subtitle: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: roleColor.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                      child: Text(
+                                        role.toUpperCase(),
+                                        style: TextStyle(color: roleColor, fontWeight: FontWeight.w700, fontSize: 12),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: statusColor.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                      child: Text(
+                                        active ? 'ACTIVE' : 'DISABLED',
+                                        style: TextStyle(color: statusColor, fontWeight: FontWeight.w700, fontSize: 12),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                trailing: PopupMenuButton<String>(
+                                  onSelected: (value) async {
+                                    if (value == 'pin') await _showResetPinDialog(u);
+                                    if (value == 'role') await _showChangeRoleDialog(u);
+                                    if (value == 'active') await _toggleActive(u);
+                                  },
+                                  itemBuilder: (context) => [
+                                    const PopupMenuItem(value: 'pin', child: Text('Reset PIN')),
+                                    const PopupMenuItem(value: 'role', child: Text('Change Role')),
+                                    PopupMenuItem(value: 'active', child: Text(active ? 'Disable User' : 'Enable User')),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
