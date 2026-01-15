@@ -107,9 +107,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     
-    // For mobile: Use drawer + bottom nav with only 4 main items
-    // For web: Use full bottom navigation bar
-    final isMobile = !kIsWeb;
+    // For small screens (including web on phones/PWA), use the compact mobile navigation
+    // so we don't render an over-crowded web bottom bar.
+    final isCompact = !kIsWeb || MediaQuery.of(context).size.width < 700;
     // (cleanup) mainNavItems was unused; selection logic uses _selectedIndex directly.
     
     return Scaffold(
@@ -127,14 +127,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      drawer: isMobile ? _buildDrawer(context, authProvider) : null,
+      drawer: isCompact ? _buildDrawer(context, authProvider) : null,
       body: kIsWeb
           ? ResponsiveWrapper(
               child: _screens[_selectedIndex],
               padding: EdgeInsets.zero, // Screens handle their own padding
             )
           : _screens[_selectedIndex],
-      bottomNavigationBar: isMobile
+      bottomNavigationBar: isCompact
           ? _buildMobileBottomNav(authProvider)
           : _buildWebBottomNav(authProvider),
     );
