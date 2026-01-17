@@ -7,9 +7,9 @@ import '../models/purchase_item_model.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 /// Purchase Service
-/// 
+///
 /// Handles purchase creation with automatic inventory ledger updates
-/// 
+///
 /// IMPORTANT RULES:
 /// - Purchases CANNOT be deleted (data integrity)
 /// - For corrections, use reverse inventory ledger entries
@@ -23,17 +23,21 @@ class PurchaseService {
     required BuildContext context,
   }) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       final now = DateTime.now();
       // Format: yymmdd (2-digit year, 2-digit month, 2-digit day) - same as orders
       final year = now.year % 100; // Get last 2 digits of year
-      final dateStr = '${year.toString().padLeft(2, '0')}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-      
+      final dateStr =
+          '${year.toString().padLeft(2, '0')}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+
       // Get start and end of today
-      final startOfDay = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
-      final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59).millisecondsSinceEpoch;
+      final startOfDay =
+          DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
+      final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59)
+          .millisecondsSinceEpoch;
 
       // Find all purchases created today with the PUR prefix
       final todayPurchases = await dbProvider.query(
@@ -41,12 +45,12 @@ class PurchaseService {
         where: 'created_at >= ? AND created_at <= ? AND purchase_number LIKE ?',
         whereArgs: [startOfDay, endOfDay, 'PUR $dateStr/%'],
       );
-      
+
       // Extract sequential numbers from today's purchases
       // FIXED: Start from 0 so first purchase is 001 (not 000)
       int maxSequence = 0;
       final pattern = RegExp(r'PUR \d{6}/(\d+)');
-      
+
       for (final purchase in todayPurchases) {
         final purchaseNumber = purchase['purchase_number'] as String;
         final match = pattern.firstMatch(purchaseNumber);
@@ -57,30 +61,31 @@ class PurchaseService {
           }
         }
       }
-      
+
       // Increment sequence number (start from 001)
       final nextSequence = maxSequence + 1;
       final sequenceStr = nextSequence.toString().padLeft(3, '0');
-      
+
       return 'PUR $dateStr/$sequenceStr';
     } catch (e) {
       debugPrint('Error generating purchase number: $e');
       // Fallback to timestamp-based number (start from 001)
       final now = DateTime.now();
       final year = now.year % 100;
-      final dateStr = '${year.toString().padLeft(2, '0')}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+      final dateStr =
+          '${year.toString().padLeft(2, '0')}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
       return 'PUR $dateStr/001';
     }
   }
 
   /// Create a new purchase with items
-  /// 
+  ///
   /// This method:
   /// 1. Creates the purchase record
   /// 2. Creates purchase items
   /// 3. Creates inventory ledger entries for each item
   /// 4. Updates product costs (average cost method)
-  /// 
+  ///
   /// All operations are done in a transaction for data integrity
   Future<dynamic> createPurchase({
     required BuildContext context,
@@ -93,7 +98,8 @@ class PurchaseService {
     String? notes,
   }) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await dbProvider.init();
 
@@ -103,7 +109,8 @@ class PurchaseService {
       }
 
       // Calculate total
-      double totalAmount = items.fold(0.0, (sum, item) => sum + item.totalPrice);
+      double totalAmount =
+          items.fold(0.0, (sum, item) => sum + item.totalPrice);
       totalAmount -= (discountAmount ?? 0.0);
       totalAmount += (taxAmount ?? 0.0);
 
@@ -113,7 +120,9 @@ class PurchaseService {
       final now = DateTime.now().millisecondsSinceEpoch;
       // FIXED: Handle both int (SQLite) and String (Firestore) user IDs
       final createdBy = authProvider.currentUserId != null
-          ? (kIsWeb ? authProvider.currentUserId! : int.tryParse(authProvider.currentUserId!))
+          ? (kIsWeb
+              ? authProvider.currentUserId!
+              : int.tryParse(authProvider.currentUserId!))
           : null;
 
       // Use transaction to ensure all operations succeed or fail together
@@ -170,20 +179,22 @@ class PurchaseService {
           // Update product cost (average cost method) - only for SQLite
           // For Firestore, we'll update cost after transaction
           if (!kIsWeb) {
-            await _updateProductCost(txn, item.productId, item.unitPrice, item.quantity);
+            await _updateProductCost(
+                txn, item.productId, item.unitPrice, item.quantity);
           }
         }
 
         return purchaseId;
       });
-      
+
       // For Firestore, update product costs after transaction
       if (kIsWeb) {
         for (final item in items) {
-          await _updateProductCostAfterTransaction(dbProvider, item.productId, item.unitPrice, item.quantity);
+          await _updateProductCostAfterTransaction(
+              dbProvider, item.productId, item.unitPrice, item.quantity);
         }
       }
-      
+
       return purchaseId;
     } catch (e) {
       debugPrint('Error creating purchase: $e');
@@ -192,9 +203,9 @@ class PurchaseService {
   }
 
   /// Update product cost using average cost method
-  /// 
+  ///
   /// New Average Cost = (Old Cost * Old Quantity + New Cost * New Quantity) / (Old Quantity + New Quantity)
-  /// 
+  ///
   /// Note: For Firestore transactions, we need to get the product before the transaction
   /// and calculate stock from the database provider directly
   Future<void> _updateProductCost(
@@ -336,7 +347,8 @@ class PurchaseService {
     required dynamic purchaseId,
   }) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       final purchases = await dbProvider.query(
@@ -360,7 +372,8 @@ class PurchaseService {
     required dynamic purchaseId,
   }) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       final items = await dbProvider.query(
@@ -382,7 +395,8 @@ class PurchaseService {
     int? limit,
   }) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       final purchases = await dbProvider.query(

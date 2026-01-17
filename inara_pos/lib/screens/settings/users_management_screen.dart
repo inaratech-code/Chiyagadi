@@ -51,7 +51,8 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
     }).toList();
   }
 
-  int _isActive(Map<String, dynamic> u) => (u['is_active'] as num?)?.toInt() ?? 1;
+  int _isActive(Map<String, dynamic> u) =>
+      (u['is_active'] as num?)?.toInt() ?? 1;
 
   Future<void> _showAddUserDialog() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
@@ -104,8 +105,10 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                     border: const OutlineInputBorder(),
                     helperText: '4-6 digits',
                     suffixIcon: IconButton(
-                      icon: Icon(obscurePin ? Icons.visibility : Icons.visibility_off),
-                      onPressed: () => setDialogState(() => obscurePin = !obscurePin),
+                      icon: Icon(
+                          obscurePin ? Icons.visibility : Icons.visibility_off),
+                      onPressed: () =>
+                          setDialogState(() => obscurePin = !obscurePin),
                     ),
                   ),
                   obscureText: obscurePin,
@@ -119,8 +122,11 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                     labelText: 'Confirm PIN',
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
-                      icon: Icon(obscureConfirmPin ? Icons.visibility : Icons.visibility_off),
-                      onPressed: () => setDialogState(() => obscureConfirmPin = !obscureConfirmPin),
+                      icon: Icon(obscureConfirmPin
+                          ? Icons.visibility
+                          : Icons.visibility_off),
+                      onPressed: () => setDialogState(
+                          () => obscureConfirmPin = !obscureConfirmPin),
                     ),
                   ),
                   obscureText: obscureConfirmPin,
@@ -131,8 +137,12 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-            ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Create')),
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel')),
+            ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Create')),
           ],
         ),
       ),
@@ -145,15 +155,24 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
     final confirm = confirmPinController.text.trim();
 
     if (username.isEmpty) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Username is required')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Username is required')));
+      }
       return;
     }
     if (pin.length < 4 || pin.length > 6) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PIN must be 4-6 digits')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('PIN must be 4-6 digits')));
+      }
       return;
     }
     if (pin != confirm) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PINs do not match')));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('PINs do not match')));
+      }
       return;
     }
 
@@ -161,12 +180,16 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
     if (!mounted) return;
     if (ok) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('User "$username" created'), backgroundColor: AppTheme.successColor),
+        SnackBar(
+            content: Text('User "$username" created'),
+            backgroundColor: AppTheme.successColor),
       );
       await _loadUsers();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to create user (username may exist)'), backgroundColor: Colors.red),
+        const SnackBar(
+            content: Text('Failed to create user (username may exist)'),
+            backgroundColor: Colors.red),
       );
     }
   }
@@ -194,8 +217,10 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                   labelText: 'New PIN',
                   border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
-                    icon: Icon(obscurePin ? Icons.visibility : Icons.visibility_off),
-                    onPressed: () => setDialogState(() => obscurePin = !obscurePin),
+                    icon: Icon(
+                        obscurePin ? Icons.visibility : Icons.visibility_off),
+                    onPressed: () =>
+                        setDialogState(() => obscurePin = !obscurePin),
                   ),
                 ),
                 obscureText: obscurePin,
@@ -209,8 +234,11 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                   labelText: 'Confirm PIN',
                   border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
-                    icon: Icon(obscureConfirm ? Icons.visibility : Icons.visibility_off),
-                    onPressed: () => setDialogState(() => obscureConfirm = !obscureConfirm),
+                    icon: Icon(obscureConfirm
+                        ? Icons.visibility
+                        : Icons.visibility_off),
+                    onPressed: () =>
+                        setDialogState(() => obscureConfirm = !obscureConfirm),
                   ),
                 ),
                 obscureText: obscureConfirm,
@@ -220,8 +248,12 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-            ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Reset')),
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel')),
+            ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Reset')),
           ],
         ),
       ),
@@ -231,11 +263,17 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
     final pin = pinController.text.trim();
     final confirm = confirmController.text.trim();
     if (pin.length < 4 || pin.length > 6) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PIN must be 4-6 digits')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('PIN must be 4-6 digits')));
+      }
       return;
     }
     if (pin != confirm) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PINs do not match')));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('PINs do not match')));
+      }
       return;
     }
 
@@ -243,11 +281,14 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
     if (!mounted) return;
     if (ok) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('PIN reset for "$username"'), backgroundColor: AppTheme.successColor),
+        SnackBar(
+            content: Text('PIN reset for "$username"'),
+            backgroundColor: AppTheme.successColor),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to reset PIN'), backgroundColor: Colors.red),
+        const SnackBar(
+            content: Text('Failed to reset PIN'), backgroundColor: Colors.red),
       );
     }
   }
@@ -265,7 +306,8 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
           title: Text('Change Role: $username'),
           content: DropdownButtonFormField<String>(
             value: role,
-            decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Role'),
+            decoration: const InputDecoration(
+                border: OutlineInputBorder(), labelText: 'Role'),
             items: const [
               DropdownMenuItem(value: 'admin', child: Text('Admin')),
               DropdownMenuItem(value: 'cashier', child: Text('Cashier')),
@@ -273,8 +315,12 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
             onChanged: (v) => setDialogState(() => role = v ?? role),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-            ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save')),
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel')),
+            ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Save')),
           ],
         ),
       ),
@@ -285,12 +331,16 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
     if (!mounted) return;
     if (ok) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Role updated for "$username"'), backgroundColor: AppTheme.successColor),
+        SnackBar(
+            content: Text('Role updated for "$username"'),
+            backgroundColor: AppTheme.successColor),
       );
       await _loadUsers();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update role'), backgroundColor: Colors.red),
+        const SnackBar(
+            content: Text('Failed to update role'),
+            backgroundColor: Colors.red),
       );
     }
   }
@@ -302,10 +352,14 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
     final isActive = _isActive(user) == 1;
 
     // Don't allow disabling yourself
-    if (auth.currentUserId != null && auth.currentUserId == userId.toString() && isActive) {
+    if (auth.currentUserId != null &&
+        auth.currentUserId == userId.toString() &&
+        isActive) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('You cannot disable your own account'), backgroundColor: Colors.red),
+          const SnackBar(
+              content: Text('You cannot disable your own account'),
+              backgroundColor: Colors.red),
         );
       }
       return;
@@ -319,10 +373,14 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
             ? 'Disable "$username"? They will not be able to login.'
             : 'Enable "$username"? They will be able to login again.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: isActive ? AppTheme.warningColor : AppTheme.successColor),
+            style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    isActive ? AppTheme.warningColor : AppTheme.successColor),
             child: Text(isActive ? 'Disable' : 'Enable'),
           ),
         ],
@@ -342,7 +400,9 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
       await _loadUsers();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update user status'), backgroundColor: Colors.red),
+        const SnackBar(
+            content: Text('Failed to update user status'),
+            backgroundColor: Colors.red),
       );
     }
   }
@@ -397,22 +457,31 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                           itemCount: _filteredUsers.length,
                           itemBuilder: (context, index) {
                             final u = _filteredUsers[index];
-                            final username = u['username'] as String? ?? 'Unknown';
+                            final username =
+                                u['username'] as String? ?? 'Unknown';
                             final role = u['role'] as String? ?? 'cashier';
                             final active = _isActive(u) == 1;
-                            final isMe = auth.currentUserId != null && auth.currentUserId == u['id'].toString();
+                            final isMe = auth.currentUserId != null &&
+                                auth.currentUserId == u['id'].toString();
 
-                            final roleColor = role == 'admin' ? AppTheme.logoPrimary : const Color(0xFF6C5CE7);
-                            final statusColor = active ? AppTheme.successColor : AppTheme.warningColor;
+                            final roleColor = role == 'admin'
+                                ? AppTheme.logoPrimary
+                                : const Color(0xFF6C5CE7);
+                            final statusColor = active
+                                ? AppTheme.successColor
+                                : AppTheme.warningColor;
 
                             return Card(
-                              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                              margin: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 6),
                               color: Colors.white,
                               child: ListTile(
                                 leading: CircleAvatar(
                                   backgroundColor: roleColor.withOpacity(0.15),
                                   child: Icon(
-                                    role == 'admin' ? Icons.admin_panel_settings : Icons.point_of_sale,
+                                    role == 'admin'
+                                        ? Icons.admin_panel_settings
+                                        : Icons.point_of_sale,
                                     color: roleColor,
                                   ),
                                 ),
@@ -423,58 +492,88 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                                         username,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontWeight: FontWeight.w700),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w700),
                                       ),
                                     ),
                                     if (isMe)
                                       Container(
                                         margin: const EdgeInsets.only(left: 8),
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: AppTheme.logoLight.withOpacity(0.25),
-                                          borderRadius: BorderRadius.circular(999),
+                                          color: AppTheme.logoLight
+                                              .withOpacity(0.25),
+                                          borderRadius:
+                                              BorderRadius.circular(999),
                                         ),
-                                        child: const Text('You', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                        child: const Text('You',
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600)),
                                       ),
                                   ],
                                 ),
                                 subtitle: Row(
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
                                         color: roleColor.withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(999),
+                                        borderRadius:
+                                            BorderRadius.circular(999),
                                       ),
                                       child: Text(
                                         role.toUpperCase(),
-                                        style: TextStyle(color: roleColor, fontWeight: FontWeight.w700, fontSize: 12),
+                                        style: TextStyle(
+                                            color: roleColor,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 12),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
                                         color: statusColor.withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(999),
+                                        borderRadius:
+                                            BorderRadius.circular(999),
                                       ),
                                       child: Text(
                                         active ? 'ACTIVE' : 'DISABLED',
-                                        style: TextStyle(color: statusColor, fontWeight: FontWeight.w700, fontSize: 12),
+                                        style: TextStyle(
+                                            color: statusColor,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 12),
                                       ),
                                     ),
                                   ],
                                 ),
                                 trailing: PopupMenuButton<String>(
                                   onSelected: (value) async {
-                                    if (value == 'pin') await _showResetPinDialog(u);
-                                    if (value == 'role') await _showChangeRoleDialog(u);
-                                    if (value == 'active') await _toggleActive(u);
+                                    if (value == 'pin') {
+                                      await _showResetPinDialog(u);
+                                    }
+                                    if (value == 'role') {
+                                      await _showChangeRoleDialog(u);
+                                    }
+                                    if (value == 'active') {
+                                      await _toggleActive(u);
+                                    }
                                   },
                                   itemBuilder: (context) => [
-                                    const PopupMenuItem(value: 'pin', child: Text('Reset PIN')),
-                                    const PopupMenuItem(value: 'role', child: Text('Change Role')),
-                                    PopupMenuItem(value: 'active', child: Text(active ? 'Disable User' : 'Enable User')),
+                                    const PopupMenuItem(
+                                        value: 'pin', child: Text('Reset PIN')),
+                                    const PopupMenuItem(
+                                        value: 'role',
+                                        child: Text('Change Role')),
+                                    PopupMenuItem(
+                                        value: 'active',
+                                        child: Text(active
+                                            ? 'Disable User'
+                                            : 'Enable User')),
                                   ],
                                 ),
                               ),
@@ -487,4 +586,3 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
     );
   }
 }
-

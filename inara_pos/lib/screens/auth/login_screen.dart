@@ -11,7 +11,8 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _pinController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
   bool _isLoading = false;
@@ -30,14 +31,14 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     );
-    
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
       ),
     );
-    
+
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.3),
       end: Offset.zero,
@@ -47,14 +48,14 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         curve: const Interval(0.2, 0.8, curve: Curves.easeOutCubic),
       ),
     );
-    
+
     _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: const Interval(0.0, 0.6, curve: Curves.elasticOut),
       ),
     );
-    
+
     _animationController.forward();
     _checkFirstTime();
   }
@@ -63,9 +64,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     // Set context for AuthProvider to access UnifiedDatabaseProvider
     authProvider.setContext(context);
-    
+
     final hasPin = await authProvider.checkPinExists();
-    
+
     setState(() {
       _isFirstTime = !hasPin;
       if (_isFirstTime) {
@@ -89,17 +90,18 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
     try {
       // Get providers
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
+
       // Ensure context is set for database access
       authProvider.setContext(context);
-      
+
       // Ensure database is initialized first with retry logic
       bool dbInitialized = false;
       int retryCount = 0;
       const maxRetries = 3;
-      
+
       while (!dbInitialized && retryCount < maxRetries) {
         try {
           await dbProvider.init();
@@ -120,7 +122,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             retryCount++;
           }
         } catch (initError) {
-          debugPrint('Database initialization attempt ${retryCount + 1} failed: $initError');
+          debugPrint(
+              'Database initialization attempt ${retryCount + 1} failed: $initError');
           // Store the last error for display
           final lastError = initError.toString();
           if (retryCount < maxRetries - 1) {
@@ -133,30 +136,39 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           } else {
             // Last attempt failed - show detailed error
             setState(() {
-              String errorDetails = 'Database initialization failed after $maxRetries attempts.\n\n';
-              
+              String errorDetails =
+                  'Database initialization failed after $maxRetries attempts.\n\n';
+
               // Provide helpful error messages based on error type
-              if (lastError.contains('permission') || lastError.contains('PERMISSION_DENIED')) {
-                errorDetails += 'Error: Firestore security rules are blocking access.\n\n';
+              if (lastError.contains('permission') ||
+                  lastError.contains('PERMISSION_DENIED')) {
+                errorDetails +=
+                    'Error: Firestore security rules are blocking access.\n\n';
                 errorDetails += 'Solution:\n';
-                errorDetails += '1. Go to Firebase Console → Firestore Database → Rules\n';
-                errorDetails += '2. Set rules to: allow read, write: if true;\n';
+                errorDetails +=
+                    '1. Go to Firebase Console → Firestore Database → Rules\n';
+                errorDetails +=
+                    '2. Set rules to: allow read, write: if true;\n';
                 errorDetails += '3. Click "Publish" (not just Save)';
-              } else if (lastError.contains('not enabled') || lastError.contains('database')) {
+              } else if (lastError.contains('not enabled') ||
+                  lastError.contains('database')) {
                 errorDetails += 'Error: Firestore Database is not enabled.\n\n';
                 errorDetails += 'Solution:\n';
-                errorDetails += '1. Go to Firebase Console → Firestore Database\n';
+                errorDetails +=
+                    '1. Go to Firebase Console → Firestore Database\n';
                 errorDetails += '2. Click "Create database"\n';
                 errorDetails += '3. Choose "Start in test mode"\n';
                 errorDetails += '4. Select location and click "Enable"';
               } else {
                 errorDetails += 'Error: $lastError\n\n';
                 errorDetails += 'Please check:\n';
-                errorDetails += '1. Browser console (F12) for detailed errors\n';
-                errorDetails += '2. Firestore Database is enabled in Firebase Console\n';
+                errorDetails +=
+                    '1. Browser console (F12) for detailed errors\n';
+                errorDetails +=
+                    '2. Firestore Database is enabled in Firebase Console\n';
                 errorDetails += '3. Security rules are published';
               }
-              
+
               _errorMessage = errorDetails;
               _isLoading = false;
             });
@@ -165,18 +177,19 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           retryCount++;
         }
       }
-      
+
       if (!dbInitialized) {
         // This shouldn't happen as we return above, but just in case
         setState(() {
-          _errorMessage = 'Database initialization failed after $maxRetries attempts. Please check browser console (F12) for details.';
+          _errorMessage =
+              'Database initialization failed after $maxRetries attempts. Please check browser console (F12) for details.';
           _isLoading = false;
         });
         return;
       }
-      
-      final username = _usernameController.text.trim().isEmpty 
-          ? 'admin' 
+
+      final username = _usernameController.text.trim().isEmpty
+          ? 'admin'
           : _usernameController.text.trim();
 
       if (_isFirstTime) {
@@ -185,24 +198,28 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           final success = await authProvider.setupAdminPin(_pinController.text);
           if (success) {
             // Login after setup
-            final loginSuccess = await authProvider.login('admin', _pinController.text);
+            final loginSuccess =
+                await authProvider.login('admin', _pinController.text);
             if (loginSuccess && mounted) {
               Navigator.of(context).pushReplacementNamed('/home');
             } else {
               setState(() {
-                _errorMessage = 'Setup succeeded but login failed. Please try logging in.';
+                _errorMessage =
+                    'Setup succeeded but login failed. Please try logging in.';
                 _isLoading = false;
               });
             }
           } else {
             setState(() {
-              _errorMessage = 'Setup failed. The database may be corrupted. Try resetting the database using the button below.';
+              _errorMessage =
+                  'Setup failed. The database may be corrupted. Try resetting the database using the button below.';
               _isLoading = false;
             });
           }
         } catch (e) {
           setState(() {
-            _errorMessage = 'Setup error: ${e.toString()}. Try resetting the database.';
+            _errorMessage =
+                'Setup error: ${e.toString()}. Try resetting the database.';
             _isLoading = false;
           });
         }
@@ -235,8 +252,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              const Color(0xFFFFEB3B).withOpacity(0.3), // Light yellow (from logo)
-              const Color(0xFFFFC107).withOpacity(0.4), // Golden yellow (from logo)
+              const Color(0xFFFFEB3B)
+                  .withOpacity(0.3), // Light yellow (from logo)
+              const Color(0xFFFFC107)
+                  .withOpacity(0.4), // Golden yellow (from logo)
               const Color(0xFFFFB300).withOpacity(0.3), // Deeper golden
             ],
             stops: const [0.0, 0.5, 1.0],
@@ -290,13 +309,16 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                         shape: BoxShape.circle,
                                         gradient: RadialGradient(
                                           colors: [
-                                            const Color(0xFFFFEB3B), // Light yellow center (from logo)
-                                            const Color(0xFFFFC107), // Golden yellow edges (from logo)
+                                            const Color(
+                                                0xFFFFEB3B), // Light yellow center (from logo)
+                                            const Color(
+                                                0xFFFFC107), // Golden yellow edges (from logo)
                                           ],
                                         ),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: const Color(0xFFFFC107).withOpacity(0.4),
+                                            color: const Color(0xFFFFC107)
+                                                .withOpacity(0.4),
                                             blurRadius: 20,
                                             offset: const Offset(0, 8),
                                             spreadRadius: 2,
@@ -307,10 +329,12 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                         child: Image.asset(
                                           'assets/images/logo.jpeg',
                                           fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) {
+                                          errorBuilder:
+                                              (context, error, stackTrace) {
                                             return const Icon(
                                               Icons.local_cafe,
-                                              color: Color(0xFF8B4513), // Brown (from logo)
+                                              color: Color(
+                                                  0xFF8B4513), // Brown (from logo)
                                               size: 50,
                                             );
                                           },
@@ -333,12 +357,15 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                       offset: Offset(0, 10 * (1 - value)),
                                       child: Text(
                                         'चिया गढी',
-                                        style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                          color: const Color(0xFF8B4513),
-                                          fontSize: 32,
-                                          letterSpacing: 1.0,
-                                        ),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .headlineLarge
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                              color: const Color(0xFF8B4513),
+                                              fontSize: 32,
+                                              letterSpacing: 1.0,
+                                            ),
                                       ),
                                     ),
                                   );
@@ -349,7 +376,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               TweenAnimationBuilder<double>(
                                 tween: Tween(begin: 0.0, end: 1.0),
                                 duration: const Duration(milliseconds: 800),
-                                curve: const Interval(0.25, 1.0, curve: Curves.easeOut),
+                                curve: const Interval(0.25, 1.0,
+                                    curve: Curves.easeOut),
                                 builder: (context, value, child) {
                                   return Opacity(
                                     opacity: value,
@@ -357,12 +385,15 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                       offset: Offset(0, 10 * (1 - value)),
                                       child: Text(
                                         'Chiya Gadhi',
-                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                          color: Colors.grey[600],
-                                          fontSize: 18,
-                                          letterSpacing: 1.5,
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              color: Colors.grey[600],
+                                              fontSize: 18,
+                                              letterSpacing: 1.5,
+                                              fontWeight: FontWeight.w500,
+                                            ),
                                       ),
                                     ),
                                   );
@@ -386,20 +417,24 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               TweenAnimationBuilder<double>(
                                 tween: Tween(begin: 0.0, end: 1.0),
                                 duration: const Duration(milliseconds: 1000),
-                                curve: const Interval(0.4, 1.0, curve: Curves.easeOut),
+                                curve: const Interval(0.4, 1.0,
+                                    curve: Curves.easeOut),
                                 builder: (context, value, child) {
                                   return Opacity(
                                     opacity: value,
                                     child: Transform.translate(
                                       offset: Offset(0, 10 * (1 - value)),
                                       child: Text(
-                                        _isFirstTime 
-                                            ? 'Setup Admin PIN' 
+                                        _isFirstTime
+                                            ? 'Setup Admin PIN'
                                             : 'Welcome Back',
-                                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                          color: Colors.grey[700],
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleLarge
+                                            ?.copyWith(
+                                              color: Colors.grey[700],
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                       ),
                                     ),
                                   );
@@ -410,9 +445,12 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                   padding: const EdgeInsets.only(top: 8.0),
                                   child: Text(
                                     'Enter a 4-6 digit PIN to get started',
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Colors.grey[500],
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: Colors.grey[500],
+                                        ),
                                     textAlign: TextAlign.center,
                                   ),
                                 ),
@@ -423,7 +461,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                 TweenAnimationBuilder<double>(
                                   tween: Tween(begin: 0.0, end: 1.0),
                                   duration: const Duration(milliseconds: 1100),
-                                  curve: const Interval(0.55, 1.0, curve: Curves.easeOut),
+                                  curve: const Interval(0.55, 1.0,
+                                      curve: Curves.easeOut),
                                   builder: (context, value, child) {
                                     return Opacity(
                                       opacity: value,
@@ -433,22 +472,34 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                           controller: _usernameController,
                                           decoration: InputDecoration(
                                             labelText: 'Username',
-                                            prefixIcon: const Icon(Icons.person_outline, color: Color(0xFFFFC107)),
+                                            prefixIcon: const Icon(
+                                                Icons.person_outline,
+                                                color: Color(0xFFFFC107)),
                                             border: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(12),
-                                              borderSide: BorderSide(color: Colors.grey[300]!),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              borderSide: BorderSide(
+                                                  color: Colors.grey[300]!),
                                             ),
                                             enabledBorder: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(12),
-                                              borderSide: BorderSide(color: Colors.grey[300]!),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              borderSide: BorderSide(
+                                                  color: Colors.grey[300]!),
                                             ),
                                             focusedBorder: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(12),
-                                              borderSide: const BorderSide(color: Color(0xFFFFC107), width: 2),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              borderSide: const BorderSide(
+                                                  color: Color(0xFFFFC107),
+                                                  width: 2),
                                             ),
                                             filled: true,
                                             fillColor: Colors.grey[50],
-                                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                    horizontal: 16,
+                                                    vertical: 16),
                                           ),
                                         ),
                                       ),
@@ -462,7 +513,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               TweenAnimationBuilder<double>(
                                 tween: Tween(begin: 0.0, end: 1.0),
                                 duration: const Duration(milliseconds: 1200),
-                                curve: Interval(_isFirstTime ? 0.5 : 0.67, 1.0, curve: Curves.easeOut),
+                                curve: Interval(_isFirstTime ? 0.5 : 0.67, 1.0,
+                                    curve: Curves.easeOut),
                                 builder: (context, value, child) {
                                   return Opacity(
                                     opacity: value,
@@ -475,10 +527,15 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                         maxLength: 6,
                                         decoration: InputDecoration(
                                           labelText: 'PIN (4-6 digits)',
-                                          prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFFFFC107)),
+                                          prefixIcon: const Icon(
+                                              Icons.lock_outline,
+                                              color: Color(0xFFFFC107)),
                                           suffixIcon: IconButton(
                                             icon: Icon(
-                                              _obscurePin ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                              _obscurePin
+                                                  ? Icons.visibility_outlined
+                                                  : Icons
+                                                      .visibility_off_outlined,
                                               color: Colors.grey[600],
                                             ),
                                             onPressed: () {
@@ -488,20 +545,29 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                             },
                                           ),
                                           border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                            borderSide: BorderSide(color: Colors.grey[300]!),
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            borderSide: BorderSide(
+                                                color: Colors.grey[300]!),
                                           ),
                                           enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                            borderSide: BorderSide(color: Colors.grey[300]!),
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            borderSide: BorderSide(
+                                                color: Colors.grey[300]!),
                                           ),
                                           focusedBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                            borderSide: const BorderSide(color: Color(0xFFFFC107), width: 2),
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            borderSide: const BorderSide(
+                                                color: Color(0xFFFFC107),
+                                                width: 2),
                                           ),
                                           filled: true,
                                           fillColor: Colors.grey[50],
-                                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                  horizontal: 16, vertical: 16),
                                         ),
                                       ),
                                     ),
@@ -523,11 +589,14 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                         scale: 0.8 + (0.2 * value),
                                         child: Container(
                                           padding: const EdgeInsets.all(12),
-                                          margin: const EdgeInsets.only(bottom: 16),
+                                          margin:
+                                              const EdgeInsets.only(bottom: 16),
                                           decoration: BoxDecoration(
                                             color: Colors.red[50],
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: Colors.red[200]!),
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            border: Border.all(
+                                                color: Colors.red[200]!),
                                           ),
                                           child: Column(
                                             mainAxisSize: MainAxisSize.min,
@@ -535,7 +604,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                               Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
-                                                  Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                                                  Icon(Icons.error_outline,
+                                                      color: Colors.red[700],
+                                                      size: 20),
                                                   const SizedBox(width: 8),
                                                   Flexible(
                                                     child: Text(
@@ -543,92 +614,149 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                                       style: TextStyle(
                                                         color: Colors.red[900],
                                                         fontSize: 13,
-                                                        fontWeight: FontWeight.w500,
+                                                        fontWeight:
+                                                            FontWeight.w500,
                                                       ),
-                                                      textAlign: TextAlign.center,
+                                                      textAlign:
+                                                          TextAlign.center,
                                                     ),
                                                   ),
                                                 ],
                                               ),
                                               // Add "Create Admin" button if login fails and no admin exists
-                                              if (_errorMessage!.contains('Invalid username or PIN') && !_isFirstTime)
+                                              if (_errorMessage!.contains(
+                                                      'Invalid username or PIN') &&
+                                                  !_isFirstTime)
                                                 Padding(
-                                                  padding: const EdgeInsets.only(top: 8),
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                          top: 8),
                                                   child: TextButton(
-                                                    onPressed: _isLoading ? null : () async {
-                                                      setState(() {
-                                                        _isFirstTime = true;
-                                                        _errorMessage = 'Please enter a new PIN to create admin account';
-                                                        _pinController.clear();
-                                                        _usernameController.text = 'admin';
-                                                      });
-                                                    },
-                                                    child: const Text('Create New Admin Account'),
+                                                    onPressed: _isLoading
+                                                        ? null
+                                                        : () async {
+                                                            setState(() {
+                                                              _isFirstTime =
+                                                                  true;
+                                                              _errorMessage =
+                                                                  'Please enter a new PIN to create admin account';
+                                                              _pinController
+                                                                  .clear();
+                                                              _usernameController
+                                                                      .text =
+                                                                  'admin';
+                                                            });
+                                                          },
+                                                    child: const Text(
+                                                        'Create New Admin Account'),
                                                   ),
                                                 ),
                                               // Show reset button for setup failures or database errors
                                               if (_errorMessage!.contains('Setup failed') ||
-                                                  _errorMessage!.contains('Setup error') ||
-                                                  _errorMessage!.contains('DatabaseException') || 
-                                                  _errorMessage!.contains('no such table') ||
-                                                  _errorMessage!.contains('Reset failed') ||
-                                                  (_errorMessage!.contains('Invalid username or PIN') && !_isFirstTime))
+                                                  _errorMessage!.contains(
+                                                      'Setup error') ||
+                                                  _errorMessage!.contains(
+                                                      'DatabaseException') ||
+                                                  _errorMessage!.contains(
+                                                      'no such table') ||
+                                                  _errorMessage!.contains(
+                                                      'Reset failed') ||
+                                                  (_errorMessage!.contains(
+                                                          'Invalid username or PIN') &&
+                                                      !_isFirstTime))
                                                 Padding(
-                                                  padding: const EdgeInsets.only(top: 8),
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                          top: 8),
                                                   child: Column(
                                                     children: [
                                                       TextButton(
-                                                        onPressed: _isLoading ? null : () async {
-                                                          setState(() {
-                                                            _isLoading = true;
-                                                            _errorMessage = 'Resetting database...';
-                                                          });
-                                                          
-                                                          try {
-                                                            final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-                                                            
-                                                            // Close database first
-                                                            try {
-                                                              await dbProvider.close();
-                                                            } catch (_) {}
-                                                            
-                                                            // Reset database
-                                                            await dbProvider.resetDatabase();
-                                                            
-                                                            // Clear SharedPreferences PIN
-                                                            final prefs = await SharedPreferences.getInstance();
-                                                            await prefs.remove('admin_pin');
-                                                            
-                                                            // Refresh first-time check
-                                                            final authProvider = Provider.of<AuthProvider>(context, listen: false);
-                                                            authProvider.setContext(context);
-                                                            final hasPin = await authProvider.checkPinExists();
-                                                            
-                                                            setState(() {
-                                                              _errorMessage = 'Database reset successfully! Please set up your PIN again.';
-                                                              _isFirstTime = !hasPin;
-                                                              _pinController.clear();
-                                                              _usernameController.text = 'admin';
-                                                              _isLoading = false;
-                                                            });
-                                                          } catch (e) {
-                                                            setState(() {
-                                                              _errorMessage = 'Reset failed: ${e.toString()}\n\nTry uninstalling and reinstalling the app.';
-                                                              _isLoading = false;
-                                                            });
-                                                          }
-                                                        },
-                                                        child: const Text('Reset Database'),
+                                                        onPressed: _isLoading
+                                                            ? null
+                                                            : () async {
+                                                                setState(() {
+                                                                  _isLoading =
+                                                                      true;
+                                                                  _errorMessage =
+                                                                      'Resetting database...';
+                                                                });
+
+                                                                try {
+                                                                  final dbProvider = Provider.of<
+                                                                          UnifiedDatabaseProvider>(
+                                                                      context,
+                                                                      listen:
+                                                                          false);
+
+                                                                  // Close database first
+                                                                  try {
+                                                                    await dbProvider
+                                                                        .close();
+                                                                  } catch (_) {}
+
+                                                                  // Reset database
+                                                                  await dbProvider
+                                                                      .resetDatabase();
+
+                                                                  // Clear SharedPreferences PIN
+                                                                  final prefs =
+                                                                      await SharedPreferences
+                                                                          .getInstance();
+                                                                  await prefs
+                                                                      .remove(
+                                                                          'admin_pin');
+
+                                                                  // Refresh first-time check
+                                                                  final authProvider = Provider.of<
+                                                                          AuthProvider>(
+                                                                      context,
+                                                                      listen:
+                                                                          false);
+                                                                  authProvider
+                                                                      .setContext(
+                                                                          context);
+                                                                  final hasPin =
+                                                                      await authProvider
+                                                                          .checkPinExists();
+
+                                                                  setState(() {
+                                                                    _errorMessage =
+                                                                        'Database reset successfully! Please set up your PIN again.';
+                                                                    _isFirstTime =
+                                                                        !hasPin;
+                                                                    _pinController
+                                                                        .clear();
+                                                                    _usernameController
+                                                                            .text =
+                                                                        'admin';
+                                                                    _isLoading =
+                                                                        false;
+                                                                  });
+                                                                } catch (e) {
+                                                                  setState(() {
+                                                                    _errorMessage =
+                                                                        'Reset failed: ${e.toString()}\n\nTry uninstalling and reinstalling the app.';
+                                                                    _isLoading =
+                                                                        false;
+                                                                  });
+                                                                }
+                                                              },
+                                                        child: const Text(
+                                                            'Reset Database'),
                                                       ),
                                                       const SizedBox(height: 8),
                                                       TextButton(
                                                         onPressed: () {
                                                           setState(() {
-                                                            _errorMessage = null;
+                                                            _errorMessage =
+                                                                null;
                                                             _isLoading = false;
                                                           });
                                                         },
-                                                        child: const Text('Clear Error', style: TextStyle(fontSize: 12)),
+                                                        child: const Text(
+                                                            'Clear Error',
+                                                            style: TextStyle(
+                                                                fontSize: 12)),
                                                       ),
                                                     ],
                                                   ),
@@ -645,7 +773,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               TweenAnimationBuilder<double>(
                                 tween: Tween(begin: 0.0, end: 1.0),
                                 duration: const Duration(milliseconds: 1200),
-                                curve: Interval(_isFirstTime ? 0.67 : 0.83, 1.0, curve: Curves.easeOut),
+                                curve: Interval(_isFirstTime ? 0.67 : 0.83, 1.0,
+                                    curve: Curves.easeOut),
                                 builder: (context, value, child) {
                                   return Opacity(
                                     opacity: value,
@@ -655,41 +784,53 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                         width: double.infinity,
                                         height: 52,
                                         decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
                                           gradient: LinearGradient(
                                             colors: [
-                                              const Color(0xFFFFC107), // Warm golden yellow (from logo)
-                                              const Color(0xFFFFB300), // Deeper golden (from logo)
+                                              const Color(
+                                                  0xFFFFC107), // Warm golden yellow (from logo)
+                                              const Color(
+                                                  0xFFFFB300), // Deeper golden (from logo)
                                             ],
                                           ),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: const Color(0xFFFFC107).withOpacity(0.4),
+                                              color: const Color(0xFFFFC107)
+                                                  .withOpacity(0.4),
                                               blurRadius: 12,
                                               offset: const Offset(0, 4),
                                             ),
                                           ],
                                         ),
                                         child: ElevatedButton(
-                                          onPressed: _isLoading ? null : _handleLogin,
+                                          onPressed:
+                                              _isLoading ? null : _handleLogin,
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: Colors.transparent,
                                             shadowColor: Colors.transparent,
                                             shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(12),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
                                             ),
                                           ),
                                           child: _isLoading
                                               ? const SizedBox(
                                                   width: 24,
                                                   height: 24,
-                                                  child: CircularProgressIndicator(
+                                                  child:
+                                                      CircularProgressIndicator(
                                                     strokeWidth: 2,
-                                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                    valueColor:
+                                                        AlwaysStoppedAnimation<
+                                                                Color>(
+                                                            Colors.white),
                                                   ),
                                                 )
                                               : Text(
-                                                  _isFirstTime ? 'Setup & Login' : 'Login',
+                                                  _isFirstTime
+                                                      ? 'Setup & Login'
+                                                      : 'Login',
                                                   style: const TextStyle(
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.w600,
@@ -708,7 +849,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               TweenAnimationBuilder<double>(
                                 tween: Tween(begin: 0.0, end: 1.0),
                                 duration: const Duration(milliseconds: 1200),
-                                curve: const Interval(1.0, 1.0, curve: Curves.easeOut),
+                                curve: const Interval(1.0, 1.0,
+                                    curve: Curves.easeOut),
                                 builder: (context, value, child) {
                                   return Opacity(
                                     opacity: value,

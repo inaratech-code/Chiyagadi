@@ -9,7 +9,8 @@ class Product {
   final String? imageUrl;
   final bool isVeg;
   final bool isActive;
-  final bool isPurchasable; // Can be purchased from suppliers (raw materials, ingredients)
+  final bool
+      isPurchasable; // Can be purchased from suppliers (raw materials, ingredients)
   final bool isSellable; // Can be sold to customers (menu items)
   final int createdAt;
   final int updatedAt;
@@ -70,7 +71,7 @@ class Product {
         idValue = idData.toInt();
       }
     }
-    
+
     // Handle both int (SQLite) and String (Firestore) category IDs
     final categoryIdData = map['category_id'];
     dynamic categoryId;
@@ -83,7 +84,7 @@ class Product {
     } else {
       categoryId = 0; // Fallback
     }
-    
+
     return Product(
       id: idValue,
       documentId: docId,

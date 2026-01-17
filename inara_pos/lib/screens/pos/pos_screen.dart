@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/order.dart';
 import '../../models/product.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/unified_database_provider.dart';
 import '../../services/order_service.dart';
 import '../../services/printer_service.dart';
@@ -20,10 +22,11 @@ class POSScreen extends StatefulWidget {
 class _POSScreenState extends State<POSScreen> {
   final OrderService _orderService = OrderService();
   final PrinterService _printerService = PrinterService();
-  
+
   Order? _currentOrder;
   String _orderType = 'dine_in'; // 'dine_in' or 'takeaway'
   int? _selectedTableId;
+  bool _isAddingItem = false;
 
   @override
   void initState() {
@@ -38,19 +41,152 @@ class _POSScreenState extends State<POSScreen> {
   }
 
   Future<void> _addProductToCart(Product product) async {
-    if (_currentOrder == null) {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      final now = DateTime.now().millisecondsSinceEpoch;
-      final orderNumber = await _orderService.generateOrderNumber(dbProvider);
-      setState(() {
-        _currentOrder = Order(
-          orderNumber: orderNumber,
+    if (_isAddingItem) return;
+    setState(() => _isAddingItem = true);
+
+    final dbProvider =
+        Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    try {
+      await dbProvider.init();
+
+      // Ensure an order exists in DB (so cart can load items)
+      dynamic orderId;
+      if (_currentOrder == null) {
+        orderId = await _orderService.createOrder(
+          dbProvider: dbProvider,
           orderType: _orderType,
           tableId: _selectedTableId,
-          createdAt: now,
-          updatedAt: now,
+          createdBy: authProvider.currentUserId != null
+              ? (kIsWeb
+                  ? authProvider.currentUserId!
+                  : int.tryParse(authProvider.currentUserId!))
+              : null,
         );
+      } else {
+        orderId = kIsWeb ? _currentOrder!.documentId : _currentOrder!.id;
+        // Safety: if current order somehow has no id, create a new one.
+        if (orderId == null) {
+          orderId = await _orderService.createOrder(
+            dbProvider: dbProvider,
+            orderType: _orderType,
+            tableId: _selectedTableId,
+            createdBy: authProvider.currentUserId != null
+                ? (kIsWeb
+                    ? authProvider.currentUserId!
+                    : int.tryParse(authProvider.currentUserId!))
+                : null,
+          );
+        }
+      }
+
+      // Add the selected product
+      await _orderService.addItemToOrder(
+        dbProvider: dbProvider,
+        context: context,
+        orderId: orderId,
+        product: product,
+        quantity: 1,
+      );
+
+      // Reload order (totals + updatedAt) so cart refreshes
+      final updatedOrder =
+          await _orderService.getOrderById(dbProvider, orderId);
+      if (mounted) {
+        setState(() {
+          _currentOrder = updatedOrder;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to add item: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isAddingItem = false);
+    }
+  }
+
+  Future<void> _startNewOrder() async {
+    if (!mounted) return;
+
+    final hadOrder = _currentOrder != null;
+    if (hadOrder) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Start new order?'),
+          content: const Text('This will clear the current cart.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('New Order'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm != true) return;
+    }
+
+    try {
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await dbProvider.init();
+
+      // If an order is already open, delete it so we truly start fresh.
+      if (_currentOrder != null) {
+        final orderId = kIsWeb ? _currentOrder!.documentId : _currentOrder!.id;
+        if (orderId != null) {
+          // Safe for pending orders; if it was paid, service handles ledger reversal.
+          await _orderService.deleteOrder(
+            dbProvider: dbProvider,
+            context: context,
+            orderId: orderId,
+          );
+        }
+      }
+
+      // Start a new blank order immediately so user sees a fresh cart.
+      final newOrderId = await _orderService.createOrder(
+        dbProvider: dbProvider,
+        orderType: _orderType,
+        tableId: _selectedTableId,
+        createdBy: authProvider.currentUserId != null
+            ? (kIsWeb
+                ? authProvider.currentUserId!
+                : int.tryParse(authProvider.currentUserId!))
+            : null,
+      );
+
+      final newOrder = await _orderService.getOrderById(dbProvider, newOrderId);
+      if (!mounted) return;
+
+      setState(() {
+        _currentOrder = newOrder;
       });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('New order started')),
+      );
+    } catch (e) {
+      debugPrint('Error starting new order: $e');
+      if (mounted) {
+        setState(() {
+          _currentOrder = null;
+          _selectedTableId = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to start new order: $e')),
+        );
+      }
     }
   }
 
@@ -69,8 +205,9 @@ class _POSScreenState extends State<POSScreen> {
 
     if (result != null && result['success'] == true) {
       final orderId = result['order_id'];
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+
       try {
         await _printerService.printBill(dbProvider, orderId);
       } catch (e) {
@@ -104,12 +241,14 @@ class _POSScreenState extends State<POSScreen> {
     return Theme(
       data: Theme.of(context).copyWith(
         brightness: Brightness.light,
-        scaffoldBackgroundColor: const Color(0xFFFFF8E1), // Warm cream background
+        scaffoldBackgroundColor:
+            const Color(0xFFFFF8E1), // Warm cream background
       ),
       child: Scaffold(
         appBar: AppBar(
           elevation: 2,
-          backgroundColor: AppTheme.logoLight.withOpacity(0.9), // Light golden app bar
+          backgroundColor:
+              AppTheme.logoLight.withOpacity(0.9), // Light golden app bar
           title: Row(
             children: [
               Container(
@@ -118,7 +257,8 @@ class _POSScreenState extends State<POSScreen> {
                   color: Theme.of(context).primaryColor.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.point_of_sale, color: Color(0xFFFFC107)),
+                child:
+                    const Icon(Icons.point_of_sale, color: Color(0xFFFFC107)),
               ),
               const SizedBox(width: 12),
               const Text(
@@ -131,6 +271,11 @@ class _POSScreenState extends State<POSScreen> {
             ],
           ),
           actions: [
+            IconButton(
+              tooltip: 'New Order',
+              onPressed: _isAddingItem ? null : _startNewOrder,
+              icon: const Icon(Icons.add_shopping_cart),
+            ),
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               decoration: BoxDecoration(
@@ -194,7 +339,7 @@ class _POSScreenState extends State<POSScreen> {
                     ),
                   ),
                 ),
-                
+
                 // Cart (30% width) - Constrained to prevent overflow
                 SizedBox(
                   width: (constraints.maxWidth * 0.3).clamp(280.0, 420.0),

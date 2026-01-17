@@ -11,11 +11,12 @@ import 'providers/sync_provider.dart';
 import 'providers/theme_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
+import 'utils/app_messenger.dart';
 import 'utils/theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Firebase (required for web, optional for mobile)
   try {
     await Firebase.initializeApp(
@@ -25,7 +26,8 @@ void main() async {
   } catch (e) {
     debugPrint('Firebase initialization failed: $e');
     if (kIsWeb) {
-      debugPrint('WARNING: Firebase is required for web. Please configure Firebase.');
+      debugPrint(
+          'WARNING: Firebase is required for web. Please configure Firebase.');
       debugPrint('Run: flutterfire configure');
     }
   }
@@ -67,6 +69,8 @@ class InaraPOSApp extends StatelessWidget {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
+            scaffoldMessengerKey: AppMessenger.messengerKey,
+            navigatorKey: AppMessenger.navigatorKey,
             home: const AuthWrapper(),
             routes: {
               '/home': (context) => const HomeScreen(),
@@ -98,7 +102,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     final prefs = await SharedPreferences.getInstance();
     // Check if admin PIN exists (for future use)
     prefs.containsKey('admin_pin');
-    
+
     setState(() {
       _isLoading = false;
     });
@@ -167,13 +171,15 @@ class WebNotSupportedScreen extends StatelessWidget {
                       ListTile(
                         leading: const Icon(Icons.android),
                         title: const Text('Android'),
-                        subtitle: const Text('Build APK and install on Android device'),
+                        subtitle: const Text(
+                            'Build APK and install on Android device'),
                       ),
                       const Divider(),
                       ListTile(
                         leading: const Icon(Icons.phone_iphone),
                         title: const Text('iOS (PWA)'),
-                        subtitle: const Text('Build web version and install as PWA'),
+                        subtitle:
+                            const Text('Build web version and install as PWA'),
                       ),
                     ],
                   ),

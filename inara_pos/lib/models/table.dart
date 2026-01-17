@@ -56,7 +56,7 @@ class CafeTable {
         idValue = idData.toInt();
       }
     }
-    
+
     return CafeTable(
       id: idValue,
       documentId: docId,

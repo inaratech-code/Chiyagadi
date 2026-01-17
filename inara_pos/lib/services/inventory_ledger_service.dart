@@ -5,24 +5,25 @@ import '../models/inventory_ledger_model.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 /// Inventory Ledger Service
-/// 
+///
 /// IMPORTANT: Stock is NEVER stored directly in the product or inventory table.
 /// Stock is ALWAYS calculated from the inventory_ledger entries.
-/// 
+///
 /// Current Stock Formula:
 /// Current Stock = Sum(quantityIn) - Sum(quantityOut)
-/// 
+///
 /// This ensures data integrity and provides a complete audit trail.
 class InventoryLedgerService {
   /// Get current stock for a product by calculating from ledger
-  /// 
+  ///
   /// This is the ONLY way to get stock - it's calculated, not stored
   Future<double> getCurrentStock({
     required BuildContext context,
     required dynamic productId,
   }) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       // Get all ledger entries for this product
@@ -54,7 +55,8 @@ class InventoryLedgerService {
     required List<dynamic> productIds,
   }) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       // Initialize result map with zeros
@@ -116,14 +118,15 @@ class InventoryLedgerService {
   }
 
   /// Add inventory ledger entry (for purchases, adjustments, etc.)
-  /// 
+  ///
   /// This is the ONLY way to increase stock - through ledger entries
   Future<void> addLedgerEntry({
     required BuildContext context,
     required InventoryLedger ledgerEntry,
   }) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       final now = DateTime.now().millisecondsSinceEpoch;
@@ -153,7 +156,8 @@ class InventoryLedgerService {
     required List<InventoryLedger> ledgerEntries,
   }) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       final now = DateTime.now().millisecondsSinceEpoch;
@@ -189,7 +193,8 @@ class InventoryLedgerService {
     int? limit,
   }) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       final entries = await dbProvider.query(
@@ -208,7 +213,7 @@ class InventoryLedgerService {
   }
 
   /// Create a reverse/correction entry for a purchase
-  /// 
+  ///
   /// Since purchases cannot be deleted, we create a reverse entry
   /// to correct any mistakes
   Future<void> createReverseEntry({
@@ -221,8 +226,10 @@ class InventoryLedgerService {
       final reverseEntry = InventoryLedger(
         productId: originalEntry.productId,
         productName: originalEntry.productName,
-        quantityIn: originalEntry.quantityOut, // Reverse: what was out becomes in
-        quantityOut: originalEntry.quantityIn, // Reverse: what was in becomes out
+        quantityIn:
+            originalEntry.quantityOut, // Reverse: what was out becomes in
+        quantityOut:
+            originalEntry.quantityIn, // Reverse: what was in becomes out
         unitPrice: originalEntry.unitPrice,
         transactionType: 'correction',
         referenceType: originalEntry.referenceType,

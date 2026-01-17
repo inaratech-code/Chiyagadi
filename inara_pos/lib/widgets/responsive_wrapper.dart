@@ -34,10 +34,11 @@ class ResponsiveWrapper extends StatelessWidget {
           maxWidth: maxWidth,
         ),
         child: Padding(
-          padding: padding ?? const EdgeInsets.symmetric(
-            horizontal: 24.0,
-            vertical: 16.0,
-          ),
+          padding: padding ??
+              const EdgeInsets.symmetric(
+                horizontal: 24.0,
+                vertical: 16.0,
+              ),
           child: child,
         ),
       ),

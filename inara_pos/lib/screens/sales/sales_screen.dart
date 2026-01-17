@@ -27,20 +27,23 @@ class _SalesScreenState extends State<SalesScreen> {
   Future<void> _loadSales() async {
     setState(() => _isLoading = true);
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
-      final startOfDay = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day)
-          .millisecondsSinceEpoch;
+      final startOfDay =
+          DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day)
+              .millisecondsSinceEpoch;
       final endOfDay = startOfDay + (24 * 60 * 60 * 1000) - 1;
-      
+
       // Include paid and partial payments (exclude unpaid)
       _sales = await dbProvider.query(
         'orders',
-        where: 'created_at >= ? AND created_at <= ? AND payment_status IN (?, ?)',
+        where:
+            'created_at >= ? AND created_at <= ? AND payment_status IN (?, ?)',
         whereArgs: [startOfDay, endOfDay, 'paid', 'partial'],
         orderBy: 'created_at DESC',
       );
-      
+
       // Load order items and products for each sale
       for (var sale in _sales) {
         final orderId = sale['id'];
@@ -50,9 +53,10 @@ class _SalesScreenState extends State<SalesScreen> {
           whereArgs: [orderId],
         );
         sale['items'] = items;
-        
+
         // Load product details for each item
-        final productIds = items.map((item) => item['product_id']).toSet().toList();
+        final productIds =
+            items.map((item) => item['product_id']).toSet().toList();
         if (productIds.isNotEmpty) {
           if (kIsWeb) {
             // Firestore wrapper doesn't support IN(...) queries. Fetch by doc id one-by-one.
@@ -93,32 +97,35 @@ class _SalesScreenState extends State<SalesScreen> {
   }
 
   double get _totalSales {
-    return _sales.fold(0.0, (sum, sale) => sum + (sale['total_amount'] as num).toDouble());
+    return _sales.fold(
+        0.0, (sum, sale) => sum + (sale['total_amount'] as num).toDouble());
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: widget.hideAppBar ? null : AppBar(
-        title: const Text('Sales History'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_today),
-            onPressed: () async {
-              final date = await showDatePicker(
-                context: context,
-                initialDate: _selectedDate,
-                firstDate: DateTime(2020),
-                lastDate: DateTime.now(),
-              );
-              if (date != null) {
-                setState(() => _selectedDate = date);
-                _loadSales();
-              }
-            },
-          ),
-        ],
-      ),
+      appBar: widget.hideAppBar
+          ? null
+          : AppBar(
+              title: const Text('Sales History'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.calendar_today),
+                  onPressed: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedDate,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                    );
+                    if (date != null) {
+                      setState(() => _selectedDate = date);
+                      _loadSales();
+                    }
+                  },
+                ),
+              ],
+            ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -138,11 +145,15 @@ class _SalesScreenState extends State<SalesScreen> {
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                             Text(
-                              NumberFormat.currency(symbol: 'NPR ').format(_totalSales),
-                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                color: Theme.of(context).primaryColor,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              NumberFormat.currency(symbol: 'NPR ')
+                                  .format(_totalSales),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineMedium
+                                  ?.copyWith(
+                                    color: Theme.of(context).primaryColor,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                             ),
                           ],
                         ),
@@ -154,9 +165,12 @@ class _SalesScreenState extends State<SalesScreen> {
                             ),
                             Text(
                               '${_sales.length}',
-                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                             ),
                           ],
                         ),
@@ -171,9 +185,11 @@ class _SalesScreenState extends State<SalesScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
+                              Icon(Icons.receipt_long,
+                                  size: 64, color: Colors.grey[400]),
                               const SizedBox(height: 16),
-                              Text('No sales found for this date', style: TextStyle(color: Colors.grey[600])),
+                              Text('No sales found for this date',
+                                  style: TextStyle(color: Colors.grey[600])),
                             ],
                           ),
                         )
@@ -218,7 +234,7 @@ class _SalesScreenState extends State<SalesScreen> {
     final orderType = sale['order_type'] as String? ?? 'dine_in';
     final paymentMethod = sale['payment_method'] as String? ?? 'cash';
     final paymentColor = _getPaymentMethodColor(paymentMethod);
-    
+
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 12),
@@ -266,7 +282,9 @@ class _SalesScreenState extends State<SalesScreen> {
                         Row(
                           children: [
                             Icon(
-                              orderType == 'dine_in' ? Icons.table_restaurant : Icons.shopping_bag,
+                              orderType == 'dine_in'
+                                  ? Icons.table_restaurant
+                                  : Icons.shopping_bag,
                               size: 16,
                               color: Colors.grey[600],
                             ),
@@ -298,7 +316,8 @@ class _SalesScreenState extends State<SalesScreen> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: paymentColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
@@ -344,7 +363,9 @@ class _SalesScreenState extends State<SalesScreen> {
                       Row(
                         children: [
                           Icon(
-                            paymentMethod == 'cash' ? Icons.money : Icons.qr_code,
+                            paymentMethod == 'cash'
+                                ? Icons.money
+                                : Icons.qr_code,
                             size: 16,
                             color: paymentColor,
                           ),
@@ -373,7 +394,8 @@ class _SalesScreenState extends State<SalesScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        NumberFormat.currency(symbol: 'NPR ').format(sale['total_amount'] ?? 0),
+                        NumberFormat.currency(symbol: 'NPR ')
+                            .format(sale['total_amount'] ?? 0),
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -384,9 +406,10 @@ class _SalesScreenState extends State<SalesScreen> {
                   ),
                 ],
               ),
-              
+
               // Order Items
-              if (sale['items'] != null && (sale['items'] as List).isNotEmpty) ...[
+              if (sale['items'] != null &&
+                  (sale['items'] as List).isNotEmpty) ...[
                 const SizedBox(height: 12),
                 const Divider(),
                 const SizedBox(height: 8),
@@ -401,12 +424,14 @@ class _SalesScreenState extends State<SalesScreen> {
                 const SizedBox(height: 8),
                 ...((sale['items'] as List).take(3).map((item) {
                   final productId = item['product_id'];
-                  final product = (sale['products'] as Map?)?[productId] as Map<String, dynamic>?;
-                  final productName = product?['name'] as String? ?? 'Product $productId';
+                  final product = (sale['products'] as Map?)?[productId]
+                      as Map<String, dynamic>?;
+                  final productName =
+                      product?['name'] as String? ?? 'Product $productId';
                   final quantity = item['quantity'] as num? ?? 0;
                   final unitPrice = item['unit_price'] as num? ?? 0;
                   final imageUrl = product?['image_url'] as String?;
-                  
+
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
@@ -427,7 +452,8 @@ class _SalesScreenState extends State<SalesScreen> {
                                         width: 40,
                                         height: 40,
                                         color: Colors.grey[200],
-                                        child: const Icon(Icons.image, size: 20, color: Colors.grey),
+                                        child: const Icon(Icons.image,
+                                            size: 20, color: Colors.grey),
                                       );
                                     },
                                   ),
@@ -439,7 +465,8 @@ class _SalesScreenState extends State<SalesScreen> {
                                     color: Colors.grey[200],
                                     borderRadius: BorderRadius.circular(6),
                                   ),
-                                  child: const Icon(Icons.image, size: 20, color: Colors.grey),
+                                  child: const Icon(Icons.image,
+                                      size: 20, color: Colors.grey),
                                 ),
                         ),
                         const SizedBox(width: 12),
@@ -470,7 +497,8 @@ class _SalesScreenState extends State<SalesScreen> {
                         ),
                         // Total Price
                         Text(
-                          NumberFormat.currency(symbol: 'NPR ').format(item['total_price']),
+                          NumberFormat.currency(symbol: 'NPR ')
+                              .format(item['total_price']),
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,

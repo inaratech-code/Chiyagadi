@@ -19,7 +19,7 @@ class AuthProvider with ChangeNotifier {
   String? get currentUserId => _currentUserId;
   String? get currentUserRole => _currentUserRole;
   String? get currentUsername => _currentUsername;
-  
+
   // Auto-lock after 5 minutes of inactivity
   static const int _inactivityTimeoutMinutes = 5;
 
@@ -46,7 +46,7 @@ class AuthProvider with ChangeNotifier {
   Future<bool> checkPinExists() async {
     final prefs = await SharedPreferences.getInstance();
     final hasPinInPrefs = prefs.containsKey('admin_pin');
-    
+
     // Also check if admin user exists in database
     try {
       final dbProvider = _getDatabaseProvider();
@@ -56,7 +56,7 @@ class AuthProvider with ChangeNotifier {
         where: 'username = ? AND role = ?',
         whereArgs: ['admin', 'admin'],
       );
-      
+
       // Return true only if both PIN in prefs AND user in database exist
       return hasPinInPrefs && adminUsers.isNotEmpty;
     } catch (e) {
@@ -65,33 +65,33 @@ class AuthProvider with ChangeNotifier {
       return hasPinInPrefs;
     }
   }
-  
+
   // Force create admin user (useful for reset scenarios)
   Future<bool> forceCreateAdmin(String pin) async {
     if (pin.length < 4 || pin.length > 6) {
       return false;
     }
-    
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final pinHash = _hashPin(pin);
-      
+
       // Clear old PIN
       await prefs.remove('admin_pin');
-      
+
       // Set new PIN
       await prefs.setString('admin_pin', pinHash);
-      
+
       final dbProvider = _getDatabaseProvider();
       await dbProvider.init();
-      
+
       // Delete any existing admin user
       await dbProvider.delete(
         'users',
         where: 'username = ?',
         whereArgs: ['admin'],
       );
-      
+
       // Create new admin user
       final now = DateTime.now().millisecondsSinceEpoch;
       await dbProvider.insert('users', {
@@ -102,7 +102,7 @@ class AuthProvider with ChangeNotifier {
         'created_at': now,
         'updated_at': now,
       });
-      
+
       debugPrint('forceCreateAdmin: Admin user created successfully');
       return true;
     } catch (e) {
@@ -119,13 +119,13 @@ class AuthProvider with ChangeNotifier {
 
     try {
       debugPrint('SetupAdminPin: Starting setup for PIN');
-      
+
       // Ensure context is set
       if (_context == null) {
         debugPrint('SetupAdminPin: ERROR - Context is not set!');
         return false;
       }
-      
+
       final prefs = await SharedPreferences.getInstance();
       final pinHash = _hashPin(pin);
       await prefs.setString('admin_pin', pinHash);
@@ -134,12 +134,12 @@ class AuthProvider with ChangeNotifier {
       // Create admin user in database
       final dbProvider = _getDatabaseProvider();
       debugPrint('SetupAdminPin: Got database provider');
-      
+
       // Ensure database is initialized with retry
       bool dbReady = false;
       int retryCount = 0;
       const maxRetries = 2;
-      
+
       while (!dbReady && retryCount < maxRetries) {
         try {
           await dbProvider.init();
@@ -148,7 +148,8 @@ class AuthProvider with ChangeNotifier {
           dbReady = true;
           debugPrint('SetupAdminPin: Database initialized and verified');
         } catch (initError) {
-          debugPrint('SetupAdminPin: Database initialization attempt ${retryCount + 1} failed: $initError');
+          debugPrint(
+              'SetupAdminPin: Database initialization attempt ${retryCount + 1} failed: $initError');
           if (retryCount < maxRetries - 1) {
             // Try to reset and reinitialize
             try {
@@ -161,22 +162,24 @@ class AuthProvider with ChangeNotifier {
           retryCount++;
         }
       }
-      
+
       if (!dbReady) {
-        debugPrint('SetupAdminPin: Database initialization failed after retries');
+        debugPrint(
+            'SetupAdminPin: Database initialization failed after retries');
         return false;
       }
-      
+
       final now = DateTime.now().millisecondsSinceEpoch;
-      
+
       // Check if admin user already exists
       final existingUsers = await dbProvider.query(
         'users',
         where: 'username = ?',
         whereArgs: ['admin'],
       );
-      debugPrint('SetupAdminPin: Existing users count: ${existingUsers.length}');
-      
+      debugPrint(
+          'SetupAdminPin: Existing users count: ${existingUsers.length}');
+
       if (existingUsers.isEmpty) {
         final userId = await dbProvider.insert('users', {
           'username': 'admin',
@@ -199,9 +202,10 @@ class AuthProvider with ChangeNotifier {
           where: 'username = ?',
           whereArgs: ['admin'],
         );
-        debugPrint('SetupAdminPin: Admin user updated. Rows affected: $rowsUpdated');
+        debugPrint(
+            'SetupAdminPin: Admin user updated. Rows affected: $rowsUpdated');
       }
-      
+
       debugPrint('SetupAdminPin: Setup completed successfully');
       return true;
     } catch (e, stackTrace) {
@@ -221,21 +225,22 @@ class AuthProvider with ChangeNotifier {
       debugPrint('Login: Attempting login for username: $username');
       final dbProvider = _getDatabaseProvider();
       debugPrint('Login: Got database provider');
-      
+
       // Ensure database is initialized
       await dbProvider.init();
       debugPrint('Login: Database initialized');
-      
+
       final pinHash = _hashPin(pin);
       debugPrint('Login: PIN hashed');
-      
+
       // First, let's check all users to debug
       final allUsers = await dbProvider.query('users');
       debugPrint('Login: Total users in database: ${allUsers.length}');
       for (var user in allUsers) {
-        debugPrint('Login: Found user - username: ${user['username']}, role: ${user['role']}');
+        debugPrint(
+            'Login: Found user - username: ${user['username']}, role: ${user['role']}');
       }
-      
+
       final users = await dbProvider.query(
         'users',
         where: 'username = ? AND pin_hash = ?',
@@ -255,13 +260,14 @@ class AuthProvider with ChangeNotifier {
         _currentUserId = user['id'].toString();
         _currentUserRole = user['role'] as String;
         _currentUsername = user['username'] as String;
-        
-        debugPrint('Login: Success! User authenticated - ID: $_currentUserId, Role: $_currentUserRole');
+
+        debugPrint(
+            'Login: Success! User authenticated - ID: $_currentUserId, Role: $_currentUserRole');
         _resetInactivityTimer();
         notifyListeners();
         return true;
       }
-      
+
       debugPrint('Login: Failed - No matching user found');
       // Let's also check if username exists with different PIN
       final usernameCheck = await dbProvider.query(
@@ -281,7 +287,7 @@ class AuthProvider with ChangeNotifier {
       } else {
         debugPrint('Login: Username does not exist in database');
       }
-      
+
       return false;
     } catch (e, stackTrace) {
       debugPrint('Login error: $e');
@@ -323,11 +329,15 @@ class AuthProvider with ChangeNotifier {
   }
 
   bool get isAdmin => _currentUserRole == 'admin';
-  bool get isCashier => _currentUserRole == 'cashier' || _currentUserRole == 'admin';
+  bool get isCashier =>
+      _currentUserRole == 'cashier' || _currentUserRole == 'admin';
 
   // Change password for current user
   Future<bool> changePassword(String oldPin, String newPin) async {
-    if (oldPin.length < 4 || oldPin.length > 6 || newPin.length < 4 || newPin.length > 6) {
+    if (oldPin.length < 4 ||
+        oldPin.length > 6 ||
+        newPin.length < 4 ||
+        newPin.length > 6) {
       return false;
     }
 
@@ -340,7 +350,7 @@ class AuthProvider with ChangeNotifier {
       await dbProvider.init();
 
       final oldPinHash = _hashPin(oldPin);
-      
+
       // Verify old password
       final users = await dbProvider.query(
         'users',
@@ -355,7 +365,7 @@ class AuthProvider with ChangeNotifier {
       // Update password
       final newPinHash = _hashPin(newPin);
       final now = DateTime.now().millisecondsSinceEpoch;
-      
+
       await dbProvider.update(
         'users',
         values: {
@@ -431,7 +441,8 @@ class AuthProvider with ChangeNotifier {
   }
 
   // Admin-only: change role
-  Future<bool> updateUserRole({required dynamic userId, required String role}) async {
+  Future<bool> updateUserRole(
+      {required dynamic userId, required String role}) async {
     if (role != 'admin' && role != 'cashier') return false;
     try {
       final dbProvider = _getDatabaseProvider();
@@ -450,7 +461,8 @@ class AuthProvider with ChangeNotifier {
   }
 
   // Admin-only: enable/disable user
-  Future<bool> setUserActive({required dynamic userId, required bool isActive}) async {
+  Future<bool> setUserActive(
+      {required dynamic userId, required bool isActive}) async {
     try {
       final dbProvider = _getDatabaseProvider();
       await dbProvider.init();
@@ -468,7 +480,8 @@ class AuthProvider with ChangeNotifier {
   }
 
   // Admin-only: reset PIN for another user
-  Future<bool> resetUserPin({required dynamic userId, required String newPin}) async {
+  Future<bool> resetUserPin(
+      {required dynamic userId, required String newPin}) async {
     if (newPin.length < 4 || newPin.length > 6) return false;
     try {
       final dbProvider = _getDatabaseProvider();

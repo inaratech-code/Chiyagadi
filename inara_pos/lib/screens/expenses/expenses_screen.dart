@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import '../../providers/auth_provider.dart';
 import '../../services/expense_service.dart';
 import '../../models/expense_model.dart';
 import '../../utils/theme.dart';
@@ -86,7 +84,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.currency_rupee),
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   onChanged: (_) => setDialogState(() {}),
                 ),
                 const SizedBox(height: 12),
@@ -100,10 +99,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   items: const [
                     DropdownMenuItem(value: 'cash', child: Text('Cash')),
                     DropdownMenuItem(value: 'card', child: Text('Card')),
-                    DropdownMenuItem(value: 'bank_transfer', child: Text('Bank Transfer')),
+                    DropdownMenuItem(
+                        value: 'bank_transfer', child: Text('Bank Transfer')),
                     DropdownMenuItem(value: 'other', child: Text('Other')),
                   ],
-                  onChanged: (v) => setDialogState(() => paymentMethod = v ?? 'cash'),
+                  onChanged: (v) =>
+                      setDialogState(() => paymentMethod = v ?? 'cash'),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -124,10 +125,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: titleController.text.trim().isEmpty || amountController.text.trim().isEmpty
+              onPressed: titleController.text.trim().isEmpty ||
+                      amountController.text.trim().isEmpty
                   ? null
                   : () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.logoPrimary),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.logoPrimary),
               child: const Text('Save'),
             ),
           ],
@@ -162,7 +165,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.errorColor),
+          SnackBar(
+              content: Text('Error: $e'), backgroundColor: AppTheme.errorColor),
         );
       }
     }
@@ -170,7 +174,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
     final total = _expenses.fold<double>(0.0, (s, e) => s + e.amount);
     final currency = NumberFormat.currency(symbol: 'NPR ');
 
@@ -184,11 +187,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   icon: const Icon(Icons.refresh),
                   onPressed: _loadExpenses,
                 ),
-                if (authProvider.isAdmin)
-                  IconButton(
-                    icon: const Icon(Icons.add),
-                    onPressed: _showAddExpenseDialog,
-                  ),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: _showAddExpenseDialog,
+                  tooltip: 'Add Expense',
+                ),
               ],
             ),
       body: _isLoading
@@ -205,10 +208,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
+                          const Text('Total',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
                           Text(
                             currency.format(total),
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87),
                           ),
                         ],
                       ),
@@ -221,45 +227,56 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.payments, size: 64, color: Colors.grey[400]),
+                              Icon(Icons.payments,
+                                  size: 64, color: Colors.grey[400]),
                               const SizedBox(height: 12),
-                              Text('No expenses found', style: TextStyle(color: Colors.grey[600])),
-                              if (authProvider.isAdmin) ...[
-                                const SizedBox(height: 8),
-                                ElevatedButton.icon(
-                                  onPressed: _showAddExpenseDialog,
-                                  icon: const Icon(Icons.add),
-                                  label: const Text('Add Expense'),
-                                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.logoPrimary),
-                                ),
-                              ],
+                              Text('No expenses found',
+                                  style: TextStyle(color: Colors.grey[600])),
+                              const SizedBox(height: 8),
+                              ElevatedButton.icon(
+                                onPressed: _showAddExpenseDialog,
+                                icon: const Icon(Icons.add),
+                                label: const Text('Add Expense'),
+                                style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.logoPrimary),
+                              ),
                             ],
                           ),
                         )
                       : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
                           itemCount: _expenses.length,
                           itemBuilder: (context, index) {
                             final e = _expenses[index];
-                            final date = DateTime.fromMillisecondsSinceEpoch(e.createdAt);
+                            final date = DateTime.fromMillisecondsSinceEpoch(
+                                e.createdAt);
                             return Card(
                               margin: const EdgeInsets.only(bottom: 10),
                               child: ListTile(
                                 leading: CircleAvatar(
                                   backgroundColor: AppTheme.logoPrimary,
-                                  child: const Icon(Icons.payments, color: Colors.white),
+                                  child: const Icon(Icons.payments,
+                                      color: Colors.white),
                                 ),
                                 title: Text(e.title),
                                 subtitle: Text(
                                   [
-                                    if ((e.category ?? '').trim().isNotEmpty) e.category!.trim(),
+                                    if ((e.category ?? '').trim().isNotEmpty)
+                                      e.category!.trim(),
                                     DateFormat('MMM dd, yyyy').format(date),
-                                    if ((e.paymentMethod ?? '').trim().isNotEmpty) (e.paymentMethod ?? '').replaceAll('_', ' '),
+                                    if ((e.paymentMethod ?? '')
+                                        .trim()
+                                        .isNotEmpty)
+                                      (e.paymentMethod ?? '')
+                                          .replaceAll('_', ' '),
                                   ].join(' • '),
                                 ),
                                 trailing: Text(
                                   currency.format(e.amount),
-                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87),
                                 ),
                               ),
                             );
@@ -268,15 +285,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 ),
               ],
             ),
-      floatingActionButton: authProvider.isAdmin
-          ? FloatingActionButton.extended(
-              onPressed: _showAddExpenseDialog,
-              backgroundColor: AppTheme.logoPrimary,
-              icon: const Icon(Icons.add),
-              label: const Text('Add Expense'),
-            )
-          : null,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddExpenseDialog,
+        backgroundColor: AppTheme.logoPrimary,
+        icon: const Icon(Icons.add),
+        label: const Text('Add Expense'),
+      ),
     );
   }
 }
-

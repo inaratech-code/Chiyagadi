@@ -6,6 +6,7 @@ import '../../providers/unified_database_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/customer.dart';
 import '../../utils/theme.dart';
+import '../orders/order_detail_screen.dart';
 
 class CustomersScreen extends StatefulWidget {
   final bool hideAppBar;
@@ -31,7 +32,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
   Future<void> _loadCustomers() async {
     setState(() => _isLoading = true);
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
       final maps = await dbProvider.query('customers', orderBy: 'name ASC');
       _customers = maps.map((map) => Customer.fromMap(map)).toList();
@@ -44,7 +46,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
   Future<void> _loadCreditTransactions(dynamic customerId) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       _creditTransactions = await dbProvider.query(
         'credit_transactions',
         where: 'customer_id = ?',
@@ -57,9 +60,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _loadCustomerOrders(dynamic customerId) async {
+  Future<List<Map<String, dynamic>>> _loadCustomerOrders(
+      dynamic customerId) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       return await dbProvider.query(
         'orders',
         where: 'customer_id = ?',
@@ -75,28 +80,32 @@ class _CustomersScreenState extends State<CustomersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: widget.hideAppBar ? null : AppBar(
-        title: const Text('Customer Credits'),
-        actions: [
-          IconButton(
-            icon: Icon(_viewMode == 'list' ? Icons.account_balance_wallet : Icons.list),
-            onPressed: () {
-              setState(() {
-                _viewMode = _viewMode == 'list' ? 'credits' : 'list';
-                if (_viewMode == 'list') {
-                  _selectedCustomerId = null;
-                }
-              });
-            },
-            tooltip: _viewMode == 'list' ? 'View Credits' : 'View List',
-          ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showAddCustomerDialog(),
-            tooltip: 'Add Customer',
-          ),
-        ],
-      ),
+      appBar: widget.hideAppBar
+          ? null
+          : AppBar(
+              title: const Text('Customer Credits'),
+              actions: [
+                IconButton(
+                  icon: Icon(_viewMode == 'list'
+                      ? Icons.account_balance_wallet
+                      : Icons.list),
+                  onPressed: () {
+                    setState(() {
+                      _viewMode = _viewMode == 'list' ? 'credits' : 'list';
+                      if (_viewMode == 'list') {
+                        _selectedCustomerId = null;
+                      }
+                    });
+                  },
+                  tooltip: _viewMode == 'list' ? 'View Credits' : 'View List',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: () => _showAddCustomerDialog(),
+                  tooltip: 'Add Customer',
+                ),
+              ],
+            ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _viewMode == 'list'
@@ -121,7 +130,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
               children: [
                 Icon(Icons.people, size: 64, color: Colors.grey[400]),
                 const SizedBox(height: 16),
-                Text('No customers found', style: TextStyle(color: Colors.grey[600])),
+                Text('No customers found',
+                    style: TextStyle(color: Colors.grey[600])),
                 const SizedBox(height: 8),
                 ElevatedButton.icon(
                   onPressed: () => _showAddCustomerDialog(),
@@ -137,13 +147,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
             itemBuilder: (context, index) {
               final customer = _customers[index];
               final hasCredit = customer.creditBalance > 0;
-              
+              final brand = AppTheme.logoPrimary;
+
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
-                color: hasCredit ? const Color(0xFFFF6B6B).withOpacity(0.1) : null,
+                // Keep UI clean/neutral; use brand color only as subtle accents.
+                color: hasCredit ? brand.withOpacity(0.04) : null,
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: hasCredit ? const Color(0xFFFF6B6B) : const Color(0xFF00B894),
+                    backgroundColor: brand,
                     child: Text(
                       customer.name.substring(0, 1).toUpperCase(),
                       style: const TextStyle(color: Colors.white),
@@ -153,11 +165,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (customer.phone != null) Text('Phone: ${customer.phone}'),
+                      if (customer.phone != null)
+                        Text('Phone: ${customer.phone}'),
                       Text(
                         'Credit: ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditBalance)} / ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditLimit)}',
                         style: TextStyle(
-                          color: hasCredit ? const Color(0xFFFF6B6B) : Colors.grey[600],
+                          color: hasCredit ? brand : Colors.grey[700],
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -168,8 +181,16 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     children: [
                       if (hasCredit)
                         Chip(
-                          label: const Text('Credit', style: TextStyle(fontSize: 10)),
-                          backgroundColor: const Color(0xFFFF6B6B).withOpacity(0.2),
+                          label: Text(
+                            'Credit',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: brand,
+                            ),
+                          ),
+                          side: BorderSide(color: brand.withOpacity(0.35)),
+                          backgroundColor: Colors.white,
                         ),
                       IconButton(
                         icon: const Icon(Icons.edit),
@@ -202,9 +223,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.account_balance_wallet, size: 64, color: Colors.grey[400]),
+            Icon(Icons.account_balance_wallet,
+                size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
-            Text('Select a customer to view credit details', style: TextStyle(color: Colors.grey[600])),
+            Text('Select a customer to view credit details',
+                style: TextStyle(color: Colors.grey[600])),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
@@ -224,17 +247,20 @@ class _CustomersScreenState extends State<CustomersScreen> {
     final customer = _customers.firstWhere(
       (c) {
         final cId = kIsWeb ? (c.documentId ?? c.id) : c.id;
-        return cId == _selectedCustomerId || cId.toString() == _selectedCustomerId.toString();
+        return cId == _selectedCustomerId ||
+            cId.toString() == _selectedCustomerId.toString();
       },
       orElse: () => _customers.first, // Fallback to first customer if not found
     );
-    
+
     return Column(
       children: [
         // Customer Summary Card
         Card(
           margin: const EdgeInsets.all(16),
-          color: customer.creditBalance > 0 ? const Color(0xFFFF6B6B).withOpacity(0.1) : const Color(0xFF00B894).withOpacity(0.1),
+          color: customer.creditBalance > 0
+              ? const Color(0xFFFF6B6B).withOpacity(0.1)
+              : const Color(0xFF00B894).withOpacity(0.1),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -267,17 +293,18 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     double totalPaid = 0.0;
                     double totalDue = customer.creditBalance;
                     double totalCreditGiven = 0.0;
-                    
+
                     for (var transaction in _creditTransactions) {
                       final type = transaction['transaction_type'] as String?;
-                      final amount = (transaction['amount'] as num?)?.toDouble() ?? 0.0;
+                      final amount =
+                          (transaction['amount'] as num?)?.toDouble() ?? 0.0;
                       if (type == 'payment') {
                         totalPaid += amount;
                       } else if (type == 'credit') {
                         totalCreditGiven += amount;
                       }
                     }
-                    
+
                     return Column(
                       children: [
                         Row(
@@ -316,7 +343,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                             Expanded(
                               child: _buildSummaryCard(
                                 'Available Credit',
-                                (customer.creditLimit - customer.creditBalance).clamp(0.0, double.infinity),
+                                (customer.creditLimit - customer.creditBalance)
+                                    .clamp(0.0, double.infinity),
                                 const Color(0xFF00B894), // Teal/Green
                                 Icons.check_circle,
                               ),
@@ -334,7 +362,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       child: ElevatedButton.icon(
                         onPressed: () => _showAddCreditDialog(customer),
                         icon: const Icon(Icons.add, color: Colors.white),
-                        label: const Text('Add Credit', style: TextStyle(color: Colors.white)),
+                        label: const Text('Add Credit',
+                            style: TextStyle(color: Colors.white)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF6C5CE7), // Purple
                           foregroundColor: Colors.white,
@@ -346,7 +375,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       child: ElevatedButton.icon(
                         onPressed: () => _showPaymentDialog(customer),
                         icon: const Icon(Icons.payment, color: Colors.white),
-                        label: const Text('Receive Payment', style: TextStyle(color: Colors.white)),
+                        label: const Text('Receive Payment',
+                            style: TextStyle(color: Colors.white)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF00B894), // Teal
                           foregroundColor: Colors.white,
@@ -359,164 +389,228 @@ class _CustomersScreenState extends State<CustomersScreen> {
             ),
           ),
         ),
-        // Orders with Credit
-        FutureBuilder<List<Map<String, dynamic>>>(
-          future: _loadCustomerOrders(_selectedCustomerId!),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            
-            final orders = snapshot.data ?? [];
-            final ordersWithCredit = orders.where((o) => (o['credit_amount'] as num? ?? 0) > 0).toList();
-            
-            if (ordersWithCredit.isEmpty && _creditTransactions.isEmpty) {
-              return Center(
-                child: Text('No credit transactions', style: TextStyle(color: Colors.grey[600])),
+        // Bills + Transactions (scrollable)
+        Expanded(
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            future: _loadCustomerOrders(_selectedCustomerId!),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final orders = snapshot.data ?? [];
+              final bills = orders
+                  .where((o) => (o['credit_amount'] as num? ?? 0) > 0)
+                  .toList()
+                ..sort((a, b) {
+                  final aAt = (a['created_at'] as num?)?.toInt() ?? 0;
+                  final bAt = (b['created_at'] as num?)?.toInt() ?? 0;
+                  return bAt.compareTo(aAt);
+                });
+
+              final totalPending = bills.fold<double>(
+                0.0,
+                (sum, o) =>
+                    sum + ((o['credit_amount'] as num?)?.toDouble() ?? 0.0),
               );
-            }
-            
-            return Column(
-              children: [
-                if (ordersWithCredit.isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Row(
+
+              if (bills.isEmpty && _creditTransactions.isEmpty) {
+                return Center(
+                  child: Text('No credit transactions',
+                      style: TextStyle(color: Colors.grey[600])),
+                );
+              }
+
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                children: [
+                  if (bills.isNotEmpty) ...[
+                    Row(
                       children: [
-                        Icon(Icons.receipt_long, size: 16, color: const Color(0xFFFF6B6B)),
+                        const Icon(Icons.receipt_long, size: 18),
                         const SizedBox(width: 8),
                         Text(
-                          'Orders with Credit (${ordersWithCredit.length})',
+                          'Bills (${bills.length})',
                           style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFFF6B6B),
-                          ),
+                              fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                        const Spacer(),
+                        Text(
+                          'Total Pending: ${NumberFormat.currency(symbol: 'NPR ').format(totalPending)}',
+                          style: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w700),
                         ),
                       ],
                     ),
-                  ),
-                  SizedBox(
-                    height: 120,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: ordersWithCredit.length,
-                      itemBuilder: (context, index) {
-                        final order = ordersWithCredit[index];
-                        final creditAmount = (order['credit_amount'] as num? ?? 0).toDouble();
-                        final paidAmount = (order['paid_amount'] as num? ?? 0).toDouble();
-                        final totalAmount = (order['total_amount'] as num? ?? 0).toDouble();
-                        
-                        return Container(
-                          width: 200,
-                          margin: const EdgeInsets.only(right: 8),
-                          child: Card(
-                            color: const Color(0xFFFF6B6B).withOpacity(0.1),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    order['order_number'] as String? ?? 'N/A',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Total: ${NumberFormat.currency(symbol: 'NPR ').format(totalAmount)}',
-                                    style: TextStyle(fontSize: 11, color: Colors.grey[700]),
-                                  ),
-                                  if (paidAmount > 0)
-                                    Text(
-                                      'Paid: ${NumberFormat.currency(symbol: 'NPR ').format(paidAmount)}',
-                                      style: const TextStyle(fontSize: 11, color: Color(0xFF00B894)),
-                                    ),
-                                  Text(
-                                    'Credit: ${NumberFormat.currency(symbol: 'NPR ').format(creditAmount)}',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Color(0xFFFF6B6B),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                    const SizedBox(height: 10),
+                    ...bills.map((order) {
+                      final orderId = kIsWeb
+                          ? (order['documentId'] ?? order['id'])
+                          : order['id'];
+                      final orderNumber =
+                          (order['order_number'] as String?) ?? 'N/A';
+                      final createdAt =
+                          (order['created_at'] as num?)?.toInt() ?? 0;
+                      final date = createdAt > 0
+                          ? DateTime.fromMillisecondsSinceEpoch(createdAt)
+                          : null;
+                      final creditAmount =
+                          (order['credit_amount'] as num? ?? 0).toDouble();
+                      final paidAmount =
+                          (order['paid_amount'] as num? ?? 0).toDouble();
+                      final totalAmount =
+                          (order['total_amount'] as num? ?? 0).toDouble();
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor:
+                                AppTheme.logoPrimary.withOpacity(0.12),
+                            child: Icon(Icons.receipt_long,
+                                color: AppTheme.logoPrimary),
                           ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                // Transactions List
-                Expanded(
-                  child: _creditTransactions.isEmpty
-                      ? Center(
-                          child: Text('No credit transactions', style: TextStyle(color: Colors.grey[600])),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _creditTransactions.length,
-                          itemBuilder: (context, index) {
-                            final transaction = _creditTransactions[index];
-                            final date = DateTime.fromMillisecondsSinceEpoch(transaction['created_at'] as int);
-                            final isCredit = transaction['transaction_type'] == 'credit';
-                            final isPayment = transaction['transaction_type'] == 'payment';
-                            
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: isCredit ? const Color(0xFFFF6B6B) : const Color(0xFF00B894),
-                                  child: Icon(
-                                    isCredit ? Icons.add : Icons.remove,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                title: Text(
-                                  isCredit ? 'Credit Added' : isPayment ? 'Payment Received' : 'Adjustment',
-                                ),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(DateFormat('MMM dd, yyyy HH:mm').format(date)),
-                                    if (transaction['order_id'] != null)
-                                      Text(
-                                        'Order: ${transaction['order_id']}',
-                                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                                      ),
-                                  ],
-                                ),
-                                trailing: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      '${isCredit ? '+' : '-'}${NumberFormat.currency(symbol: 'NPR ').format(transaction['amount'])}',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: isCredit ? const Color(0xFFFF6B6B) : const Color(0xFF00B894),
-                                      ),
-                                    ),
-                                    Text(
-                                      'Balance: ${NumberFormat.currency(symbol: 'NPR ').format(transaction['balance_after'])}',
-                                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                                    ),
-                                  ],
+                          title: Text(orderNumber,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w700)),
+                          subtitle: Text(
+                            [
+                              if (date != null)
+                                DateFormat('MMM dd, yyyy').format(date),
+                              'Total: ${NumberFormat.currency(symbol: 'NPR ').format(totalAmount)}',
+                              if (paidAmount > 0)
+                                'Paid: ${NumberFormat.currency(symbol: 'NPR ').format(paidAmount)}',
+                            ].join(' • '),
+                          ),
+                          trailing: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                NumberFormat.currency(symbol: 'NPR ')
+                                    .format(creditAmount),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: creditAmount > 0
+                                      ? AppTheme.warningColor
+                                      : Colors.grey[700],
                                 ),
                               ),
-                            );
-                          },
+                              const SizedBox(height: 2),
+                              Text(
+                                'Pending',
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey[600]),
+                              ),
+                            ],
+                          ),
+                          onTap: orderId == null
+                              ? null
+                              : () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => OrderDetailScreen(
+                                        orderId: orderId,
+                                        orderNumber: orderNumber,
+                                      ),
+                                    ),
+                                  );
+                                },
                         ),
-                ),
-              ],
-            );
-          },
+                      );
+                    }),
+                    const SizedBox(height: 6),
+                    const Divider(),
+                    const SizedBox(height: 6),
+                  ],
+                  Row(
+                    children: const [
+                      Icon(Icons.swap_horiz, size: 18),
+                      SizedBox(width: 8),
+                      Text('Transactions',
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  if (_creditTransactions.isEmpty)
+                    Text('No credit transactions',
+                        style: TextStyle(color: Colors.grey[600]))
+                  else
+                    ..._creditTransactions.map((transaction) {
+                      final createdAtRaw = transaction['created_at'];
+                      final createdAt = createdAtRaw is int
+                          ? createdAtRaw
+                          : createdAtRaw is num
+                              ? createdAtRaw.toInt()
+                              : createdAtRaw is String
+                                  ? (int.tryParse(createdAtRaw) ?? 0)
+                                  : 0;
+                      final date =
+                          DateTime.fromMillisecondsSinceEpoch(createdAt);
+                      final isCredit =
+                          transaction['transaction_type'] == 'credit';
+                      final isPayment =
+                          transaction['transaction_type'] == 'payment';
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: isCredit
+                                ? AppTheme.warningColor
+                                : AppTheme.successColor,
+                            child: Icon(isCredit ? Icons.add : Icons.remove,
+                                color: Colors.white),
+                          ),
+                          title: Text(
+                            isCredit
+                                ? 'Credit Added'
+                                : isPayment
+                                    ? 'Payment Received'
+                                    : 'Adjustment',
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(DateFormat('MMM dd, yyyy HH:mm')
+                                  .format(date)),
+                              if (transaction['order_id'] != null)
+                                Text(
+                                  'Order: ${transaction['order_id']}',
+                                  style: TextStyle(
+                                      fontSize: 11, color: Colors.grey[600]),
+                                ),
+                            ],
+                          ),
+                          trailing: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                '${isCredit ? '+' : '-'}${NumberFormat.currency(symbol: 'NPR ').format(transaction['amount'])}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isCredit
+                                      ? AppTheme.warningColor
+                                      : AppTheme.successColor,
+                                ),
+                              ),
+                              Text(
+                                'Balance: ${NumberFormat.currency(symbol: 'NPR ').format(transaction['balance_after'])}',
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.grey[600]),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                ],
+              );
+            },
+          ),
         ),
       ],
     );
@@ -560,7 +654,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
               ),
               TextField(
                 controller: creditLimitController,
-                decoration: const InputDecoration(labelText: 'Credit Limit (NPR)'),
+                decoration:
+                    const InputDecoration(labelText: 'Credit Limit (NPR)'),
                 keyboardType: TextInputType.number,
               ),
               TextField(
@@ -586,16 +681,27 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
     if (result == true && nameController.text.isNotEmpty) {
       try {
-        final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         final now = DateTime.now().millisecondsSinceEpoch;
         await dbProvider.insert('customers', {
           'name': nameController.text.trim(),
-          'phone': phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
-          'email': emailController.text.trim().isEmpty ? null : emailController.text.trim(),
-          'address': addressController.text.trim().isEmpty ? null : addressController.text.trim(),
-          'credit_limit': double.parse(creditLimitController.text.isEmpty ? '0' : creditLimitController.text),
+          'phone': phoneController.text.trim().isEmpty
+              ? null
+              : phoneController.text.trim(),
+          'email': emailController.text.trim().isEmpty
+              ? null
+              : emailController.text.trim(),
+          'address': addressController.text.trim().isEmpty
+              ? null
+              : addressController.text.trim(),
+          'credit_limit': double.parse(creditLimitController.text.isEmpty
+              ? '0'
+              : creditLimitController.text),
           'credit_balance': 0,
-          'notes': notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+          'notes': notesController.text.trim().isEmpty
+              ? null
+              : notesController.text.trim(),
           'created_at': now,
           'updated_at': now,
         });
@@ -622,8 +728,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
     final nameController = TextEditingController(text: customer.name);
     final phoneController = TextEditingController(text: customer.phone ?? '');
     final emailController = TextEditingController(text: customer.email ?? '');
-    final addressController = TextEditingController(text: customer.address ?? '');
-    final creditLimitController = TextEditingController(text: customer.creditLimit.toString());
+    final addressController =
+        TextEditingController(text: customer.address ?? '');
+    final creditLimitController =
+        TextEditingController(text: customer.creditLimit.toString());
     final notesController = TextEditingController(text: customer.notes ?? '');
 
     final result = await showDialog<bool>(
@@ -655,7 +763,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
               ),
               TextField(
                 controller: creditLimitController,
-                decoration: const InputDecoration(labelText: 'Credit Limit (NPR)'),
+                decoration:
+                    const InputDecoration(labelText: 'Credit Limit (NPR)'),
                 keyboardType: TextInputType.number,
               ),
               TextField(
@@ -681,19 +790,30 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
     if (result == true && nameController.text.isNotEmpty) {
       try {
-        final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         final customerId = customer.documentId ?? customer.id;
         if (customerId == null) return;
-        
+
         await dbProvider.update(
           'customers',
           values: {
             'name': nameController.text.trim(),
-            'phone': phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
-            'email': emailController.text.trim().isEmpty ? null : emailController.text.trim(),
-            'address': addressController.text.trim().isEmpty ? null : addressController.text.trim(),
-            'credit_limit': double.parse(creditLimitController.text.isEmpty ? '0' : creditLimitController.text),
-            'notes': notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+            'phone': phoneController.text.trim().isEmpty
+                ? null
+                : phoneController.text.trim(),
+            'email': emailController.text.trim().isEmpty
+                ? null
+                : emailController.text.trim(),
+            'address': addressController.text.trim().isEmpty
+                ? null
+                : addressController.text.trim(),
+            'credit_limit': double.parse(creditLimitController.text.isEmpty
+                ? '0'
+                : creditLimitController.text),
+            'notes': notesController.text.trim().isEmpty
+                ? null
+                : notesController.text.trim(),
             'updated_at': DateTime.now().millisecondsSinceEpoch,
           },
           where: kIsWeb ? 'documentId = ?' : 'id = ?',
@@ -705,7 +825,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
             // Force rebuild to show updated customer details
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Customer updated'), backgroundColor: Color(0xFF00B894)),
+            const SnackBar(
+                content: Text('Customer updated'),
+                backgroundColor: Color(0xFF00B894)),
           );
         }
       } catch (e) {
@@ -730,11 +852,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('Customer: ${customer.name}'),
-            Text('Current Balance: ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditBalance)}'),
+            Text(
+                'Current Balance: ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditBalance)}'),
             const SizedBox(height: 16),
             TextField(
               controller: amountController,
-              decoration: const InputDecoration(labelText: 'Credit Amount (NPR)'),
+              decoration:
+                  const InputDecoration(labelText: 'Credit Amount (NPR)'),
               keyboardType: TextInputType.number,
               autofocus: true,
             ),
@@ -752,7 +876,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              if (amountController.text.isEmpty || double.tryParse(amountController.text) == null || double.parse(amountController.text) <= 0) {
+              if (amountController.text.isEmpty ||
+                  double.tryParse(amountController.text) == null ||
+                  double.parse(amountController.text) <= 0) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Please enter a valid amount')),
                 );
@@ -772,11 +898,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
     if (result == true && amountController.text.isNotEmpty) {
       try {
-        final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
         final customerId = customer.documentId ?? customer.id;
         if (customerId == null) return;
-        
+
         final amount = double.parse(amountController.text);
         final now = DateTime.now().millisecondsSinceEpoch;
         final balanceBefore = customer.creditBalance;
@@ -800,10 +927,14 @@ class _CustomersScreenState extends State<CustomersScreen> {
           'amount': amount,
           'balance_before': balanceBefore,
           'balance_after': balanceAfter,
-          'notes': notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+          'notes': notesController.text.trim().isEmpty
+              ? null
+              : notesController.text.trim(),
           // FIXED: Handle both int (SQLite) and String (Firestore) user IDs
-          'created_by': authProvider.currentUserId != null 
-              ? (kIsWeb ? authProvider.currentUserId! : int.tryParse(authProvider.currentUserId!))
+          'created_by': authProvider.currentUserId != null
+              ? (kIsWeb
+                  ? authProvider.currentUserId!
+                  : int.tryParse(authProvider.currentUserId!))
               : null,
           'created_at': now,
           'synced': 0,
@@ -817,7 +948,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
             // Force rebuild to show updated credit balance
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Credit added successfully'), backgroundColor: Color(0xFF00B894)),
+            const SnackBar(
+                content: Text('Credit added successfully'),
+                backgroundColor: Color(0xFF00B894)),
           );
         }
       } catch (e) {
@@ -830,7 +963,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
     }
   }
 
-  Widget _buildSummaryCard(String label, double amount, Color color, IconData icon) {
+  Widget _buildSummaryCard(
+      String label, double amount, Color color, IconData icon) {
     return Card(
       color: color.withOpacity(0.1),
       child: Padding(
@@ -878,7 +1012,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
               children: [
                 Text(
                   'Customer: ${customer.name}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 const SizedBox(height: 8),
                 Container(
@@ -893,7 +1028,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     children: [
                       const Text('Outstanding Amount:'),
                       Text(
-                        NumberFormat.currency(symbol: 'NPR ').format(customer.creditBalance),
+                        NumberFormat.currency(symbol: 'NPR ')
+                            .format(customer.creditBalance),
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -918,43 +1054,48 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   onChanged: (value) {
                     final amount = double.tryParse(value) ?? 0;
                     setDialogState(() {
-                      isPartialPaymentNotifier.value = amount > 0 && amount < customer.creditBalance;
+                      isPartialPaymentNotifier.value =
+                          amount > 0 && amount < customer.creditBalance;
                     });
                   },
                 ),
                 ValueListenableBuilder<bool>(
                   valueListenable: isPartialPaymentNotifier,
                   builder: (context, isPartial, _) {
-                    if (!isPartial || amountController.text.isEmpty) return const SizedBox.shrink();
-                    return
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.info_outline, size: 16, color: Colors.blue[700]),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Partial payment. Remaining: ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditBalance - (double.tryParse(amountController.text) ?? 0))}',
-                              style: TextStyle(fontSize: 12, color: Colors.blue[700]),
+                    if (!isPartial || amountController.text.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline,
+                                size: 16, color: Colors.blue[700]),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Partial payment. Remaining: ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditBalance - (double.tryParse(amountController.text) ?? 0))}',
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.blue[700]),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  );
+                    );
                   },
                 ),
                 const SizedBox(height: 16),
                 ValueListenableBuilder<String>(
                   valueListenable: paymentMethodNotifier,
-                  builder: (context, paymentMethod, _) => DropdownButtonFormField<String>(
+                  builder: (context, paymentMethod, _) =>
+                      DropdownButtonFormField<String>(
                     value: paymentMethod,
                     decoration: const InputDecoration(
                       labelText: 'Payment Method *',
@@ -964,7 +1105,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     items: const [
                       DropdownMenuItem(value: 'cash', child: Text('Cash')),
                       DropdownMenuItem(value: 'card', child: Text('Card')),
-                      DropdownMenuItem(value: 'bank_transfer', child: Text('Bank Transfer')),
+                      DropdownMenuItem(
+                          value: 'bank_transfer', child: Text('Bank Transfer')),
                       DropdownMenuItem(value: 'other', child: Text('Other')),
                     ],
                     onChanged: (value) {
@@ -995,13 +1137,16 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 final amount = double.tryParse(amountController.text) ?? 0;
                 if (amount <= 0) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter a valid amount')),
+                    const SnackBar(
+                        content: Text('Please enter a valid amount')),
                   );
                   return;
                 }
                 if (amount > customer.creditBalance) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Amount cannot exceed outstanding balance of ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditBalance)}')),
+                    SnackBar(
+                        content: Text(
+                            'Amount cannot exceed outstanding balance of ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditBalance)}')),
                   );
                   return;
                 }
@@ -1011,7 +1156,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   'notes': notesController.text.trim(),
                 });
               },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B894)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00B894)),
               child: const Text('Receive Payment'),
             ),
           ],
@@ -1019,19 +1165,24 @@ class _CustomersScreenState extends State<CustomersScreen> {
       ),
     );
 
-    if (result != null && result['amount'] != null && (result['amount'] as double) > 0) {
+    if (result != null &&
+        result['amount'] != null &&
+        (result['amount'] as double) > 0) {
       final paymentMethod = result['paymentMethod'] as String? ?? 'cash';
       final notes = result['notes'] as String? ?? '';
       try {
-        final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        final customerId = kIsWeb ? (customer.documentId ?? customer.id) : customer.id;
+        final customerId =
+            kIsWeb ? (customer.documentId ?? customer.id) : customer.id;
         if (customerId == null) return;
-        
+
         final amount = result['amount'] as double;
         final now = DateTime.now().millisecondsSinceEpoch;
         final balanceBefore = customer.creditBalance;
-        final balanceAfter = (balanceBefore - amount).clamp(0.0, double.infinity);
+        final balanceAfter =
+            (balanceBefore - amount).clamp(0.0, double.infinity);
         final isPartial = amount < customer.creditBalance;
 
         // Update customer credit balance
@@ -1053,12 +1204,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
           'balance_before': balanceBefore,
           'balance_after': balanceAfter,
           'payment_method': paymentMethod, // Store payment method
-          'notes': notes.isEmpty 
-              ? (isPartial ? 'Partial payment' : null)
-              : notes,
+          'notes':
+              notes.isEmpty ? (isPartial ? 'Partial payment' : null) : notes,
           // FIXED: Handle both int (SQLite) and String (Firestore) user IDs
-          'created_by': authProvider.currentUserId != null 
-              ? (kIsWeb ? authProvider.currentUserId! : int.tryParse(authProvider.currentUserId!))
+          'created_by': authProvider.currentUserId != null
+              ? (kIsWeb
+                  ? authProvider.currentUserId!
+                  : int.tryParse(authProvider.currentUserId!))
               : null,
           'created_at': now,
           'synced': 0,
@@ -1074,7 +1226,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                isPartial 
+                isPartial
                     ? 'Partial payment of ${NumberFormat.currency(symbol: 'NPR ').format(amount)} received. Remaining: ${NumberFormat.currency(symbol: 'NPR ').format(balanceAfter)}'
                     : 'Payment received successfully',
               ),

@@ -64,27 +64,34 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     if (_searchQuery.isEmpty) {
       return _suppliers;
     }
-    return _suppliers.where((s) =>
-      s.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-      (s.contactPerson != null && s.contactPerson!.toLowerCase().contains(_searchQuery.toLowerCase())) ||
-      (s.phone != null && s.phone!.contains(_searchQuery)) ||
-      (s.email != null && s.email!.toLowerCase().contains(_searchQuery.toLowerCase()))
-    ).toList();
+    return _suppliers
+        .where((s) =>
+            s.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+            (s.contactPerson != null &&
+                s.contactPerson!
+                    .toLowerCase()
+                    .contains(_searchQuery.toLowerCase())) ||
+            (s.phone != null && s.phone!.contains(_searchQuery)) ||
+            (s.email != null &&
+                s.email!.toLowerCase().contains(_searchQuery.toLowerCase())))
+        .toList();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: widget.hideAppBar ? null : AppBar(
-        title: const Text('Suppliers / Parties'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadSuppliers,
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
+      appBar: widget.hideAppBar
+          ? null
+          : AppBar(
+              title: const Text('Suppliers / Parties'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _loadSuppliers,
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
       body: Column(
         children: [
           // Search Bar
@@ -129,7 +136,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                 ),
                 filled: true,
                 fillColor: Colors.grey[50],
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
               onChanged: (value) {
                 setState(() {
@@ -138,7 +146,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
               },
             ),
           ),
-          
+
           // Suppliers List
           Expanded(
             child: _isLoading
@@ -148,13 +156,15 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.business, size: 64, color: Colors.grey[400]),
+                            Icon(Icons.business,
+                                size: 64, color: Colors.grey[400]),
                             const SizedBox(height: 16),
                             Text(
                               _searchQuery.isEmpty
                                   ? 'No suppliers found'
                                   : 'No suppliers match your search',
-                              style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                              style: TextStyle(
+                                  color: Colors.grey[600], fontSize: 16),
                             ),
                             if (_searchQuery.isEmpty) ...[
                               const SizedBox(height: 8),
@@ -207,7 +217,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
-          backgroundColor: supplier.isActive ? AppTheme.logoPrimary : Colors.grey,
+          backgroundColor:
+              supplier.isActive ? AppTheme.logoPrimary : Colors.grey,
           radius: 24,
           child: Text(
             supplier.name.substring(0, 1).toUpperCase(),
@@ -226,7 +237,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
-                  decoration: supplier.isActive ? null : TextDecoration.lineThrough,
+                  decoration:
+                      supplier.isActive ? null : TextDecoration.lineThrough,
                 ),
               ),
             ),
@@ -363,12 +375,14 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(
             children: [
               Icon(Icons.business, color: AppTheme.logoPrimary, size: 28),
               const SizedBox(width: 12),
-              const Text('Add Supplier / Party', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const Text('Add Supplier / Party',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             ],
           ),
           content: SingleChildScrollView(
@@ -488,17 +502,28 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       try {
         final supplier = Supplier(
           name: nameController.text.trim(),
-          contactPerson: contactPersonController.text.trim().isEmpty ? null : contactPersonController.text.trim(),
-          phone: phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
-          email: emailController.text.trim().isEmpty ? null : emailController.text.trim(),
-          address: addressController.text.trim().isEmpty ? null : addressController.text.trim(),
-          notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+          contactPerson: contactPersonController.text.trim().isEmpty
+              ? null
+              : contactPersonController.text.trim(),
+          phone: phoneController.text.trim().isEmpty
+              ? null
+              : phoneController.text.trim(),
+          email: emailController.text.trim().isEmpty
+              ? null
+              : emailController.text.trim(),
+          address: addressController.text.trim().isEmpty
+              ? null
+              : addressController.text.trim(),
+          notes: notesController.text.trim().isEmpty
+              ? null
+              : notesController.text.trim(),
           isActive: isActive,
           createdAt: DateTime.now().millisecondsSinceEpoch,
           updatedAt: DateTime.now().millisecondsSinceEpoch,
         );
 
-        await _supplierService.createSupplier(context: context, supplier: supplier);
+        await _supplierService.createSupplier(
+            context: context, supplier: supplier);
         await _loadSuppliers();
 
         if (mounted) {
@@ -524,10 +549,12 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
 
   Future<void> _showEditSupplierDialog(Supplier supplier) async {
     final nameController = TextEditingController(text: supplier.name);
-    final contactPersonController = TextEditingController(text: supplier.contactPerson ?? '');
+    final contactPersonController =
+        TextEditingController(text: supplier.contactPerson ?? '');
     final phoneController = TextEditingController(text: supplier.phone ?? '');
     final emailController = TextEditingController(text: supplier.email ?? '');
-    final addressController = TextEditingController(text: supplier.address ?? '');
+    final addressController =
+        TextEditingController(text: supplier.address ?? '');
     final notesController = TextEditingController(text: supplier.notes ?? '');
     bool isActive = supplier.isActive;
 
@@ -535,12 +562,14 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(
             children: [
               Icon(Icons.edit, color: AppTheme.logoPrimary, size: 28),
               const SizedBox(width: 12),
-              const Text('Edit Supplier', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const Text('Edit Supplier',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             ],
           ),
           content: SingleChildScrollView(
@@ -653,11 +682,21 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       try {
         final updatedSupplier = supplier.copyWith(
           name: nameController.text.trim(),
-          contactPerson: contactPersonController.text.trim().isEmpty ? null : contactPersonController.text.trim(),
-          phone: phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
-          email: emailController.text.trim().isEmpty ? null : emailController.text.trim(),
-          address: addressController.text.trim().isEmpty ? null : addressController.text.trim(),
-          notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+          contactPerson: contactPersonController.text.trim().isEmpty
+              ? null
+              : contactPersonController.text.trim(),
+          phone: phoneController.text.trim().isEmpty
+              ? null
+              : phoneController.text.trim(),
+          email: emailController.text.trim().isEmpty
+              ? null
+              : emailController.text.trim(),
+          address: addressController.text.trim().isEmpty
+              ? null
+              : addressController.text.trim(),
+          notes: notesController.text.trim().isEmpty
+              ? null
+              : notesController.text.trim(),
           isActive: isActive,
           updatedAt: DateTime.now().millisecondsSinceEpoch,
         );
@@ -673,7 +712,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Supplier "${updatedSupplier.name}" updated successfully'),
+              content: Text(
+                  'Supplier "${updatedSupplier.name}" updated successfully'),
               backgroundColor: AppTheme.successColor,
             ),
           );
@@ -695,7 +735,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(supplier.isActive ? 'Deactivate Supplier?' : 'Activate Supplier?'),
+        title: Text(
+            supplier.isActive ? 'Deactivate Supplier?' : 'Activate Supplier?'),
         content: Text(
           supplier.isActive
               ? 'Are you sure you want to deactivate "${supplier.name}"?'
@@ -709,7 +750,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: supplier.isActive ? Colors.orange : AppTheme.successColor,
+              backgroundColor:
+                  supplier.isActive ? Colors.orange : AppTheme.successColor,
             ),
             child: Text(supplier.isActive ? 'Deactivate' : 'Activate'),
           ),
@@ -759,15 +801,16 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
 
   Future<void> _showSupplierDetails(Supplier supplier) async {
     // Load supplier's purchases and payments
-    final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+    final dbProvider =
+        Provider.of<UnifiedDatabaseProvider>(context, listen: false);
     await dbProvider.init();
-    
+
     List<Map<String, dynamic>> purchases = [];
     List<Map<String, dynamic>> payments = [];
     double totalPurchases = 0;
     double totalPaid = 0;
     double outstanding = 0;
-    
+
     try {
       // Load purchases for this supplier
       // Prefer supplier_id linkage; fallback to supplier_name for legacy data.
@@ -784,7 +827,9 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
             orderBy: 'created_at DESC',
           );
           for (final p in byId) {
-            final key = (kIsWeb ? (p['documentId'] ?? p['id']) : p['id'])?.toString() ?? p.toString();
+            final key =
+                (kIsWeb ? (p['documentId'] ?? p['id']) : p['id'])?.toString() ??
+                    p.toString();
             byKey[key] = p;
           }
         } catch (e) {
@@ -801,7 +846,9 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           orderBy: 'created_at DESC',
         );
         for (final p in byName) {
-          final key = (kIsWeb ? (p['documentId'] ?? p['id']) : p['id'])?.toString() ?? p.toString();
+          final key =
+              (kIsWeb ? (p['documentId'] ?? p['id']) : p['id'])?.toString() ??
+                  p.toString();
           byKey[key] = p;
         }
       } catch (e) {
@@ -822,12 +869,15 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           for (final p in recent) {
             final rawName = (p['supplier_name'] as String?) ?? '';
             if (rawName.trim().toLowerCase() == normSupplier) {
-              final key = (kIsWeb ? (p['documentId'] ?? p['id']) : p['id'])?.toString() ?? p.toString();
+              final key = (kIsWeb ? (p['documentId'] ?? p['id']) : p['id'])
+                      ?.toString() ??
+                  p.toString();
               byKey[key] = p;
             }
           }
         } catch (e) {
-          debugPrint('Error loading purchases via name-normalized fallback: $e');
+          debugPrint(
+              'Error loading purchases via name-normalized fallback: $e');
         }
       }
 
@@ -837,7 +887,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
         final bTime = (b['created_at'] as num? ?? 0).toInt();
         return bTime.compareTo(aTime);
       });
-      
+
       // Calculate totals
       for (var purchase in purchases) {
         final total = (purchase['total_amount'] as num? ?? 0).toDouble();
@@ -846,10 +896,11 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
         totalPaid += paid;
         outstanding += (total - paid);
       }
-      
+
       // Load payment history
       for (var purchase in purchases) {
-        final purchaseId = kIsWeb ? purchase['documentId'] ?? purchase['id'] : purchase['id'];
+        final purchaseId =
+            kIsWeb ? purchase['documentId'] ?? purchase['id'] : purchase['id'];
         if (purchaseId != null) {
           try {
             final purchasePayments = await dbProvider.query(
@@ -872,7 +923,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     } catch (e) {
       debugPrint('Error loading supplier details: $e');
     }
-    
+
     await showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -901,7 +952,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                       backgroundColor: AppTheme.logoPrimary,
                       child: Text(
                         supplier.name.substring(0, 1).toUpperCase(),
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.bold),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -911,12 +963,14 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                         children: [
                           Text(
                             supplier.name,
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                fontSize: 20, fontWeight: FontWeight.bold),
                           ),
                           if (supplier.phone != null)
                             Text(
                               'Phone: ${supplier.phone}',
-                              style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey[700]),
                             ),
                         ],
                       ),
@@ -928,7 +982,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                   ],
                 ),
               ),
-              
+
               // Content
               Expanded(
                 child: SingleChildScrollView(
@@ -975,11 +1029,12 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                         },
                       ),
                       const SizedBox(height: 24),
-                      
+
                       // Action Buttons
                       Builder(
                         builder: (dialogContext) {
-                          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                          final authProvider =
+                              Provider.of<AuthProvider>(context, listen: false);
                           final hasOutstanding = outstanding > 0;
                           return Row(
                             children: [
@@ -989,12 +1044,15 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                                     Navigator.pop(dialogContext);
                                     _navigateToAddPurchase(supplier.name);
                                   },
-                                  icon: const Icon(Icons.add_shopping_cart, color: Colors.white),
-                                  label: const Text('Create Purchase', style: TextStyle(color: Colors.white)),
+                                  icon: const Icon(Icons.add_shopping_cart,
+                                      color: Colors.white),
+                                  label: const Text('Create Purchase',
+                                      style: TextStyle(color: Colors.white)),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: AppTheme.logoPrimary,
                                     foregroundColor: AppTheme.logoAccent,
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 12),
                                   ),
                                 ),
                               ),
@@ -1003,7 +1061,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                                 Expanded(
                                   child: ElevatedButton.icon(
                                     onPressed: () async {
-                                      final success = await _showSupplierPaymentDialog(
+                                      final success =
+                                          await _showSupplierPaymentDialog(
                                         supplier: supplier,
                                         purchases: purchases,
                                       );
@@ -1012,18 +1071,22 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                                         if (Navigator.canPop(dialogContext)) {
                                           Navigator.pop(dialogContext);
                                         }
-                                        await Future.delayed(const Duration(milliseconds: 150));
+                                        await Future.delayed(
+                                            const Duration(milliseconds: 150));
                                         if (mounted) {
                                           await _showSupplierDetails(supplier);
                                         }
                                       }
                                     },
-                                    icon: const Icon(Icons.payments, color: Colors.white),
-                                    label: const Text('Pay Supplier', style: TextStyle(color: Colors.white)),
+                                    icon: const Icon(Icons.payments,
+                                        color: Colors.white),
+                                    label: const Text('Pay Supplier',
+                                        style: TextStyle(color: Colors.white)),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: AppTheme.successColor,
                                       foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12),
                                     ),
                                   ),
                                 ),
@@ -1033,7 +1096,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                         },
                       ),
                       const SizedBox(height: 24),
-                      
+
                       // Purchase History
                       Text(
                         'Purchase History (${purchases.length})',
@@ -1054,10 +1117,11 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                           ),
                         )
                       else
-                        ...purchases.map((purchase) => _buildPurchaseCard(purchase)),
-                      
+                        ...purchases
+                            .map((purchase) => _buildPurchaseCard(purchase)),
+
                       const SizedBox(height: 24),
-                      
+
                       // Payment History
                       Text(
                         'Payment History (${payments.length})',
@@ -1078,7 +1142,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                           ),
                         )
                       else
-                        ...payments.map((payment) => _buildPaymentCard(payment, purchases)),
+                        ...payments.map(
+                            (payment) => _buildPaymentCard(payment, purchases)),
                     ],
                   ),
                 ),
@@ -1089,12 +1154,13 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       ),
     );
   }
-  
+
   void _navigateToAddPurchase(String supplierName) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => PurchasesScreen(preSelectedSupplier: supplierName),
+        builder: (context) =>
+            PurchasesScreen(preSelectedSupplier: supplierName),
       ),
     );
   }
@@ -1116,7 +1182,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     if (outstandingPurchases.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No outstanding purchases for this supplier')),
+          const SnackBar(
+              content: Text('No outstanding purchases for this supplier')),
         );
       }
       return false;
@@ -1132,9 +1199,13 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
-          double totalAmount = (selectedPurchase['total_amount'] as num? ?? 0).toDouble();
-          double paidAmount = (selectedPurchase['paid_amount'] as num? ?? 0).toDouble();
-          double outstandingAmount = (selectedPurchase['outstanding_amount'] as num?)?.toDouble() ?? (totalAmount - paidAmount);
+          double totalAmount =
+              (selectedPurchase['total_amount'] as num? ?? 0).toDouble();
+          double paidAmount =
+              (selectedPurchase['paid_amount'] as num? ?? 0).toDouble();
+          double outstandingAmount =
+              (selectedPurchase['outstanding_amount'] as num?)?.toDouble() ??
+                  (totalAmount - paidAmount);
           outstandingAmount = outstandingAmount.clamp(0.0, double.infinity);
 
           return AlertDialog(
@@ -1145,7 +1216,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                 children: [
                   Text(
                     supplier.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<Map<String, dynamic>>(
@@ -1158,10 +1230,13 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                       final pn = p['purchase_number'] as String? ?? 'N/A';
                       final total = (p['total_amount'] as num? ?? 0).toDouble();
                       final paid = (p['paid_amount'] as num? ?? 0).toDouble();
-                      final out = (p['outstanding_amount'] as num?)?.toDouble() ?? (total - paid);
+                      final out =
+                          (p['outstanding_amount'] as num?)?.toDouble() ??
+                              (total - paid);
                       return DropdownMenuItem(
                         value: p,
-                        child: Text('$pn • Outstanding: ${NumberFormat.currency(symbol: 'NPR ').format(out)}'),
+                        child: Text(
+                            '$pn • Outstanding: ${NumberFormat.currency(symbol: 'NPR ').format(out)}'),
                       );
                     }).toList(),
                     onChanged: (value) {
@@ -1186,8 +1261,11 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                       children: [
                         const Text('Outstanding:'),
                         Text(
-                          NumberFormat.currency(symbol: 'NPR ').format(outstandingAmount),
-                          style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.logoAccent),
+                          NumberFormat.currency(symbol: 'NPR ')
+                              .format(outstandingAmount),
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.logoAccent),
                         ),
                       ],
                     ),
@@ -1200,26 +1278,33 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.currency_rupee),
                     ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                     autofocus: true,
                     onChanged: (value) {
                       final amount = double.tryParse(value) ?? 0;
                       setDialogState(() {
-                        isPartialPaymentNotifier.value = amount > 0 && amount < outstandingAmount;
+                        isPartialPaymentNotifier.value =
+                            amount > 0 && amount < outstandingAmount;
                       });
                     },
                   ),
                   ValueListenableBuilder<bool>(
                     valueListenable: isPartialPaymentNotifier,
                     builder: (context, isPartial, _) {
-                      if (!isPartial || amountController.text.isEmpty) return const SizedBox.shrink();
-                      final amount = double.tryParse(amountController.text) ?? 0;
-                      final remaining = (outstandingAmount - amount).clamp(0.0, double.infinity);
+                      if (!isPartial || amountController.text.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      final amount =
+                          double.tryParse(amountController.text) ?? 0;
+                      final remaining = (outstandingAmount - amount)
+                          .clamp(0.0, double.infinity);
                       return Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
                           'Partial payment. Remaining: ${NumberFormat.currency(symbol: 'NPR ').format(remaining)}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                          style:
+                              TextStyle(fontSize: 12, color: Colors.grey[700]),
                         ),
                       );
                     },
@@ -1227,7 +1312,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                   const SizedBox(height: 12),
                   ValueListenableBuilder<String>(
                     valueListenable: paymentMethodNotifier,
-                    builder: (context, paymentMethod, _) => DropdownButtonFormField<String>(
+                    builder: (context, paymentMethod, _) =>
+                        DropdownButtonFormField<String>(
                       value: paymentMethod,
                       decoration: const InputDecoration(
                         labelText: 'Payment Method *',
@@ -1237,7 +1323,9 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                       items: const [
                         DropdownMenuItem(value: 'cash', child: Text('Cash')),
                         DropdownMenuItem(value: 'card', child: Text('Card')),
-                        DropdownMenuItem(value: 'bank_transfer', child: Text('Bank Transfer')),
+                        DropdownMenuItem(
+                            value: 'bank_transfer',
+                            child: Text('Bank Transfer')),
                         DropdownMenuItem(value: 'other', child: Text('Other')),
                       ],
                       onChanged: (value) {
@@ -1268,13 +1356,16 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                   final amount = double.tryParse(amountController.text) ?? 0;
                   if (amount <= 0) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Please enter a valid amount')),
+                      const SnackBar(
+                          content: Text('Please enter a valid amount')),
                     );
                     return;
                   }
                   if (amount > outstandingAmount) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Amount cannot exceed outstanding ${NumberFormat.currency(symbol: 'NPR ').format(outstandingAmount)}')),
+                      SnackBar(
+                          content: Text(
+                              'Amount cannot exceed outstanding ${NumberFormat.currency(symbol: 'NPR ').format(outstandingAmount)}')),
                     );
                     return;
                   }
@@ -1300,11 +1391,13 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     if (result == null) return false;
 
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       final purchase = result['purchase'] as Map<String, dynamic>;
-      final purchaseId = kIsWeb ? (purchase['documentId'] ?? purchase['id']) : purchase['id'];
+      final purchaseId =
+          kIsWeb ? (purchase['documentId'] ?? purchase['id']) : purchase['id'];
       if (purchaseId == null) return false;
 
       final amount = (result['amount'] as num).toDouble();
@@ -1315,17 +1408,23 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       final totalAmount = (purchase['total_amount'] as num? ?? 0).toDouble();
       final currentPaid = (purchase['paid_amount'] as num? ?? 0).toDouble();
       final newPaid = currentPaid + amount;
-      final newOutstanding = (totalAmount - newPaid).clamp(0.0, double.infinity);
-      final newPaymentStatus = newOutstanding <= 0 ? 'paid' : (newPaid > 0 ? 'partial' : 'unpaid');
+      final newOutstanding =
+          (totalAmount - newPaid).clamp(0.0, double.infinity);
+      final newPaymentStatus =
+          newOutstanding <= 0 ? 'paid' : (newPaid > 0 ? 'partial' : 'unpaid');
 
       // Create payment record
       await dbProvider.insert('purchase_payments', {
         'purchase_id': purchaseId,
         'amount': amount,
         'payment_method': paymentMethod,
-        'notes': notes.isEmpty ? (newOutstanding > 0 ? 'Partial payment' : null) : notes,
+        'notes': notes.isEmpty
+            ? (newOutstanding > 0 ? 'Partial payment' : null)
+            : notes,
         'created_by': authProvider.currentUserId != null
-            ? (kIsWeb ? authProvider.currentUserId! : int.tryParse(authProvider.currentUserId!))
+            ? (kIsWeb
+                ? authProvider.currentUserId!
+                : int.tryParse(authProvider.currentUserId!))
             : null,
         'created_at': now,
         'synced': 0,
@@ -1367,8 +1466,10 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       return false;
     }
   }
-  
-  Widget _buildSummaryCard(String label, double amount, Color color, IconData icon, {bool fullWidth = false}) {
+
+  Widget _buildSummaryCard(
+      String label, double amount, Color color, IconData icon,
+      {bool fullWidth = false}) {
     return Card(
       color: color.withOpacity(0.1),
       child: Padding(
@@ -1405,7 +1506,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       ),
     );
   }
-  
+
   Widget _buildPurchaseCard(Map<String, dynamic> purchase) {
     final purchaseNumber = purchase['purchase_number'] as String? ?? 'N/A';
     final totalAmount = (purchase['total_amount'] as num? ?? 0).toDouble();
@@ -1414,13 +1515,16 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     final createdAt = (purchase['created_at'] as num? ?? 0).toInt();
     final date = DateTime.fromMillisecondsSinceEpoch(createdAt);
     final isPaid = outstandingAmount <= 0;
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      color: isPaid ? AppTheme.successColor.withOpacity(0.1) : AppTheme.warningColor.withOpacity(0.1),
+      color: isPaid
+          ? AppTheme.successColor.withOpacity(0.1)
+          : AppTheme.warningColor.withOpacity(0.1),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: isPaid ? AppTheme.successColor : AppTheme.warningColor,
+          backgroundColor:
+              isPaid ? AppTheme.successColor : AppTheme.warningColor,
           child: Icon(
             isPaid ? Icons.check_circle : Icons.pending,
             color: Colors.white,
@@ -1461,14 +1565,15 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       ),
     );
   }
-  
-  Widget _buildPaymentCard(Map<String, dynamic> payment, List<Map<String, dynamic>> purchases) {
+
+  Widget _buildPaymentCard(
+      Map<String, dynamic> payment, List<Map<String, dynamic>> purchases) {
     final amount = (payment['amount'] as num? ?? 0).toDouble();
     final paymentMethod = payment['payment_method'] as String? ?? 'cash';
     final notes = payment['notes'] as String? ?? '';
     final createdAt = (payment['created_at'] as num? ?? 0).toInt();
     final date = DateTime.fromMillisecondsSinceEpoch(createdAt);
-    
+
     // Find purchase number
     String purchaseNumber = 'N/A';
     final purchaseId = payment['purchase_id'];
@@ -1481,7 +1586,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     } catch (e) {
       debugPrint('Error finding purchase: $e');
     }
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(

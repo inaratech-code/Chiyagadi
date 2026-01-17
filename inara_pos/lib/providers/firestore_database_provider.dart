@@ -33,10 +33,10 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
     try {
       debugPrint('FirestoreDatabase: Initializing Firestore...');
-      
+
       // Get Firestore instance
       _firestore = FirebaseFirestore.instance;
-      
+
       // Try to enable offline persistence (may not be supported on all web platforms)
       try {
         _firestore!.settings = const Settings(
@@ -45,7 +45,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         );
         debugPrint('FirestoreDatabase: Offline persistence enabled');
       } catch (settingsError) {
-        debugPrint('FirestoreDatabase: Could not set persistence settings (this is OK on some web platforms): $settingsError');
+        debugPrint(
+            'FirestoreDatabase: Could not set persistence settings (this is OK on some web platforms): $settingsError');
         // Continue without persistence settings - Firestore will still work
       }
 
@@ -57,10 +58,13 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       } catch (testError) {
         debugPrint('FirestoreDatabase: Connection test failed: $testError');
         // Check if it's a permissions error (database not enabled)
-        if (testError.toString().contains('permission') || 
+        if (testError.toString().contains('permission') ||
             testError.toString().contains('PERMISSION_DENIED') ||
-            testError.toString().contains('Missing or insufficient permissions')) {
-          throw Exception('Firestore database is not enabled or permissions are not set. Please enable Firestore Database in Firebase Console and configure security rules.');
+            testError
+                .toString()
+                .contains('Missing or insufficient permissions')) {
+          throw Exception(
+              'Firestore database is not enabled or permissions are not set. Please enable Firestore Database in Firebase Console and configure security rules.');
         }
         // Re-throw other errors
         rethrow;
@@ -68,7 +72,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
       _isInitialized = true;
       debugPrint('FirestoreDatabase: Firestore initialized successfully');
-      
+
       // Initialize default data if needed
       await _initializeDefaultData();
     } catch (e) {
@@ -81,49 +85,53 @@ class FirestoreDatabaseProvider with ChangeNotifier {
   Future<void> _initializeDefaultData() async {
     try {
       // Check if settings already exist
-      final settingsSnapshot = await firestore.collection('settings').limit(1).get();
-      
+      final settingsSnapshot =
+          await firestore.collection('settings').limit(1).get();
+
       if (settingsSnapshot.docs.isEmpty) {
         debugPrint('FirestoreDatabase: Initializing default data...');
         final now = DateTime.now().millisecondsSinceEpoch;
-        
+
         // Create default settings
         await firestore.collection('settings').doc('cafe_name').set({
           'key': 'cafe_name',
           'value': 'चिया गढी',
           'updated_at': now,
         });
-        
+
         await firestore.collection('settings').doc('cafe_name_en').set({
           'key': 'cafe_name_en',
           'value': 'Chiya Gadhi',
           'updated_at': now,
         });
-        
+
         await firestore.collection('settings').doc('tax_percent').set({
           'key': 'tax_percent',
           'value': '13',
           'updated_at': now,
         });
-        
+
         await firestore.collection('settings').doc('discount_enabled').set({
           'key': 'discount_enabled',
           'value': '1',
           'updated_at': now,
         });
-        
-        await firestore.collection('settings').doc('default_discount_percent').set({
+
+        await firestore
+            .collection('settings')
+            .doc('default_discount_percent')
+            .set({
           'key': 'default_discount_percent',
           'value': '0',
           'updated_at': now,
         });
-        
+
         await firestore.collection('settings').doc('max_discount_percent').set({
           'key': 'max_discount_percent',
           'value': '50',
           'updated_at': now,
         });
-        
+
         debugPrint('FirestoreDatabase: Default settings created');
       }
     } catch (e) {
@@ -192,12 +200,16 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
       // Apply orderBy
       if (orderBy != null) {
-        final parts = orderBy.split(' ');
-        final field = parts[0];
-        final direction = parts.length > 1 && parts[1].toUpperCase() == 'DESC'
-            ? 'desc'
-            : 'asc';
-        query = query.orderBy(field, descending: direction == 'desc');
+        // Support multi-field orderBy: "field1 ASC, field2 DESC"
+        final segments =
+            orderBy.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty);
+        for (final seg in segments) {
+          final parts =
+              seg.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+          final field = parts.isNotEmpty ? parts[0] : seg;
+          final isDesc = parts.length > 1 && parts[1].toUpperCase() == 'DESC';
+          query = query.orderBy(field, descending: isDesc);
+        }
       }
 
       // Apply limit
@@ -211,17 +223,107 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       }
 
       final snapshot = await query.get();
-      
+
       return snapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
         // Add document ID as 'id' field for compatibility
         data['id'] = doc.id;
         return data;
       }).toList();
+    } on FirebaseException catch (e) {
+      // Web frequently hits "failed-precondition: requires an index" for compound queries.
+      // Fallback: rerun without orderBy and sort client-side, so app remains usable without indexes.
+      debugPrint('FirestoreDatabase: Query error: $e');
+
+      final msg = (e.message ?? '').toLowerCase();
+      final isIndexError = e.code == 'failed-precondition' &&
+          (msg.contains('requires an index') || msg.contains('index'));
+
+      if (!isIndexError || orderBy == null) {
+        rethrow;
+      }
+
+      try {
+        Query fallbackQuery = firestore.collection(collection);
+
+        // Apply the same where clause (but no orderBy)
+        if (where != null && whereArgs != null && whereArgs.isNotEmpty) {
+          final conditions = where.split(' AND ');
+          for (var i = 0; i < conditions.length && i < whereArgs.length; i++) {
+            final condition = conditions[i].trim();
+            if (condition.contains(' = ?')) {
+              final field = condition.split(' = ?')[0].trim();
+              fallbackQuery =
+                  fallbackQuery.where(field, isEqualTo: whereArgs[i]);
+            } else if (condition.contains(' != ?')) {
+              final field = condition.split(' != ?')[0].trim();
+              fallbackQuery =
+                  fallbackQuery.where(field, isNotEqualTo: whereArgs[i]);
+            } else if (condition.contains(' > ?')) {
+              final field = condition.split(' > ?')[0].trim();
+              fallbackQuery =
+                  fallbackQuery.where(field, isGreaterThan: whereArgs[i]);
+            } else if (condition.contains(' < ?')) {
+              final field = condition.split(' < ?')[0].trim();
+              fallbackQuery =
+                  fallbackQuery.where(field, isLessThan: whereArgs[i]);
+            }
+          }
+        }
+
+        if (limit != null) {
+          fallbackQuery = fallbackQuery.limit(limit);
+        }
+
+        final snap = await fallbackQuery.get();
+        final rows = snap.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          data['id'] = doc.id;
+          return data;
+        }).toList();
+
+        // Sort locally to approximate Firestore orderBy
+        _sortRowsInMemory(rows, orderBy);
+        return rows;
+      } catch (fallbackError) {
+        debugPrint('FirestoreDatabase: Query fallback failed: $fallbackError');
+        rethrow;
+      }
     } catch (e) {
       debugPrint('FirestoreDatabase: Query error: $e');
       rethrow;
     }
+  }
+
+  static void _sortRowsInMemory(
+      List<Map<String, dynamic>> rows, String orderBy) {
+    final segments = orderBy
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+
+    int compareDynamic(dynamic a, dynamic b) {
+      if (a == null && b == null) return 0;
+      if (a == null) return -1;
+      if (b == null) return 1;
+      if (a is num && b is num) return a.compareTo(b);
+      return a.toString().toLowerCase().compareTo(b.toString().toLowerCase());
+    }
+
+    rows.sort((ra, rb) {
+      for (final seg in segments) {
+        final parts =
+            seg.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+        final field = parts.isNotEmpty ? parts[0] : seg;
+        final isDesc = parts.length > 1 && parts[1].toUpperCase() == 'DESC';
+
+        final c = compareDynamic(ra[field], rb[field]);
+        if (c != 0) return isDesc ? -c : c;
+      }
+      // Stable-ish tie-breaker: document id
+      return compareDynamic(ra['id'], rb['id']);
+    });
   }
 
   Future<String> insert(String collection, Map<String, dynamic> data) async {
@@ -233,7 +335,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       // Remove 'id' field if present (Firestore generates it)
       final dataToInsert = Map<String, dynamic>.from(data);
       dataToInsert.remove('id');
-      
+
       // Add timestamps if not present
       final now = DateTime.now().millisecondsSinceEpoch;
       if (!dataToInsert.containsKey('created_at')) {
@@ -244,7 +346,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       }
 
       final docRef = await firestore.collection(collection).add(dataToInsert);
-      debugPrint('FirestoreDatabase: Inserted document ${docRef.id} into $collection');
+      debugPrint(
+          'FirestoreDatabase: Inserted document ${docRef.id} into $collection');
       return docRef.id;
     } catch (e) {
       debugPrint('FirestoreDatabase: Insert error: $e');
@@ -276,15 +379,18 @@ class FirestoreDatabaseProvider with ChangeNotifier {
           final docRef = firestore.collection(collection).doc(docId);
           await docRef.update(dataToUpdate);
           count = 1;
-          debugPrint('FirestoreDatabase: Updated document $docId in $collection');
+          debugPrint(
+              'FirestoreDatabase: Updated document $docId in $collection');
         } else {
           // Find documents matching where clause
-          final docs = await query(collection, where: where, whereArgs: whereArgs);
-          
+          final docs =
+              await query(collection, where: where, whereArgs: whereArgs);
+
           // Update each document
           final batch = firestore.batch();
           for (var doc in docs) {
-            final docRef = firestore.collection(collection).doc(doc['id'] as String);
+            final docRef =
+                firestore.collection(collection).doc(doc['id'] as String);
             batch.update(docRef, dataToUpdate);
             count++;
           }
@@ -329,20 +435,24 @@ class FirestoreDatabaseProvider with ChangeNotifier {
           final docRef = firestore.collection(collection).doc(docId);
           await docRef.delete();
           count = 1;
-          debugPrint('FirestoreDatabase: Deleted document $docId from $collection');
+          debugPrint(
+              'FirestoreDatabase: Deleted document $docId from $collection');
         } else {
           // Find documents matching where clause
-          final docs = await query(collection, where: where, whereArgs: whereArgs);
-          
+          final docs =
+              await query(collection, where: where, whereArgs: whereArgs);
+
           // Delete each document
           final batch = firestore.batch();
           for (var doc in docs) {
-            final docRef = firestore.collection(collection).doc(doc['id'] as String);
+            final docRef =
+                firestore.collection(collection).doc(doc['id'] as String);
             batch.delete(docRef);
             count++;
           }
           await batch.commit();
-          debugPrint('FirestoreDatabase: Deleted $count documents from $collection');
+          debugPrint(
+              'FirestoreDatabase: Deleted $count documents from $collection');
         }
       } else {
         // Delete all documents (use with caution)
@@ -355,7 +465,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         await batch.commit();
       }
 
-      debugPrint('FirestoreDatabase: Deleted $count documents from $collection');
+      debugPrint(
+          'FirestoreDatabase: Deleted $count documents from $collection');
       return count;
     } catch (e) {
       debugPrint('FirestoreDatabase: Delete error: $e');
@@ -369,11 +480,14 @@ class FirestoreDatabaseProvider with ChangeNotifier {
     }
 
     try {
-      return await firestore.runTransaction((transaction) async {
-        // Create a wrapper to match the expected interface
-        final txnWrapper = _FirestoreTransaction(transaction, firestore);
-        return await action(txnWrapper);
-      });
+      // IMPORTANT (Web): The current transaction wrapper uses normal `.get()` reads inside
+      // a Firestore transaction callback, which is not supported on web and can throw
+      // opaque JS errors ("Dart exception thrown from converted Future").
+      //
+      // For web, we run the "transaction" as a best-effort sequential operation wrapper.
+      // This keeps the app working reliably without requiring strict atomicity.
+      final txnWrapper = _FirestoreNonTransaction(this);
+      return await action(txnWrapper);
     } catch (e) {
       debugPrint('FirestoreDatabase: Transaction error: $e');
       rethrow;
@@ -388,17 +502,33 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
     try {
       debugPrint('FirestoreDatabase: Resetting database...');
-      
+
       // Get all collections
-      final collections = ['users', 'orders', 'order_items', 'products', 'categories', 
-                          'customers', 'settings', 'inventory', 'purchases', 
-                          'purchase_items', 'purchase_payments', 'stock_transactions', 'credit_transactions', 
-                          'payments', 'tables', 'day_sessions', 'audit_log',
-                          'suppliers', 'inventory_ledger'];
-      
+      final collections = [
+        'users',
+        'orders',
+        'order_items',
+        'products',
+        'categories',
+        'customers',
+        'settings',
+        'inventory',
+        'purchases',
+        'purchase_items',
+        'purchase_payments',
+        'stock_transactions',
+        'credit_transactions',
+        'payments',
+        'tables',
+        'day_sessions',
+        'audit_log',
+        'suppliers',
+        'inventory_ledger'
+      ];
+
       final batch = firestore.batch();
       int totalDeleted = 0;
-      
+
       for (final collectionName in collections) {
         final snapshot = await firestore.collection(collectionName).get();
         for (var doc in snapshot.docs) {
@@ -406,10 +536,11 @@ class FirestoreDatabaseProvider with ChangeNotifier {
           totalDeleted++;
         }
       }
-      
+
       await batch.commit();
-      debugPrint('FirestoreDatabase: Reset complete. Deleted $totalDeleted documents');
-      
+      debugPrint(
+          'FirestoreDatabase: Reset complete. Deleted $totalDeleted documents');
+
       // Reinitialize default data
       await _initializeDefaultData();
     } catch (e) {
@@ -424,31 +555,23 @@ class FirestoreDatabaseProvider with ChangeNotifier {
   }
 }
 
-/// Wrapper class to make Firestore Transaction compatible with expected interface
-/// 
-/// FIXED: Added query support and update with where clause support
-class _FirestoreTransaction {
-  final Transaction _transaction;
-  final FirebaseFirestore _firestore;
+// NOTE: Firestore transaction wrapper removed.
+// We intentionally avoid Firestore `runTransaction` on web because it caused
+// opaque failures due to invalid read patterns in the old wrapper.
 
-  _FirestoreTransaction(this._transaction, this._firestore);
+/// Best-effort "transaction" wrapper for Firestore web.
+///
+/// It provides the minimal API used by services (`insert`, `update`, `query`, `delete`)
+/// but executes operations sequentially (no Firestore `runTransaction`).
+class _FirestoreNonTransaction {
+  final FirestoreDatabaseProvider _db;
+
+  _FirestoreNonTransaction(this._db);
 
   Future<String> insert(String collection, Map<String, dynamic> data) async {
-    final docRef = _firestore.collection(collection).doc();
-    final dataToInsert = Map<String, dynamic>.from(data);
-    dataToInsert.remove('id');
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (!dataToInsert.containsKey('created_at')) {
-      dataToInsert['created_at'] = now;
-    }
-    if (!dataToInsert.containsKey('updated_at')) {
-      dataToInsert['updated_at'] = now;
-    }
-    _transaction.set(docRef, dataToInsert);
-    return docRef.id;
+    return await _db.insert(collection, data);
   }
 
-  /// FIXED: Support both direct docId update and where clause update
   Future<int> update(
     String collection,
     dynamic docIdOrData, {
@@ -456,89 +579,62 @@ class _FirestoreTransaction {
     String? where,
     List<Object?>? whereArgs,
   }) async {
-    // Handle SQLite-style update (data, where, whereArgs)
-    if (data != null && where != null && whereArgs != null) {
-      // Query to get document ID first
-      final query = _firestore.collection(collection);
-      Query queryRef = query;
-      
-      // Parse where clause (simple support for 'field = ?')
-      if (where.contains('=') && whereArgs.isNotEmpty) {
-        final field = where.split('=')[0].trim();
-        final value = whereArgs[0];
-        queryRef = queryRef.where(field, isEqualTo: value);
-      }
-      
-      // Get document snapshot (this must be done before transaction)
-      // Note: Firestore transactions require all reads before writes
-      final snapshot = await queryRef.get();
-      if (snapshot.docs.isEmpty) {
-        return 0;
-      }
-      
-      final docRef = snapshot.docs.first.reference;
-      final dataToUpdate = Map<String, dynamic>.from(data);
-      dataToUpdate['updated_at'] = DateTime.now().millisecondsSinceEpoch;
-      _transaction.update(docRef, dataToUpdate);
-      return 1;
+    // SQLite-style: txn.update('table', valuesMap, where: ..., whereArgs: ...)
+    if (data == null && docIdOrData is Map<String, dynamic>) {
+      return await _db.update(
+        collection,
+        data: docIdOrData,
+        where: where,
+        whereArgs: whereArgs,
+      );
     }
-    
-    // Handle Firestore-style update (collection, docId, data)
+
+    // Firestore-style: txn.update('table', docId, dataMap)
     if (docIdOrData is String && data != null) {
-      final docRef = _firestore.collection(collection).doc(docIdOrData);
-      final dataToUpdate = Map<String, dynamic>.from(data);
-      dataToUpdate['updated_at'] = DateTime.now().millisecondsSinceEpoch;
-      _transaction.update(docRef, dataToUpdate);
-      return 1;
+      return await _db.update(
+        collection,
+        data: data,
+        where: 'documentId = ?',
+        whereArgs: [docIdOrData],
+      );
     }
-    
+
+    // Also support txn.update('table', dataMap, where: ..., whereArgs: ...)
+    if (data != null) {
+      return await _db.update(
+        collection,
+        data: data,
+        where: where,
+        whereArgs: whereArgs,
+      );
+    }
+
     throw ArgumentError('Invalid update parameters');
   }
 
-  /// FIXED: Added query support for transactions
-  /// Note: In Firestore, all reads must happen before writes in a transaction
   Future<List<Map<String, dynamic>>> query(
     String collection, {
     String? where,
     List<Object?>? whereArgs,
+    String? orderBy,
+    int? limit,
+    int? offset,
   }) async {
-    Query queryRef = _firestore.collection(collection);
-    
-    if (where != null && whereArgs != null && whereArgs.isNotEmpty) {
-      // FIXED: Allow direct doc lookup inside transactions too
-      if (whereArgs.length == 1 &&
-          (where.trim() == 'documentId = ?' || where.trim() == 'id = ?') &&
-          whereArgs.first is String) {
-        final docId = whereArgs.first as String;
-        final docSnap = await _firestore.collection(collection).doc(docId).get();
-        if (!docSnap.exists) return [];
-        final data = docSnap.data() ?? <String, dynamic>{};
-        data['id'] = docSnap.id;
-        return [data];
-      }
-
-      // Parse simple where clause (e.g., 'field = ?')
-      if (where.contains('=')) {
-        final parts = where.split('=');
-        if (parts.length == 2) {
-          final field = parts[0].trim();
-          final value = whereArgs[0];
-          queryRef = queryRef.where(field, isEqualTo: value);
-        }
-      }
-    }
-    
-    final snapshot = await queryRef.get();
-    return snapshot.docs.map((doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      data['id'] = doc.id; // Add document ID
-      return data;
-    }).toList();
+    return await _db.query(
+      collection,
+      where: where,
+      whereArgs: whereArgs,
+      orderBy: orderBy,
+      limit: limit,
+      offset: offset,
+    );
   }
 
   Future<int> delete(String collection, String docId) async {
-    final docRef = _firestore.collection(collection).doc(docId);
-    _transaction.delete(docRef);
-    return 1;
+    return await _db.delete(
+      collection,
+      where: 'documentId = ?',
+      whereArgs: [docId],
+    );
   }
 }

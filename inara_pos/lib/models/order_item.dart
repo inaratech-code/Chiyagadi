@@ -1,15 +1,20 @@
 import 'product.dart';
 
 class OrderItem {
-  final int? id;
-  final int orderId;
-  final int productId;
+  /// Can be int (SQLite) or String (Firestore document id)
+  final dynamic id;
+
+  /// Can be int (SQLite) or String (Firestore)
+  final dynamic orderId;
+
+  /// Can be int (SQLite) or String (Firestore)
+  final dynamic productId;
   final int quantity;
   final double unitPrice;
   final double totalPrice;
   final String? notes;
   final int createdAt;
-  
+
   // Join data (loaded separately)
   Product? product;
 
@@ -39,22 +44,28 @@ class OrderItem {
   }
 
   factory OrderItem.fromMap(Map<String, dynamic> map) {
+    final quantityData = map['quantity'];
+    final createdAtData = map['created_at'];
     return OrderItem(
-      id: map['id'] as int?,
-      orderId: map['order_id'] as int,
-      productId: map['product_id'] as int,
-      quantity: map['quantity'] as int? ?? 1,
+      id: map['id'],
+      orderId: map['order_id'],
+      productId: map['product_id'],
+      quantity: quantityData is num
+          ? quantityData.toInt()
+          : (quantityData as int? ?? 1),
       unitPrice: (map['unit_price'] as num).toDouble(),
       totalPrice: (map['total_price'] as num).toDouble(),
       notes: map['notes'] as String?,
-      createdAt: map['created_at'] as int,
+      createdAt: createdAtData is num
+          ? createdAtData.toInt()
+          : (createdAtData as int? ?? 0),
     );
   }
 
   OrderItem copyWith({
-    int? id,
-    int? orderId,
-    int? productId,
+    dynamic id,
+    dynamic orderId,
+    dynamic productId,
     int? quantity,
     double? unitPrice,
     double? totalPrice,

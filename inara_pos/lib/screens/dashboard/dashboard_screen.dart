@@ -30,6 +30,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _todayCredit = 0.0;
   int _lowStockCount = 0;
   String _shopName = 'Shop';
+  List<_ActivityItem> _recentActivity = const [];
   // FIXED: Use ledger service instead of direct inventory service
   final InventoryLedgerService _ledgerService = InventoryLedgerService();
 
@@ -41,33 +42,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadDashboardData() async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
+
+      String nextShopName = _shopName;
+      double nextTodaySales = 0.0;
+      double nextTodayCredit = 0.0;
+      int nextLowStockCount = 0;
+      List<_ActivityItem> nextRecent = [];
 
       // Get shop name from settings
       final settings = await dbProvider.query('settings');
       for (final setting in settings) {
         if (setting['key'] == 'cafe_name_en') {
-          _shopName = setting['value'] as String? ?? 'Shop';
+          nextShopName = setting['value'] as String? ?? 'Shop';
           break;
         }
       }
 
       // Get today's sales and credit
       final now = DateTime.now();
-      final startOfDay = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
-      final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59).millisecondsSinceEpoch;
+      final startOfDay =
+          DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
+      final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59)
+          .millisecondsSinceEpoch;
 
       final todayOrders = await dbProvider.query(
         'orders',
-        where: 'created_at >= ? AND created_at <= ? AND payment_status IN (?, ?)',
+        where:
+            'created_at >= ? AND created_at <= ? AND payment_status IN (?, ?)',
         whereArgs: [startOfDay, endOfDay, 'paid', 'partial'],
       );
 
-      if (!mounted) return;
-      _todaySales = todayOrders.fold<double>(
+      nextTodaySales = todayOrders.fold<double>(
         0.0,
-        (sum, order) => sum + ((order['total_amount'] as num?)?.toDouble() ?? 0.0),
+        (sum, order) =>
+            sum + ((order['total_amount'] as num?)?.toDouble() ?? 0.0),
       );
 
       // Get today's credit from credit_transactions (matching customer credit section)
@@ -77,10 +88,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         whereArgs: [startOfDay, endOfDay, 'credit'],
       );
 
-      if (!mounted) return;
-      _todayCredit = todayCreditTransactions.fold<double>(
+      nextTodayCredit = todayCreditTransactions.fold<double>(
         0.0,
-        (sum, transaction) => sum + ((transaction['amount'] as num?)?.toDouble() ?? 0.0),
+        (sum, transaction) =>
+            sum + ((transaction['amount'] as num?)?.toDouble() ?? 0.0),
       );
 
       // FIXED: Calculate low stock count from ledger (not from inventory table)
@@ -89,7 +100,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         where: 'is_sellable = ? OR is_sellable IS NULL',
         whereArgs: [1],
       );
-      
+
       if (!mounted) return;
       final productIds = products
           .map((p) => p['id'])
@@ -107,8 +118,88 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (currentStock <= 0) lowStockCount++;
       }
 
+      nextLowStockCount = lowStockCount;
+
+      // Recent Activity (latest orders / expenses / credit transactions)
+      final recentOrders = await dbProvider.query(
+        'orders',
+        orderBy: 'created_at DESC',
+        limit: 5,
+      );
+      for (final o in recentOrders) {
+        final createdAt = (o['created_at'] as num?)?.toInt() ?? 0;
+        final orderNumber = (o['order_number'] as String?) ?? 'Order';
+        final paymentStatus = (o['payment_status'] as String?) ?? 'unpaid';
+        final total = (o['total_amount'] as num?)?.toDouble() ?? 0.0;
+        nextRecent.add(
+          _ActivityItem(
+            createdAt: createdAt,
+            icon: Icons.receipt_long,
+            color: Colors.blueGrey,
+            title: orderNumber,
+            subtitle: 'Order • ${paymentStatus.toUpperCase()}',
+            amount: total,
+          ),
+        );
+      }
+
+      final recentExpenses = await dbProvider.query(
+        'expenses',
+        orderBy: 'created_at DESC',
+        limit: 5,
+      );
+      for (final e in recentExpenses) {
+        final createdAt = (e['created_at'] as num?)?.toInt() ?? 0;
+        final title = (e['title'] as String?) ?? 'Expense';
+        final method = (e['payment_method'] as String?)?.replaceAll('_', ' ');
+        final amount = (e['amount'] as num?)?.toDouble() ?? 0.0;
+        nextRecent.add(
+          _ActivityItem(
+            createdAt: createdAt,
+            icon: Icons.payments_outlined,
+            color: Colors.deepOrange,
+            title: title,
+            subtitle: method == null || method.trim().isEmpty
+                ? 'Expense'
+                : 'Expense • $method',
+            amount: amount,
+          ),
+        );
+      }
+
+      final recentCredits = await dbProvider.query(
+        'credit_transactions',
+        orderBy: 'created_at DESC',
+        limit: 5,
+      );
+      for (final t in recentCredits) {
+        final createdAt = (t['created_at'] as num?)?.toInt() ?? 0;
+        final type = (t['transaction_type'] as String?) ?? 'credit';
+        final amount = (t['amount'] as num?)?.toDouble() ?? 0.0;
+        final isPayment = type == 'payment';
+        nextRecent.add(
+          _ActivityItem(
+            createdAt: createdAt,
+            icon: isPayment ? Icons.payments : Icons.credit_card,
+            color: isPayment ? Colors.green : Colors.orange,
+            title: isPayment ? 'Credit payment received' : 'Credit given',
+            subtitle: isPayment ? 'Credit • Payment' : 'Credit • Given',
+            amount: amount,
+          ),
+        );
+      }
+
+      nextRecent.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      if (nextRecent.length > 8) nextRecent = nextRecent.take(8).toList();
+
       if (!mounted) return;
-      _lowStockCount = lowStockCount;
+      setState(() {
+        _shopName = nextShopName;
+        _todaySales = nextTodaySales;
+        _todayCredit = nextTodayCredit;
+        _lowStockCount = nextLowStockCount;
+        _recentActivity = nextRecent;
+      });
     } catch (e) {
       debugPrint('Error loading dashboard data: $e');
     }
@@ -119,7 +210,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final authProvider = Provider.of<AuthProvider>(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFEF5), // Very light yellow/cream background
+      backgroundColor:
+          const Color(0xFFFFFEF5), // Very light yellow/cream background
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadDashboardData,
@@ -127,7 +219,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ? ResponsiveWrapper(
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: _buildContent(context, authProvider),
@@ -136,7 +229,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 )
               : SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: _buildContent(context, authProvider),
@@ -289,8 +383,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildSummaryCards() {
-    final currencyFormat = NumberFormat.currency(symbol: 'NPR ', decimalDigits: 0);
-    
+    final currencyFormat =
+        NumberFormat.currency(symbol: 'NPR ', decimalDigits: 0);
+
     return Column(
       children: [
         // First Row: Total Sales and Today's Credit (reversed)
@@ -321,7 +416,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   } else {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const CustomersScreen()),
+                      MaterialPageRoute(
+                          builder: (_) => const CustomersScreen()),
                     );
                   }
                 },
@@ -415,7 +511,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         decoration: BoxDecoration(
           color: AppTheme.warningColor.withOpacity(0.1),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.warningColor.withOpacity(0.3), width: 1),
+          border: Border.all(
+              color: AppTheme.warningColor.withOpacity(0.3), width: 1),
         ),
         child: Row(
           children: [
@@ -465,7 +562,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildQuickAccessTiles(BuildContext context, AuthProvider authProvider) {
+  Widget _buildQuickAccessTiles(
+      BuildContext context, AuthProvider authProvider) {
     // Reordered by daily usage: Orders, Menu, Inventory, Customers, Reports, Purchases
     // Map labels to navigation indices in HomeScreen
     final Map<String, int> navigationMap = {
@@ -533,9 +631,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         'label': 'Suppliers',
         'color': AppTheme.logoPrimary, // Golden yellow from logo
         'onTap': () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SuppliersScreen()),
-        ),
+              context,
+              MaterialPageRoute(builder: (_) => const SuppliersScreen()),
+            ),
       },
       {
         'icon': Icons.payments,
@@ -550,10 +648,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final isCompact = width < 700;
 
     // Responsive grid: compact phones = 3 columns, tablets = 3, desktop = 4
-    final crossAxisCount = isCompact
-        ? 3
-        : (kIsWeb ? (width > 1200 ? 4 : 3) : 2);
-    
+    final crossAxisCount =
+        isCompact ? 3 : (kIsWeb ? (width > 1200 ? 4 : 3) : 2);
+
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -641,6 +738,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildRecentActivity() {
+    final currency = NumberFormat.currency(symbol: 'NPR ', decimalDigits: 0);
+    final timeFmt = DateFormat('MMM dd, hh:mm a');
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -656,34 +756,106 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
       child: Column(
-        children: [
-          Icon(
-            Icons.inbox_outlined,
-            size: 48,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'No recent activity',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Your recent transactions will appear here',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+        children: _recentActivity.isEmpty
+            ? [
+                Icon(
+                  Icons.inbox_outlined,
+                  size: 48,
+                  color: Colors.grey[400],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'No recent activity',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Your recent transactions will appear here',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[500],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ]
+            : _recentActivity.map((a) {
+                final dt = a.createdAt > 0
+                    ? DateTime.fromMillisecondsSinceEpoch(a.createdAt)
+                    : null;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: a.color.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(a.icon, color: a.color, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              a.title,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w700),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              [
+                                a.subtitle,
+                                if (dt != null) timeFmt.format(dt),
+                              ].join(' • '),
+                              style: TextStyle(
+                                  color: Colors.grey[600], fontSize: 12),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        currency.format(a.amount),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
       ),
     );
   }
 
   // (cleanup) Removed unused create-user dialog from Dashboard.
+}
+
+class _ActivityItem {
+  final int createdAt;
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final double amount;
+
+  const _ActivityItem({
+    required this.createdAt,
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.amount,
+  });
 }

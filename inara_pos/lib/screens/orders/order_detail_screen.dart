@@ -12,7 +12,8 @@ import 'package:intl/intl.dart';
 class OrderDetailScreen extends StatefulWidget {
   final dynamic orderId; // Can be int (SQLite) or String (Firestore)
   final String orderNumber;
-  final bool autoOpenAddItems; // opens multi-add on first load if order is empty
+  final bool
+      autoOpenAddItems; // opens multi-add on first load if order is empty
 
   const OrderDetailScreen({
     super.key,
@@ -45,9 +46,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
-      
+
       // Load order - FIXED: Handle both SQLite (id) and Firestore (documentId) queries
       final orders = await dbProvider.query(
         'orders',
@@ -59,17 +61,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         // Initialize VAT and Discount controllers
         // FIXED: Use order's tax_percent, default to 13% if 0 or null
         final taxPercent = (_order!['tax_percent'] as num?)?.toDouble();
-        _vatController.text = (taxPercent != null && taxPercent > 0 ? taxPercent : 13.0).toStringAsFixed(1);
-        _discountController.text = (_order!['discount_percent'] as num? ?? 0.0).toStringAsFixed(1);
-        
+        _vatController.text =
+            (taxPercent != null && taxPercent > 0 ? taxPercent : 13.0)
+                .toStringAsFixed(1);
+        _discountController.text =
+            (_order!['discount_percent'] as num? ?? 0.0).toStringAsFixed(1);
+
         // FIXED: If tax_percent is 0 or null, set it to 13% and recalculate
         if (taxPercent == null || taxPercent == 0) {
-          final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+          final dbProvider =
+              Provider.of<UnifiedDatabaseProvider>(context, listen: false);
           await _orderService.updateVATAndDiscount(
             dbProvider: dbProvider,
             orderId: widget.orderId,
             vatPercent: 13.0,
-            discountPercent: (_order!['discount_percent'] as num?)?.toDouble() ?? 0.0,
+            discountPercent:
+                (_order!['discount_percent'] as num?)?.toDouble() ?? 0.0,
           );
           // Reload to get updated values
           final updatedOrders = await dbProvider.query(
@@ -81,19 +88,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             setState(() {
               _order = updatedOrders.first;
               // Update controller with new VAT value
-              _vatController.text = ((_order!['tax_percent'] as num?)?.toDouble() ?? 13.0).toStringAsFixed(1);
+              _vatController.text =
+                  ((_order!['tax_percent'] as num?)?.toDouble() ?? 13.0)
+                      .toStringAsFixed(1);
             });
           }
         } else {
           // Ensure totals are recalculated even if VAT is already set
           // This handles cases where items were added but totals weren't updated
-          final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+          final dbProvider =
+              Provider.of<UnifiedDatabaseProvider>(context, listen: false);
           // Trigger recalculation by updating VAT/Discount with current values
           await _orderService.updateVATAndDiscount(
             dbProvider: dbProvider,
             orderId: widget.orderId,
             vatPercent: taxPercent,
-            discountPercent: (_order!['discount_percent'] as num?)?.toDouble() ?? 0.0,
+            discountPercent:
+                (_order!['discount_percent'] as num?)?.toDouble() ?? 0.0,
           );
           // Reload to get updated values
           final updatedOrders = await dbProvider.query(
@@ -108,14 +119,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           }
         }
       }
-      
+
       // Load order items
       _orderItems = await dbProvider.query(
         'order_items',
         where: 'order_id = ?',
         whereArgs: [widget.orderId],
       );
-      
+
       // Load products - only sellable items for orders
       // FIXED: Handle Firestore query limitations (no OR with IS NULL)
       List<Map<String, dynamic>> productMaps;
@@ -141,9 +152,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       }
       _products = productMaps.map((map) => Product.fromMap(map)).toList();
       debugPrint('Loaded ${_products.length} products for order');
-      
+
       // Load categories
-      _categories = await dbProvider.query('categories', orderBy: 'display_order ASC');
+      _categories =
+          await dbProvider.query('categories', orderBy: 'display_order ASC');
       debugPrint('Loaded ${_categories.length} categories');
     } catch (e) {
       debugPrint('Error loading order data: $e');
@@ -165,15 +177,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   double get _subtotal {
     // FIXED: Calculate from order items, or use order's subtotal if available
-    final calculatedSubtotal = _orderItems.fold(0.0, (sum, item) => sum + (item['total_price'] as num).toDouble());
+    final calculatedSubtotal = _orderItems.fold(
+        0.0, (sum, item) => sum + (item['total_price'] as num).toDouble());
     final orderSubtotal = (_order?['subtotal'] as num?)?.toDouble();
     return orderSubtotal ?? calculatedSubtotal;
   }
-  
+
   double get _discountAmount {
     return (_order?['discount_amount'] as num?)?.toDouble() ?? 0.0;
   }
-  
+
   double get _vatAmount {
     return (_order?['tax_amount'] as num?)?.toDouble() ?? 0.0;
   }
@@ -261,18 +274,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                   _order?['status'] as String? ?? 'pending',
                                   style: const TextStyle(fontSize: 12),
                                 ),
-                                backgroundColor: AppTheme.warningColor.withOpacity(0.2),
+                                backgroundColor:
+                                    AppTheme.warningColor.withOpacity(0.2),
                               ),
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Text('Type: ${_order?['order_type'] == 'dine_in' ? 'Dine-In' : 'Takeaway'}'),
-                          Text('Payment: ${_order?['payment_status'] == 'paid' ? 'Paid' : 'Unpaid'}'),
+                          Text(
+                              'Type: ${_order?['order_type'] == 'dine_in' ? 'Dine-In' : 'Takeaway'}'),
+                          Text(
+                              'Payment: ${_order?['payment_status'] == 'paid' ? 'Paid' : 'Unpaid'}'),
                         ],
                       ),
                     ),
                   ),
-                  
+
                   // Items List
                   _orderItems.isEmpty
                       ? Padding(
@@ -280,7 +296,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.shopping_cart_outlined, size: 64, color: Colors.grey[400]),
+                              Icon(Icons.shopping_cart_outlined,
+                                  size: 64, color: Colors.grey[400]),
                               const SizedBox(height: 16),
                               Text(
                                 'No items in order',
@@ -320,257 +337,282 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             return _buildOrderItemCard(item, product);
                           },
                         ),
-                  
+
                   // Totals and Payment
                   Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.2),
-                        spreadRadius: 1,
-                        blurRadius: 4,
-                        offset: const Offset(0, -2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      // VAT and Discount Input Fields
-                      if (_order?['payment_status'] != 'paid') ...[
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _vatController,
-                                decoration: InputDecoration(
-                                  labelText: 'VAT %',
-                                  border: const OutlineInputBorder(),
-                                  suffixText: '%',
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                ),
-                                keyboardType: TextInputType.numberWithOptions(decimal: true),
-                                onChanged: (value) => _updateVATAndDiscount(),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextField(
-                                controller: _discountController,
-                                decoration: InputDecoration(
-                                  labelText: 'Discount %',
-                                  border: const OutlineInputBorder(),
-                                  suffixText: '%',
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                ),
-                                keyboardType: TextInputType.numberWithOptions(decimal: true),
-                                onChanged: (value) => _updateVATAndDiscount(),
-                              ),
-                            ),
-                          ],
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.2),
+                          spreadRadius: 1,
+                          blurRadius: 4,
+                          offset: const Offset(0, -2),
                         ),
-                        const SizedBox(height: 12),
                       ],
-                      
-                      // Breakdown - FIXED: Always show VAT and Discount in bill
-                      _buildTotalRow('Subtotal', _subtotal),
-                      // Always show discount if percent is set (even if 0, show it)
-                      if ((_order?['discount_percent'] as num?) != null)
-                        _buildTotalRow(
-                          'Discount (${(_order?['discount_percent'] as num? ?? 0).toStringAsFixed(1)}%)',
-                          -_discountAmount,
-                        ),
-                      // Always show VAT if percent is set (even if 0, show it)
-                      if ((_order?['tax_percent'] as num?) != null)
-                        _buildTotalRow(
-                          'VAT (${(_order?['tax_percent'] as num? ?? 0).toStringAsFixed(1)}%)',
-                          _vatAmount,
-                        ),
-                      const Divider(),
-                      _buildTotalRow('Total Payable', _total, isTotal: true),
-                      const SizedBox(height: 16),
-                      
-                      // Payment Status
-                      Builder(
-                        builder: (context) {
-                          final paymentStatus = _order?['payment_status'] as String? ?? 'unpaid';
-                          final creditAmount = (_order?['credit_amount'] as num? ?? 0).toDouble();
-                          final paidAmount = (_order?['paid_amount'] as num? ?? 0).toDouble();
-                          
-                          if (paymentStatus == 'paid') {
-                            return Column(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.successColor.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: AppTheme.successColor),
+                    ),
+                    child: Column(
+                      children: [
+                        // VAT and Discount Input Fields
+                        if (_order?['payment_status'] != 'paid') ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _vatController,
+                                  decoration: InputDecoration(
+                                    labelText: 'VAT %',
+                                    border: const OutlineInputBorder(),
+                                    suffixText: '%',
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 8),
                                   ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
+                                  keyboardType: TextInputType.numberWithOptions(
+                                      decimal: true),
+                                  onChanged: (value) => _updateVATAndDiscount(),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextField(
+                                  controller: _discountController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Discount %',
+                                    border: const OutlineInputBorder(),
+                                    suffixText: '%',
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 8),
+                                  ),
+                                  keyboardType: TextInputType.numberWithOptions(
+                                      decimal: true),
+                                  onChanged: (value) => _updateVATAndDiscount(),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+
+                        // Breakdown - FIXED: Always show VAT and Discount in bill
+                        _buildTotalRow('Subtotal', _subtotal),
+                        // Always show discount if percent is set (even if 0, show it)
+                        if ((_order?['discount_percent'] as num?) != null)
+                          _buildTotalRow(
+                            'Discount (${(_order?['discount_percent'] as num? ?? 0).toStringAsFixed(1)}%)',
+                            -_discountAmount,
+                          ),
+                        // Always show VAT if percent is set (even if 0, show it)
+                        if ((_order?['tax_percent'] as num?) != null)
+                          _buildTotalRow(
+                            'VAT (${(_order?['tax_percent'] as num? ?? 0).toStringAsFixed(1)}%)',
+                            _vatAmount,
+                          ),
+                        const Divider(),
+                        _buildTotalRow('Total Payable', _total, isTotal: true),
+                        const SizedBox(height: 16),
+
+                        // Payment Status
+                        Builder(
+                          builder: (context) {
+                            final paymentStatus =
+                                _order?['payment_status'] as String? ??
+                                    'unpaid';
+                            final creditAmount =
+                                (_order?['credit_amount'] as num? ?? 0)
+                                    .toDouble();
+                            final paidAmount =
+                                (_order?['paid_amount'] as num? ?? 0)
+                                    .toDouble();
+
+                            if (paymentStatus == 'paid') {
+                              return Column(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.successColor
+                                          .withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                          color: AppTheme.successColor),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.check_circle,
+                                            color: AppTheme.successColor),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'PAID - ${_getPaymentMethodLabel(_order?['payment_method'] as String? ?? 'cash')}',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppTheme.successColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
                                     children: [
-                                      Icon(Icons.check_circle, color: AppTheme.successColor),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'PAID - ${_getPaymentMethodLabel(_order?['payment_method'] as String? ?? 'cash')}',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppTheme.successColor,
+                                      Expanded(
+                                        child: OutlinedButton.icon(
+                                          onPressed: () => _printBill(),
+                                          icon: const Icon(Icons.print),
+                                          label: const Text('Print'),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: OutlinedButton.icon(
+                                          onPressed: () => _shareBill(),
+                                          icon: const Icon(Icons.share),
+                                          label: const Text('Share'),
                                         ),
                                       ),
                                     ],
                                   ),
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: () => _printBill(),
-                                        icon: const Icon(Icons.print),
-                                        label: const Text('Print'),
-                                      ),
+                                ],
+                              );
+                            } else if (paymentStatus == 'partial' ||
+                                creditAmount > 0) {
+                              return Column(
+                                children: [
+                                  // Partial payment or credit status
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.warningColor
+                                          .withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                          color: AppTheme.warningColor),
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: () => _shareBill(),
-                                        icon: const Icon(Icons.share),
-                                        label: const Text('Share'),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            );
-                          } else if (paymentStatus == 'partial' || creditAmount > 0) {
-                            return Column(
-                              children: [
-                                // Partial payment or credit status
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.warningColor.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: AppTheme.warningColor),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(Icons.account_balance_wallet, color: AppTheme.warningColor),
-                                          const SizedBox(width: 8),
+                                    child: Column(
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.account_balance_wallet,
+                                                color: AppTheme.warningColor),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              creditAmount > 0
+                                                  ? 'CREDIT / PARTIAL'
+                                                  : 'PARTIAL PAYMENT',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppTheme.warningColor,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (paidAmount > 0) ...[
+                                          const SizedBox(height: 8),
                                           Text(
-                                            creditAmount > 0 ? 'CREDIT / PARTIAL' : 'PARTIAL PAYMENT',
+                                            'Paid: ${NumberFormat.currency(symbol: 'NPR ').format(paidAmount)}',
                                             style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppTheme.warningColor,
+                                              fontSize: 14,
+                                              color: AppTheme.successColor,
+                                              fontWeight: FontWeight.w500,
                                             ),
                                           ),
                                         ],
+                                        if (creditAmount > 0) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Credit: ${NumberFormat.currency(symbol: 'NPR ').format(creditAmount)}',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.black87,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  if (creditAmount > 0) ...[
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton.icon(
+                                        onPressed: () =>
+                                            _showPayCreditDialog(creditAmount),
+                                        icon: const Icon(Icons.payment),
+                                        label: Text(
+                                            'Pay Credit (${NumberFormat.currency(symbol: 'NPR ').format(creditAmount)})'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.orange,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 12),
+                                        ),
                                       ),
-                                      if (paidAmount > 0) ...[
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          'Paid: ${NumberFormat.currency(symbol: 'NPR ').format(paidAmount)}',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: AppTheme.successColor,
-                                            fontWeight: FontWeight.w500,
-                                          ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                  ],
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: OutlinedButton.icon(
+                                          onPressed: () => _printBill(),
+                                          icon: const Icon(Icons.print),
+                                          label: const Text('Print'),
                                         ),
-                                      ],
-                                      if (creditAmount > 0) ...[
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Credit: ${NumberFormat.currency(symbol: 'NPR ').format(creditAmount)}',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.black87,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: OutlinedButton.icon(
+                                          onPressed: () => _shareBill(),
+                                          icon: const Icon(Icons.share),
+                                          label: const Text('Share'),
                                         ),
-                                      ],
+                                      ),
                                     ],
                                   ),
-                                ),
-                                const SizedBox(height: 12),
-                                if (creditAmount > 0) ...[
+                                ],
+                              );
+                            } else {
+                              return Column(
+                                children: [
                                   SizedBox(
                                     width: double.infinity,
-                                    child: ElevatedButton.icon(
-                                      onPressed: () => _showPayCreditDialog(creditAmount),
-                                      icon: const Icon(Icons.payment),
-                                      label: Text('Pay Credit (${NumberFormat.currency(symbol: 'NPR ').format(creditAmount)})'),
+                                    height: 50,
+                                    child: ElevatedButton(
+                                      onPressed: _orderItems.isEmpty
+                                          ? null
+                                          : () => _showPaymentDialog(),
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.orange,
+                                        backgroundColor:
+                                            Theme.of(context).primaryColor,
                                         foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                      ),
+                                      child: const Text(
+                                        'Complete Payment',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
                                 ],
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: () => _printBill(),
-                                        icon: const Icon(Icons.print),
-                                        label: const Text('Print'),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: () => _shareBill(),
-                                        icon: const Icon(Icons.share),
-                                        label: const Text('Share'),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            );
-                          } else {
-                            return Column(
-                              children: [
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 50,
-                                  child: ElevatedButton(
-                                    onPressed: _orderItems.isEmpty
-                                        ? null
-                                        : () => _showPaymentDialog(),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Theme.of(context).primaryColor,
-                                      foregroundColor: Colors.white,
-                                    ),
-                                    child: const Text(
-                                      'Complete Payment',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          }
-                        },
-                      ),
-                    ],
+                              );
+                            }
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
     );
   }
 
@@ -597,7 +639,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 color: Colors.grey[700],
               ),
             ),
-            if (product.description != null && product.description!.isNotEmpty) ...[
+            if (product.description != null &&
+                product.description!.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(
                 product.description!,
@@ -620,7 +663,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  NumberFormat.currency(symbol: 'NPR ').format(item['total_price']),
+                  NumberFormat.currency(symbol: 'NPR ')
+                      .format(item['total_price']),
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -629,7 +673,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ),
                 Container(
                   margin: const EdgeInsets.only(top: 4),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: product.isVeg ? Colors.green : Colors.red,
                     borderRadius: BorderRadius.circular(4),
@@ -663,7 +708,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       width: 60,
       height: 60,
       decoration: BoxDecoration(
-        color: product.isVeg ? AppTheme.successColor.withOpacity(0.2) : AppTheme.errorColor.withOpacity(0.2),
+        color: product.isVeg
+            ? AppTheme.successColor.withOpacity(0.2)
+            : AppTheme.errorColor.withOpacity(0.2),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Center(
@@ -714,13 +761,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     Product? selectedProduct;
     int quantity = 1;
     double? availableStock; // Track available stock for selected product
-    final InventoryLedgerService ledgerService = InventoryLedgerService(); // For stock checking
+    final InventoryLedgerService ledgerService =
+        InventoryLedgerService(); // For stock checking
 
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Container(
             width: MediaQuery.of(context).size.width * 0.9,
             constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
@@ -736,7 +785,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Category Filter
                 // FIXED: Use Object? to handle both int and String IDs without type errors
                 DropdownButtonFormField<Object?>(
@@ -746,12 +795,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     border: OutlineInputBorder(),
                   ),
                   items: [
-                    const DropdownMenuItem<Object?>(value: null, child: Text('All Categories')),
+                    const DropdownMenuItem<Object?>(
+                        value: null, child: Text('All Categories')),
                     ..._categories.map((cat) {
                       // FIXED: Handle both int (SQLite) and String (Firestore) IDs
                       // Explicitly convert to Object? to avoid type inference issues
                       final catIdData = cat['id'];
-                      final catId = catIdData is int ? catIdData as Object? : (catIdData is String ? catIdData as Object? : catIdData);
+                      final catId = catIdData is int
+                          ? catIdData as Object?
+                          : (catIdData is String
+                              ? catIdData as Object?
+                              : catIdData);
                       return DropdownMenuItem<Object?>(
                         value: catId,
                         child: Text(cat['name'] as String),
@@ -786,9 +840,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     });
                   },
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Product Selection
                 // FIXED: Handle both int (SQLite) and String (Firestore) product IDs
                 filteredProducts.isEmpty
@@ -815,16 +869,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         ),
                       )
                     : DropdownButtonFormField<Object?>(
-                        value: kIsWeb ? selectedProduct?.documentId : selectedProduct?.id,
+                        value: kIsWeb
+                            ? selectedProduct?.documentId
+                            : selectedProduct?.id,
                         decoration: const InputDecoration(
                           labelText: 'Select Product *',
                           border: OutlineInputBorder(),
                         ),
                         items: filteredProducts.map((product) {
-                          final productId = kIsWeb ? product.documentId : product.id;
+                          final productId =
+                              kIsWeb ? product.documentId : product.id;
                           return DropdownMenuItem<Object?>(
                             value: productId,
-                            child: Text('${product.name} - ${NumberFormat.currency(symbol: 'NPR ').format(product.price)}'),
+                            child: Text(
+                                '${product.name} - ${NumberFormat.currency(symbol: 'NPR ').format(product.price)}'),
                           );
                         }).toList(),
                         onChanged: (Object? value) async {
@@ -837,17 +895,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               setDialogState(() {
                                 selectedProduct = product;
                               });
-                              
+
                               // Load stock availability for selected product
-                              final productId = kIsWeb ? product.documentId : product.id;
+                              final productId =
+                                  kIsWeb ? product.documentId : product.id;
                               if (productId != null) {
                                 try {
-                                  final stock = await ledgerService.getCurrentStock(
+                                  final stock =
+                                      await ledgerService.getCurrentStock(
                                     context: context,
                                     productId: productId,
                                   );
                                   // Get current quantity already in this order
-                                  final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+                                  final dbProvider =
+                                      Provider.of<UnifiedDatabaseProvider>(
+                                          context,
+                                          listen: false);
                                   await dbProvider.init();
                                   final existingItems = await dbProvider.query(
                                     'order_items',
@@ -856,18 +919,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                   );
                                   double currentOrderQty = 0.0;
                                   if (existingItems.isNotEmpty) {
-                                    currentOrderQty = (existingItems.first['quantity'] as num?)?.toDouble() ?? 0.0;
+                                    currentOrderQty = (existingItems
+                                                .first['quantity'] as num?)
+                                            ?.toDouble() ??
+                                        0.0;
                                   }
-                                  final maxAvailable = (stock - currentOrderQty).toInt();
-                                  
+                                  final maxAvailable =
+                                      (stock - currentOrderQty).toInt();
+
                                   setDialogState(() {
                                     availableStock = stock;
                                     // Limit quantity to available stock
-                                    if (quantity > maxAvailable && maxAvailable > 0) {
+                                    if (quantity > maxAvailable &&
+                                        maxAvailable > 0) {
                                       quantity = maxAvailable;
                                     } else if (maxAvailable <= 0) {
                                       quantity = 0;
-                                    } else if (quantity == 0 && maxAvailable > 0) {
+                                    } else if (quantity == 0 &&
+                                        maxAvailable > 0) {
                                       quantity = 1; // Set to 1 if was 0
                                     }
                                   });
@@ -893,9 +962,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           }
                         },
                       ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Stock availability info
                 if (selectedProduct != null && availableStock != null)
                   Padding(
@@ -903,8 +972,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     child: Row(
                       children: [
                         Icon(
-                          availableStock! > 0 ? Icons.check_circle : Icons.warning,
-                          color: availableStock! > 0 ? Colors.green : Colors.orange,
+                          availableStock! > 0
+                              ? Icons.check_circle
+                              : Icons.warning,
+                          color: availableStock! > 0
+                              ? Colors.green
+                              : Colors.orange,
                           size: 16,
                         ),
                         const SizedBox(width: 4),
@@ -912,14 +985,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           'Available Stock: ${availableStock!.toStringAsFixed(1)}',
                           style: TextStyle(
                             fontSize: 12,
-                            color: availableStock! > 0 ? Colors.green : Colors.orange,
+                            color: availableStock! > 0
+                                ? Colors.green
+                                : Colors.orange,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],
                     ),
                   ),
-                
+
                 // Quantity
                 Row(
                   children: [
@@ -939,7 +1014,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: (availableStock != null && quantity > availableStock!) ? Colors.red : null,
+                          color: (availableStock != null &&
+                                  quantity > availableStock!)
+                              ? Colors.red
+                              : null,
                         ),
                       ),
                     ),
@@ -947,10 +1025,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       icon: const Icon(Icons.add),
                       onPressed: () async {
                         if (selectedProduct != null) {
-                          final productId = kIsWeb ? selectedProduct!.documentId : selectedProduct!.id;
+                          final productId = kIsWeb
+                              ? selectedProduct!.documentId
+                              : selectedProduct!.id;
                           if (productId != null && availableStock != null) {
                             // Get current quantity in order
-                            final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+                            final dbProvider =
+                                Provider.of<UnifiedDatabaseProvider>(context,
+                                    listen: false);
                             await dbProvider.init();
                             final existingItems = await dbProvider.query(
                               'order_items',
@@ -959,10 +1041,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             );
                             double currentOrderQty = 0.0;
                             if (existingItems.isNotEmpty) {
-                              currentOrderQty = (existingItems.first['quantity'] as num?)?.toDouble() ?? 0.0;
+                              currentOrderQty =
+                                  (existingItems.first['quantity'] as num?)
+                                          ?.toDouble() ??
+                                      0.0;
                             }
-                            final maxQty = (availableStock! - currentOrderQty).toInt();
-                            
+                            final maxQty =
+                                (availableStock! - currentOrderQty).toInt();
+
                             setDialogState(() {
                               if (quantity < maxQty) {
                                 quantity++;
@@ -978,9 +1064,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ),
                   ],
                 ),
-                
+
                 const Spacer(),
-                
+
                 // Buttons
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -1011,7 +1097,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     if (result == true && selectedProduct != null) {
       try {
-        final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         await _orderService.addItemToOrder(
           dbProvider: dbProvider,
           context: context,
@@ -1040,7 +1127,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Future<void> _showAddMultipleItemsDialog() async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       // Batch-load stock for all sellable products to keep UI fast
@@ -1103,10 +1191,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
                           return ListTile(
                             dense: true,
-                            title: Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            title: Text(p.name,
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
                             subtitle: Text(
                               'Stock: ${available.toStringAsFixed(1)} • Price: ${NumberFormat.currency(symbol: 'NPR ').format(p.price)}',
-                              style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey[700]),
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -1114,7 +1204,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 IconButton(
                                   icon: const Icon(Icons.remove),
                                   onPressed: current > 0
-                                      ? () => setDialogState(() => qty[pid] = current - 1)
+                                      ? () => setDialogState(
+                                          () => qty[pid] = current - 1)
                                       : null,
                                 ),
                                 SizedBox(
@@ -1122,13 +1213,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                   child: Text(
                                     '$current',
                                     textAlign: TextAlign.center,
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
                                   ),
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.add),
                                   onPressed: canAddMore
-                                      ? () => setDialogState(() => qty[pid] = current + 1)
+                                      ? () => setDialogState(
+                                          () => qty[pid] = current + 1)
                                       : null,
                                 ),
                               ],
@@ -1146,7 +1239,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: qty.values.any((v) => v > 0) ? () => Navigator.pop(context, true) : null,
+                  onPressed: qty.values.any((v) => v > 0)
+                      ? () => Navigator.pop(context, true)
+                      : null,
                   child: const Text('Add Selected'),
                 ),
               ],
@@ -1190,7 +1285,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Remove Item?'),
-        content: const Text('Are you sure you want to remove this item from the order?'),
+        content: const Text(
+            'Are you sure you want to remove this item from the order?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1207,7 +1303,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     if (confirm == true) {
       try {
-        final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         await _orderService.removeItemFromOrder(dbProvider, itemId);
         await _loadData(); // Await to ensure data is loaded
       } catch (e) {
@@ -1223,20 +1320,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Future<void> _updateVATAndDiscount() async {
     final vatPercent = double.tryParse(_vatController.text) ?? 0.0;
     final discountPercent = double.tryParse(_discountController.text) ?? 0.0;
-    
+
     if (vatPercent < 0 || vatPercent > 100) return;
     if (discountPercent < 0 || discountPercent > 100) return;
-    
+
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+
       // Calculate values locally for immediate UI update
       final subtotal = _subtotal;
       final discountAmount = subtotal * (discountPercent / 100);
       final discountedSubtotal = subtotal - discountAmount;
       final taxAmount = discountedSubtotal * (vatPercent / 100);
       final totalAmount = discountedSubtotal + taxAmount;
-      
+
       // Update local state immediately (no page refresh)
       setState(() {
         if (_order != null) {
@@ -1248,14 +1346,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           _order!['subtotal'] = subtotal;
         }
       });
-      
+
       // Update database in background (don't wait for it to complete)
-      _orderService.updateVATAndDiscount(
+      _orderService
+          .updateVATAndDiscount(
         dbProvider: dbProvider,
         orderId: widget.orderId,
         vatPercent: vatPercent,
         discountPercent: discountPercent,
-      ).catchError((e) {
+      )
+          .catchError((e) {
         debugPrint('Error updating VAT/Discount in database: $e');
         // Reload data if update fails to sync with database
         _loadData();
@@ -1277,7 +1377,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Cancel Order?'),
-        content: const Text('Are you sure you want to cancel this order? The order status will be changed to "cancelled".'),
+        content: const Text(
+            'Are you sure you want to cancel this order? The order status will be changed to "cancelled".'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1294,7 +1395,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     if (confirm == true) {
       try {
-        final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         await _orderService.cancelOrder(dbProvider, widget.orderId);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1323,7 +1425,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Order?'),
-        content: const Text('Are you sure you want to permanently delete this order? This action cannot be undone.'),
+        content: const Text(
+            'Are you sure you want to permanently delete this order? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1340,7 +1443,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     if (confirm == true) {
       try {
-        final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         await _orderService.deleteOrder(
           dbProvider: dbProvider,
           context: context,
@@ -1395,7 +1499,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     // Load customers for credit payment
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       customers = await dbProvider.query('customers', orderBy: 'name ASC');
     } catch (e) {
       debugPrint('Error loading customers: $e');
@@ -1405,7 +1510,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('Complete Payment'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1481,7 +1587,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       }
                     : null,
                 subtitle: paymentMethod != 'credit'
-                    ? const Text('Pay less than total amount (requires customer)')
+                    ? const Text(
+                        'Pay less than total amount (requires customer)')
                     : null,
               ),
               if (allowPartial && paymentMethod != 'credit') ...[
@@ -1498,7 +1605,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   child: customers.isEmpty
                       ? const Padding(
                           padding: EdgeInsets.all(16.0),
-                          child: Text('No customers found. Please add a customer first.'),
+                          child: Text(
+                              'No customers found. Please add a customer first.'),
                         )
                       : ListView.builder(
                           shrinkWrap: true,
@@ -1510,7 +1618,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               value: customer['id'] as int,
                               groupValue: selectedCustomerId,
                               onChanged: (value) {
-                                setDialogState(() => selectedCustomerId = value);
+                                setDialogState(
+                                    () => selectedCustomerId = value);
                               },
                             );
                           },
@@ -1521,11 +1630,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   controller: partialAmountController,
                   decoration: InputDecoration(
                     labelText: 'Amount to Pay (NPR)',
-                    hintText: 'Enter amount less than ${NumberFormat.currency(symbol: 'NPR ').format(_total)}',
+                    hintText:
+                        'Enter amount less than ${NumberFormat.currency(symbol: 'NPR ').format(_total)}',
                     border: const OutlineInputBorder(),
                     prefixText: 'NPR ',
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   onChanged: (value) {
                     setDialogState(() {});
                   },
@@ -1544,7 +1655,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       Expanded(
                         child: Text(
                           'Remaining amount will be saved as credit',
-                          style: TextStyle(fontSize: 12, color: AppTheme.warningColor),
+                          style: TextStyle(
+                              fontSize: 12, color: AppTheme.warningColor),
                         ),
                       ),
                     ],
@@ -1579,23 +1691,30 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   child: customers.isEmpty
                       ? const Padding(
                           padding: EdgeInsets.all(16.0),
-                          child: Text('No customers found. Please add a customer first.'),
+                          child: Text(
+                              'No customers found. Please add a customer first.'),
                         )
                       : ListView.builder(
                           shrinkWrap: true,
                           itemCount: customers.length,
                           itemBuilder: (context, index) {
                             final customer = customers[index];
-                            final creditBalance = (customer['credit_balance'] as num? ?? 0).toDouble();
-                            final creditLimit = (customer['credit_limit'] as num? ?? 0).toDouble();
+                            final creditBalance =
+                                (customer['credit_balance'] as num? ?? 0)
+                                    .toDouble();
+                            final creditLimit =
+                                (customer['credit_limit'] as num? ?? 0)
+                                    .toDouble();
                             final available = creditLimit - creditBalance;
-                            
+
                             return RadioListTile<int>(
                               title: Text(customer['name'] as String),
                               subtitle: Text(
                                 'Available: ${NumberFormat.currency(symbol: 'NPR ').format(available)}',
                                 style: TextStyle(
-                                  color: available >= _total ? Colors.green : Colors.red,
+                                  color: available >= _total
+                                      ? Colors.green
+                                      : Colors.red,
                                   fontSize: 12,
                                 ),
                               ),
@@ -1603,7 +1722,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               groupValue: selectedCustomerId,
                               onChanged: available >= _total
                                   ? (value) {
-                                      setDialogState(() => selectedCustomerId = value);
+                                      setDialogState(
+                                          () => selectedCustomerId = value);
                                     }
                                   : null,
                             );
@@ -1620,12 +1740,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.info, size: 16, color: AppTheme.warningColor),
+                        Icon(Icons.info,
+                            size: 16, color: AppTheme.warningColor),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Credit will be deducted from customer account',
-                            style: TextStyle(fontSize: 12, color: AppTheme.warningColor),
+                            style: TextStyle(
+                                fontSize: 12, color: AppTheme.warningColor),
                           ),
                         ),
                       ],
@@ -1641,18 +1763,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: (paymentMethod == 'credit' && selectedCustomerId == null) ||
-                      (allowPartial && (selectedCustomerId == null ||
-                       partialAmountController.text.isEmpty || 
-                       double.tryParse(partialAmountController.text) == null ||
-                       double.parse(partialAmountController.text) <= 0 ||
-                       double.parse(partialAmountController.text) > _total))
+              onPressed: (paymentMethod == 'credit' &&
+                          selectedCustomerId == null) ||
+                      (allowPartial &&
+                          (selectedCustomerId == null ||
+                              partialAmountController.text.isEmpty ||
+                              double.tryParse(partialAmountController.text) ==
+                                  null ||
+                              double.parse(partialAmountController.text) <= 0 ||
+                              double.parse(partialAmountController.text) >
+                                  _total))
                   ? null
                   : () => Navigator.pop(context, true),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).primaryColor,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
               child: const Text('Complete Payment'),
             ),
@@ -1664,14 +1791,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     if (result == true) {
       try {
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        
+
         // Calculate payment amounts
         double? partialAmount;
         int? customerId;
-        
+
         if (allowPartial && partialAmountController.text.isNotEmpty) {
           partialAmount = double.tryParse(partialAmountController.text);
-          if (partialAmount == null || partialAmount <= 0 || partialAmount > _total) {
+          if (partialAmount == null ||
+              partialAmount <= 0 ||
+              partialAmount > _total) {
             throw Exception('Invalid partial amount');
           }
           if (selectedCustomerId == null) {
@@ -1681,8 +1810,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         } else if (paymentMethod == 'credit') {
           customerId = selectedCustomerId;
         }
-        
-        final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         await _orderService.completePayment(
           dbProvider: dbProvider,
           context: context,
@@ -1692,13 +1822,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           customerId: customerId,
           partialAmount: partialAmount,
           // FIXED: Handle both int (SQLite) and String (Firestore) user IDs
-          createdBy: authProvider.currentUserId != null 
-              ? (kIsWeb ? authProvider.currentUserId! : int.tryParse(authProvider.currentUserId!))
+          createdBy: authProvider.currentUserId != null
+              ? (kIsWeb
+                  ? authProvider.currentUserId!
+                  : int.tryParse(authProvider.currentUserId!))
               : null,
         );
-        
+
         await _loadData(); // Await to ensure data is loaded
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -1746,7 +1878,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _showPayCreditDialog(double creditAmount) async {
-    final amountController = TextEditingController(text: creditAmount.toStringAsFixed(2));
+    final amountController =
+        TextEditingController(text: creditAmount.toStringAsFixed(2));
     String paymentMethod = 'cash';
 
     final result = await showDialog<bool>(
@@ -1757,7 +1890,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Outstanding Credit: ${NumberFormat.currency(symbol: 'NPR ').format(creditAmount)}'),
+              Text(
+                  'Outstanding Credit: ${NumberFormat.currency(symbol: 'NPR ').format(creditAmount)}'),
               const SizedBox(height: 16),
               TextField(
                 controller: amountController,
@@ -1765,7 +1899,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   labelText: 'Amount to Pay (NPR)',
                   border: OutlineInputBorder(),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
               ),
               const SizedBox(height: 16),
               const Text('Payment Method:'),
@@ -1773,13 +1908,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 title: const Text('Cash'),
                 value: 'cash',
                 groupValue: paymentMethod,
-                onChanged: (value) => setDialogState(() => paymentMethod = value!),
+                onChanged: (value) =>
+                    setDialogState(() => paymentMethod = value!),
               ),
               RadioListTile<String>(
                 title: const Text('UPI / Digital'),
                 value: 'digital',
                 groupValue: paymentMethod,
-                onChanged: (value) => setDialogState(() => paymentMethod = value!),
+                onChanged: (value) =>
+                    setDialogState(() => paymentMethod = value!),
               ),
             ],
           ),
@@ -1805,15 +1942,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         }
 
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         await _orderService.payCredit(
           dbProvider: dbProvider,
           orderId: widget.orderId,
           amount: amount,
           paymentMethod: paymentMethod,
           // FIXED: Handle both int (SQLite) and String (Firestore) user IDs
-          createdBy: authProvider.currentUserId != null 
-              ? (kIsWeb ? authProvider.currentUserId! : int.tryParse(authProvider.currentUserId!))
+          createdBy: authProvider.currentUserId != null
+              ? (kIsWeb
+                  ? authProvider.currentUserId!
+                  : int.tryParse(authProvider.currentUserId!))
               : null,
         );
 
@@ -1821,7 +1961,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Credit payment of ${NumberFormat.currency(symbol: 'NPR ').format(amount)} recorded'),
+              content: Text(
+                  'Credit payment of ${NumberFormat.currency(symbol: 'NPR ').format(amount)} recorded'),
               backgroundColor: AppTheme.successColor,
             ),
           );

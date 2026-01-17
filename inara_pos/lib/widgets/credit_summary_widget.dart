@@ -27,10 +27,12 @@ class _CreditSummaryWidgetState extends State<CreditSummaryWidget> {
     try {
       final dbProvider = Provider.of<DatabaseProvider>(context, listen: false);
       await dbProvider.init();
-      
+
       final customers = await dbProvider.query('customers');
-      _totalCredits = customers.fold(0.0, (sum, c) => sum + (c['credit_balance'] as num? ?? 0).toDouble());
-      _customersWithCredit = customers.where((c) => (c['credit_balance'] as num? ?? 0) > 0).length;
+      _totalCredits = customers.fold(
+          0.0, (sum, c) => sum + (c['credit_balance'] as num? ?? 0).toDouble());
+      _customersWithCredit =
+          customers.where((c) => (c['credit_balance'] as num? ?? 0) > 0).length;
     } catch (e) {
       debugPrint('Error loading credit summary: $e');
     } finally {
@@ -72,21 +74,26 @@ class _CreditSummaryWidgetState extends State<CreditSummaryWidget> {
                 children: [
                   Icon(
                     Icons.account_balance_wallet,
-                    color: _totalCredits > 0 ? Colors.orange[900] : Colors.green[700],
+                    color: _totalCredits > 0
+                        ? Colors.orange[900]
+                        : Colors.green[700],
                     size: 24,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'Credit Summary',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: _totalCredits > 0 ? Colors.orange[900] : Colors.green[700],
-                    ),
+                          fontWeight: FontWeight.bold,
+                          color: _totalCredits > 0
+                              ? Colors.orange[900]
+                              : Colors.green[700],
+                        ),
                   ),
                   const Spacer(),
                   if (_totalCredits > 0)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.orange[200],
                         borderRadius: BorderRadius.circular(12),
@@ -118,11 +125,14 @@ class _CreditSummaryWidgetState extends State<CreditSummaryWidget> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        NumberFormat.currency(symbol: 'NPR ').format(_totalCredits),
+                        NumberFormat.currency(symbol: 'NPR ')
+                            .format(_totalCredits),
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: _totalCredits > 0 ? Colors.orange[900] : Colors.green[700],
+                          color: _totalCredits > 0
+                              ? Colors.orange[900]
+                              : Colors.green[700],
                         ),
                       ),
                     ],

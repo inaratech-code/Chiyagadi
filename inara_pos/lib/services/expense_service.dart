@@ -12,7 +12,8 @@ class ExpenseService {
     required BuildContext context,
   }) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       final now = DateTime.now();
@@ -20,8 +21,10 @@ class ExpenseService {
       final dateStr =
           '${year.toString().padLeft(2, '0')}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
 
-      final startOfDay = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
-      final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59).millisecondsSinceEpoch;
+      final startOfDay =
+          DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
+      final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59)
+          .millisecondsSinceEpoch;
 
       final today = await dbProvider.query(
         'expenses',
@@ -61,13 +64,16 @@ class ExpenseService {
     String? paymentMethod,
     String? notes,
   }) async {
-    final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+    final dbProvider =
+        Provider.of<UnifiedDatabaseProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     await dbProvider.init();
 
     final now = DateTime.now().millisecondsSinceEpoch;
     final createdBy = authProvider.currentUserId != null
-        ? (kIsWeb ? authProvider.currentUserId! : int.tryParse(authProvider.currentUserId!))
+        ? (kIsWeb
+            ? authProvider.currentUserId!
+            : int.tryParse(authProvider.currentUserId!))
         : null;
 
     final expenseNumber = await generateExpenseNumber(context: context);
@@ -92,7 +98,8 @@ class ExpenseService {
     int? endMillis,
   }) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       String? where;
@@ -116,4 +123,3 @@ class ExpenseService {
     }
   }
 }
-

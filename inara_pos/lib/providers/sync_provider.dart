@@ -22,7 +22,7 @@ class SyncProvider with ChangeNotifier {
     // Check connectivity
     final connectivityResult = await Connectivity().checkConnectivity();
     _isOnline = connectivityResult != ConnectivityResult.none;
-    
+
     // Listen to connectivity changes
     Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
       _isOnline = result != ConnectivityResult.none;
@@ -47,22 +47,21 @@ class SyncProvider with ChangeNotifier {
     try {
       // Sync orders
       await _syncOrders();
-      
+
       // Sync payments
       await _syncPayments();
-      
+
       // Sync purchases
       await _syncPurchases();
-      
+
       // Sync stock transactions
       await _syncStockTransactions();
-      
+
       // Sync day sessions
       await _syncDaySessions();
-      
+
       // Update pending count
       await _updatePendingCount();
-      
     } catch (e) {
       debugPrint('Sync error: $e');
     } finally {
@@ -79,14 +78,14 @@ class SyncProvider with ChangeNotifier {
     );
 
     final firestore = FirebaseFirestore.instance;
-    
+
     for (final order in unsynced) {
       try {
         await firestore.collection('orders').doc(order['id'].toString()).set({
           ...order,
           'synced_at': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
-        
+
         await dbProvider.update(
           'orders',
           {'synced': 1},
@@ -107,14 +106,17 @@ class SyncProvider with ChangeNotifier {
     );
 
     final firestore = FirebaseFirestore.instance;
-    
+
     for (final payment in unsynced) {
       try {
-        await firestore.collection('payments').doc(payment['id'].toString()).set({
+        await firestore
+            .collection('payments')
+            .doc(payment['id'].toString())
+            .set({
           ...payment,
           'synced_at': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
-        
+
         await dbProvider.update(
           'payments',
           {'synced': 1},
@@ -135,14 +137,17 @@ class SyncProvider with ChangeNotifier {
     );
 
     final firestore = FirebaseFirestore.instance;
-    
+
     for (final purchase in unsynced) {
       try {
-        await firestore.collection('purchases').doc(purchase['id'].toString()).set({
+        await firestore
+            .collection('purchases')
+            .doc(purchase['id'].toString())
+            .set({
           ...purchase,
           'synced_at': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
-        
+
         await dbProvider.update(
           'purchases',
           {'synced': 1},
@@ -163,14 +168,17 @@ class SyncProvider with ChangeNotifier {
     );
 
     final firestore = FirebaseFirestore.instance;
-    
+
     for (final transaction in unsynced) {
       try {
-        await firestore.collection('stock_transactions').doc(transaction['id'].toString()).set({
+        await firestore
+            .collection('stock_transactions')
+            .doc(transaction['id'].toString())
+            .set({
           ...transaction,
           'synced_at': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
-        
+
         await dbProvider.update(
           'stock_transactions',
           {'synced': 1},
@@ -191,14 +199,17 @@ class SyncProvider with ChangeNotifier {
     );
 
     final firestore = FirebaseFirestore.instance;
-    
+
     for (final session in unsynced) {
       try {
-        await firestore.collection('day_sessions').doc(session['id'].toString()).set({
+        await firestore
+            .collection('day_sessions')
+            .doc(session['id'].toString())
+            .set({
           ...session,
           'synced_at': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
-        
+
         await dbProvider.update(
           'day_sessions',
           {'synced': 1},
@@ -227,7 +238,7 @@ class SyncProvider with ChangeNotifier {
       where: 'synced = ?',
       whereArgs: [0],
     );
-    
+
     _pendingSyncs = orders.length + payments.length + purchases.length;
     notifyListeners();
   }

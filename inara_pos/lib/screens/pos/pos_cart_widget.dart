@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/order.dart';
@@ -34,6 +35,11 @@ class _POSCartWidgetState extends State<POSCartWidget> {
   List<OrderItem> _items = [];
   bool _isLoading = false;
 
+  dynamic _currentOrderId() {
+    if (widget.order == null) return null;
+    return kIsWeb ? widget.order!.documentId : widget.order!.id;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -43,13 +49,19 @@ class _POSCartWidgetState extends State<POSCartWidget> {
   @override
   void didUpdateWidget(POSCartWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.order?.id != widget.order?.id) {
+    // Reload if order identity changes OR order gets updated (items/totals changed)
+    final oldOrderId =
+        kIsWeb ? oldWidget.order?.documentId : oldWidget.order?.id;
+    final newOrderId = kIsWeb ? widget.order?.documentId : widget.order?.id;
+    if (oldOrderId != newOrderId ||
+        oldWidget.order?.updatedAt != widget.order?.updatedAt) {
       _loadOrderItems();
     }
   }
 
   Future<void> _loadOrderItems() async {
-    if (widget.order?.id == null) {
+    final orderId = _currentOrderId();
+    if (orderId == null) {
       setState(() {
         _items = [];
       });
@@ -61,8 +73,10 @@ class _POSCartWidgetState extends State<POSCartWidget> {
     });
 
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      final items = await _orderService.getOrderItemsAsObjects(dbProvider, widget.order!.id!);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final items =
+          await _orderService.getOrderItemsAsObjects(dbProvider, orderId);
       setState(() {
         _items = items;
         _isLoading = false;
@@ -157,7 +171,8 @@ class _POSCartWidgetState extends State<POSCartWidget> {
                           ),
                           const SizedBox(height: 2),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
                               color: widget.orderType == 'dine_in'
                                   ? Colors.blue.withOpacity(0.2)
@@ -165,9 +180,13 @@ class _POSCartWidgetState extends State<POSCartWidget> {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              widget.orderType == 'dine_in' ? 'Dine-In' : 'Takeaway',
+                              widget.orderType == 'dine_in'
+                                  ? 'Dine-In'
+                                  : 'Takeaway',
                               style: TextStyle(
-                                color: widget.orderType == 'dine_in' ? AppTheme.logoPrimary : AppTheme.warningColor,
+                                color: widget.orderType == 'dine_in'
+                                    ? AppTheme.logoPrimary
+                                    : AppTheme.warningColor,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -218,7 +237,9 @@ class _POSCartWidgetState extends State<POSCartWidget> {
                 _buildTotalRow('Subtotal', widget.order!.subtotal),
                 if (widget.order!.discountAmount > 0)
                   _buildTotalRow('Discount', -widget.order!.discountAmount),
-                _buildTotalRow('VAT (${widget.order!.taxPercent.toStringAsFixed(0)}%)', widget.order!.taxAmount),
+                _buildTotalRow(
+                    'VAT (${widget.order!.taxPercent.toStringAsFixed(0)}%)',
+                    widget.order!.taxAmount),
                 const SizedBox(height: 8),
                 Container(
                   height: 1,
@@ -235,7 +256,9 @@ class _POSCartWidgetState extends State<POSCartWidget> {
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: widget.order!.totalAmount > 0 ? widget.onPayPressed : null,
+                    onPressed: widget.order!.totalAmount > 0
+                        ? widget.onPayPressed
+                        : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFFC107),
                       foregroundColor: Colors.white,
@@ -292,7 +315,8 @@ class _POSCartWidgetState extends State<POSCartWidget> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFC107).withOpacity(0.2),
                     borderRadius: BorderRadius.circular(4),
@@ -328,9 +352,12 @@ class _POSCartWidgetState extends State<POSCartWidget> {
                         icon: const Icon(Icons.remove, size: 18),
                         color: Colors.white,
                         padding: const EdgeInsets.all(4),
-                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        constraints:
+                            const BoxConstraints(minWidth: 32, minHeight: 32),
                         onPressed: () {
-                          _updateQuantity(item.id!, item.quantity - 1);
+                          if (item.id != null) {
+                            _updateQuantity(item.id, item.quantity - 1);
+                          }
                         },
                       ),
                       Container(
@@ -348,9 +375,12 @@ class _POSCartWidgetState extends State<POSCartWidget> {
                         icon: const Icon(Icons.add, size: 18),
                         color: Colors.white,
                         padding: const EdgeInsets.all(4),
-                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        constraints:
+                            const BoxConstraints(minWidth: 32, minHeight: 32),
                         onPressed: () {
-                          _updateQuantity(item.id!, item.quantity + 1);
+                          if (item.id != null) {
+                            _updateQuantity(item.id, item.quantity + 1);
+                          }
                         },
                       ),
                       Container(
@@ -359,9 +389,12 @@ class _POSCartWidgetState extends State<POSCartWidget> {
                           icon: const Icon(Icons.delete_outline, size: 18),
                           color: AppTheme.errorColor,
                           padding: const EdgeInsets.all(4),
-                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          constraints:
+                              const BoxConstraints(minWidth: 32, minHeight: 32),
                           onPressed: () {
-                            _removeItem(item.id!);
+                            if (item.id != null) {
+                              _removeItem(item.id);
+                            }
                           },
                         ),
                       ),
@@ -406,19 +439,22 @@ class _POSCartWidgetState extends State<POSCartWidget> {
     );
   }
 
-  Future<void> _updateQuantity(int itemId, int newQuantity) async {
+  Future<void> _updateQuantity(dynamic itemId, int newQuantity) async {
     if (newQuantity <= 0) {
       await _removeItem(itemId);
       return;
     }
 
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await _orderService.updateItemQuantity(dbProvider, itemId, newQuantity);
       await _loadOrderItems();
       // Reload order to update totals
-      if (widget.order?.id != null) {
-        final updatedOrder = await _orderService.getOrderById(dbProvider, widget.order!.id!);
+      final orderId = _currentOrderId();
+      if (orderId != null) {
+        final updatedOrder =
+            await _orderService.getOrderById(dbProvider, orderId);
         widget.onOrderUpdated?.call(updatedOrder);
       }
     } catch (e) {
@@ -430,14 +466,17 @@ class _POSCartWidgetState extends State<POSCartWidget> {
     }
   }
 
-  Future<void> _removeItem(int itemId) async {
+  Future<void> _removeItem(dynamic itemId) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await _orderService.removeItemFromOrder(dbProvider, itemId);
       await _loadOrderItems();
       // Reload order to update totals
-      if (widget.order?.id != null) {
-        final updatedOrder = await _orderService.getOrderById(dbProvider, widget.order!.id!);
+      final orderId = _currentOrderId();
+      if (orderId != null) {
+        final updatedOrder =
+            await _orderService.getOrderById(dbProvider, orderId);
         widget.onOrderUpdated?.call(updatedOrder);
       }
     } catch (e) {

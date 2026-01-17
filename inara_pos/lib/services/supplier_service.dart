@@ -13,7 +13,8 @@ class SupplierService {
     required String name,
   }) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       final trimmed = name.trim();
@@ -60,11 +61,14 @@ class SupplierService {
 
     final existing = await getSupplierByName(context: context, name: trimmed);
     if (existing != null) {
-      return kIsWeb ? (existing.documentId ?? existing.id?.toString()) : existing.id;
+      return kIsWeb
+          ? (existing.documentId ?? existing.id?.toString())
+          : existing.id;
     }
 
     final now = DateTime.now().millisecondsSinceEpoch;
-    final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+    final dbProvider =
+        Provider.of<UnifiedDatabaseProvider>(context, listen: false);
     await dbProvider.init();
 
     // Create minimal supplier
@@ -87,7 +91,8 @@ class SupplierService {
     bool activeOnly = false,
   }) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       final suppliers = await dbProvider.query(
@@ -110,7 +115,8 @@ class SupplierService {
     required dynamic supplierId,
   }) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       final suppliers = await dbProvider.query(
@@ -134,7 +140,8 @@ class SupplierService {
     required Supplier supplier,
   }) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       final now = DateTime.now().millisecondsSinceEpoch;
@@ -165,7 +172,8 @@ class SupplierService {
     required Supplier supplier,
   }) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       final now = DateTime.now().millisecondsSinceEpoch;
@@ -197,7 +205,8 @@ class SupplierService {
     required dynamic supplierId,
   }) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       final now = DateTime.now().millisecondsSinceEpoch;

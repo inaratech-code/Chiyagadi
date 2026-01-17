@@ -37,7 +37,8 @@ class _POSProductGridState extends State<POSProductGrid> {
     });
 
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
       final categoryMaps = await dbProvider.query(
         'categories',
@@ -63,7 +64,8 @@ class _POSProductGridState extends State<POSProductGrid> {
   }
 
   Future<void> _loadProducts() async {
-    final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+    final dbProvider =
+        Provider.of<UnifiedDatabaseProvider>(context, listen: false);
     if (_selectedCategoryId == null) {
       final productMaps = await dbProvider.query(
         'products',
@@ -116,14 +118,16 @@ class _POSProductGridState extends State<POSProductGrid> {
                     },
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
                       decoration: BoxDecoration(
-                        color: isSelected 
-                            ? const Color(0xFFFFC107) 
+                        color: isSelected
+                            ? const Color(0xFFFFC107)
                             : Colors.grey[800],
                         borderRadius: BorderRadius.circular(20),
-                        border: isSelected 
-                            ? Border.all(color: const Color(0xFFFFC107), width: 2)
+                        border: isSelected
+                            ? Border.all(
+                                color: const Color(0xFFFFC107), width: 2)
                             : null,
                       ),
                       child: Row(
@@ -138,8 +142,11 @@ class _POSProductGridState extends State<POSProductGrid> {
                             category.name,
                             style: TextStyle(
                               fontSize: 14,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                              color: isSelected ? Colors.white : Colors.grey[300],
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.w500,
+                              color:
+                                  isSelected ? Colors.white : Colors.grey[300],
                             ),
                           ),
                         ],
@@ -178,7 +185,8 @@ class _POSProductGridState extends State<POSProductGrid> {
                     )
                   : GridView.builder(
                       padding: const EdgeInsets.all(12),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 4,
                         childAspectRatio: 0.75,
                         crossAxisSpacing: 12,
@@ -237,11 +245,12 @@ class _POSProductGridState extends State<POSProductGrid> {
                     ),
                   ),
                 ),
-              
+
               // Product name
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8),
                   child: Center(
                     child: Text(
                       product.name,
@@ -258,7 +267,7 @@ class _POSProductGridState extends State<POSProductGrid> {
                   ),
                 ),
               ),
-              
+
               // Price section
               Container(
                 width: double.infinity,

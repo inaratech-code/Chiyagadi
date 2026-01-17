@@ -52,7 +52,7 @@ class Category {
         idValue = idData.toInt();
       }
     }
-    
+
     return Category(
       id: idValue,
       documentId: docId,

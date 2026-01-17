@@ -14,7 +14,9 @@ class Order {
   final String? paymentMethod; // 'cash', 'card', 'digital'
   final String paymentStatus; // 'unpaid', 'paid', 'partial'
   final String? notes;
-  final int? createdBy;
+
+  /// Can be int (SQLite) or String (Firestore)
+  final dynamic createdBy;
   final int createdAt;
   final int updatedAt;
   final bool synced;
@@ -94,6 +96,21 @@ class Order {
       }
     }
 
+    // Handle created_by as dynamic (int for SQLite, String for Firestore)
+    dynamic createdByValue;
+    final createdByData = map['created_by'];
+    if (createdByData != null) {
+      if (createdByData is int) {
+        createdByValue = createdByData;
+      } else if (createdByData is String) {
+        createdByValue = createdByData;
+      } else if (createdByData is num) {
+        createdByValue = createdByData.toInt();
+      } else {
+        createdByValue = createdByData.toString();
+      }
+    }
+
     return Order(
       id: idValue,
       documentId: docId ?? map['documentId'] as String?,
@@ -110,7 +127,7 @@ class Order {
       paymentMethod: map['payment_method'] as String?,
       paymentStatus: map['payment_status'] as String? ?? 'unpaid',
       notes: map['notes'] as String?,
-      createdBy: map['created_by'] as int?,
+      createdBy: createdByValue,
       createdAt: map['created_at'] as int,
       updatedAt: map['updated_at'] as int,
       synced: (map['synced'] as int? ?? 0) == 1,
@@ -133,7 +150,7 @@ class Order {
     String? paymentMethod,
     String? paymentStatus,
     String? notes,
-    int? createdBy,
+    dynamic createdBy,
     int? createdAt,
     int? updatedAt,
     bool? synced,

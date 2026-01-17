@@ -4,7 +4,7 @@ import '../providers/database_provider.dart';
 
 class InventoryService {
   DatabaseProvider? _db;
-  
+
   DatabaseProvider _getDb(BuildContext? context) {
     if (context != null) {
       // Use Provider if context is available
@@ -115,7 +115,8 @@ class InventoryService {
 
       // Prevent negative stock
       if (newQty < 0) {
-        throw Exception('Insufficient stock. Available: $currentQty, Required: $quantity');
+        throw Exception(
+            'Insufficient stock. Available: $currentQty, Required: $quantity');
       }
 
       // Update inventory
@@ -192,7 +193,8 @@ class InventoryService {
   }
 
   /// Get current inventory quantity
-  Future<double> _getCurrentInventoryQuantity(dynamic txn, int productId) async {
+  Future<double> _getCurrentInventoryQuantity(
+      dynamic txn, int productId) async {
     final inventory = await txn.query(
       'inventory',
       where: 'product_id = ?',
@@ -222,7 +224,8 @@ class InventoryService {
   }
 
   /// Get available stock quantity
-  Future<double> getAvailableStock(int productId, {BuildContext? context}) async {
+  Future<double> getAvailableStock(int productId,
+      {BuildContext? context}) async {
     final dbProvider = _getDb(context);
     final inventory = await dbProvider.query(
       'inventory',
@@ -235,7 +238,8 @@ class InventoryService {
   }
 
   /// Get low stock items
-  Future<List<Map<String, dynamic>>> getLowStockItems({BuildContext? context}) async {
+  Future<List<Map<String, dynamic>>> getLowStockItems(
+      {BuildContext? context}) async {
     final dbProvider = _getDb(context);
     return await dbProvider.query('''
       SELECT 
@@ -322,7 +326,7 @@ class InventoryService {
     BuildContext? context,
   }) async {
     final dbProvider = _getDb(context);
-    
+
     String whereClause = '1=1';
     List<dynamic> whereArgs = [];
 
@@ -361,7 +365,8 @@ class InventoryService {
   }
 
   /// Get inventory report with profit margins
-  Future<List<Map<String, dynamic>>> getInventoryReport({BuildContext? context}) async {
+  Future<List<Map<String, dynamic>>> getInventoryReport(
+      {BuildContext? context}) async {
     final dbProvider = _getDb(context);
     return await dbProvider.query('''
       SELECT 

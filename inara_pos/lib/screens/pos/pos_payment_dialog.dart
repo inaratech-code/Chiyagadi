@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/order.dart';
@@ -46,7 +47,7 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 24),
-            
+
             // Total amount
             Container(
               padding: const EdgeInsets.all(16),
@@ -61,15 +62,15 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
                   Text(
                     NumberFormatter.formatCurrency(widget.order.totalAmount),
                     style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).primaryColor,
-                    ),
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).primaryColor,
+                        ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Payment method
             Text(
               'Payment Method',
@@ -90,11 +91,12 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
               },
             ),
             const SizedBox(height: 24),
-            
+
             // Amount (if partial payment)
             TextField(
               controller: _amountController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
                 labelText: 'Amount',
                 prefixText: 'Rs. ',
@@ -104,15 +106,17 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Buttons
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: _isProcessing ? null : () {
-                      Navigator.of(context).pop();
-                    },
+                    onPressed: _isProcessing
+                        ? null
+                        : () {
+                            Navigator.of(context).pop();
+                          },
                     child: const Text('Cancel'),
                   ),
                 ),
@@ -159,24 +163,32 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      final userId = authProvider.currentUserId != null 
-          ? int.tryParse(authProvider.currentUserId!) 
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final createdBy = authProvider.currentUserId != null
+          ? (kIsWeb
+              ? authProvider.currentUserId!
+              : int.tryParse(authProvider.currentUserId!))
           : null;
+
+      final orderId = kIsWeb ? widget.order.documentId : widget.order.id;
+      if (orderId == null) {
+        throw Exception('Order ID not found');
+      }
 
       await widget.orderService.completePayment(
         dbProvider: dbProvider,
         context: context,
-        orderId: widget.order.id!,
+        orderId: orderId,
         paymentMethod: _selectedPaymentMethod,
         amount: amount,
-        createdBy: userId,
+        createdBy: createdBy,
       );
 
       if (mounted) {
         Navigator.of(context).pop({
           'success': true,
-          'order_id': widget.order.id,
+          'order_id': orderId,
         });
       }
     } catch (e) {

@@ -37,13 +37,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Future<void> _loadInventory() async {
     setState(() => _isLoading = true);
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
-      
+
       // FIXED: Get all products (sellable items for inventory management)
       // Firestore doesn't support OR clauses, so we'll query and filter in memory
       List<Map<String, dynamic>> productMaps;
-      
+
       if (kIsWeb) {
         // For Firestore: Query all products, then filter in memory
         // This avoids requiring composite indexes
@@ -53,7 +54,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           // Include if is_sellable is 1, null, or not set (default to sellable)
           return isSellable == null || isSellable == 1;
         }).toList();
-        
+
         // Sort in memory (Firestore orderBy with where requires index)
         productMaps.sort((a, b) {
           final nameA = (a['name'] as String? ?? '').toLowerCase();
@@ -69,9 +70,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
           orderBy: 'name ASC',
         );
       }
-      
+
       final products = productMaps.map((map) => Product.fromMap(map)).toList();
-      
+
       // FIXED: Calculate stock from ledger for each product
       final List<Map<String, dynamic>> inventoryList = [];
       final List<Map<String, dynamic>> lowStockList = [];
@@ -101,7 +102,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
         final inventoryItem = {
           'product_id': productId,
           'product_name': product.name,
-          'quantity': currentStock, // FIXED: Stock from ledger, not inventory table
+          'quantity':
+              currentStock, // FIXED: Stock from ledger, not inventory table
           'min_stock_level': minStockLevel,
           'is_low_stock': isLowStock ? 1 : 0,
           'selling_price': product.price,
@@ -115,16 +117,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
           lowStockList.add(inventoryItem);
         }
       }
-      
+
       // Sort by low stock first, then by name
       inventoryList.sort((a, b) {
         final isLowA = a['is_low_stock'] == 1;
         final isLowB = b['is_low_stock'] == 1;
         if (isLowA && !isLowB) return -1;
         if (!isLowA && isLowB) return 1;
-        return (a['product_name'] as String).compareTo(b['product_name'] as String);
+        return (a['product_name'] as String)
+            .compareTo(b['product_name'] as String);
       });
-      
+
       _inventory = inventoryList;
       _lowStockItems = lowStockList;
     } catch (e) {
@@ -147,16 +150,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: widget.hideAppBar ? null : AppBar(
-        title: const Text('Inventory Management'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadInventory,
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
+      appBar: widget.hideAppBar
+          ? null
+          : AppBar(
+              title: const Text('Inventory Management'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _loadInventory,
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -164,7 +169,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 // View Mode Dropdown
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: Theme.of(context).cardColor,
                     boxShadow: [
@@ -179,7 +185,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     value: _viewMode,
                     isExpanded: true,
                     underline: const SizedBox(),
-                    icon: Icon(Icons.arrow_drop_down, color: Theme.of(context).primaryColor),
+                    icon: Icon(Icons.arrow_drop_down,
+                        color: Theme.of(context).primaryColor),
                     style: TextStyle(
                       color: Theme.of(context).textTheme.bodyLarge?.color,
                       fontSize: 16,
@@ -246,9 +253,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.inventory_2, size: 64, color: Colors.grey[400]),
+                              Icon(Icons.inventory_2,
+                                  size: 64, color: Colors.grey[400]),
                               const SizedBox(height: 16),
-                              Text('No inventory found', style: TextStyle(color: Colors.grey[600])),
+                              Text('No inventory found',
+                                  style: TextStyle(color: Colors.grey[600])),
                             ],
                           ),
                         )
@@ -258,82 +267,108 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               padding: const EdgeInsets.all(16),
                               itemCount: _inventory.length,
                               itemBuilder: (context, index) {
-                    final item = _inventory[index];
-                    final quantity = (item['quantity'] as num).toDouble();
-                    final minLevel = (item['min_stock_level'] as num).toDouble();
-                    final isLowStock = quantity <= minLevel;
-                    
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      color: isLowStock ? Colors.red[50] : null,
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: isLowStock ? Colors.red : Colors.green,
-                          child: Text(
-                            item['product_name'].toString().substring(0, 1).toUpperCase(),
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        ),
-                        title: Text(item['product_name'] as String),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('${item['category_name']} • ${item['unit']}'),
-                            if (_viewMode == 'report' && item['purchase_price'] != null)
-                              Text(
-                                'Cost: ${NumberFormat.currency(symbol: 'NPR ').format(item['purchase_price'])} | '
-                                'Sell: ${NumberFormat.currency(symbol: 'NPR ').format(item['selling_price'])}',
-                                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                              ),
-                            if (_viewMode == 'report' && item['profit_margin_percent'] != null)
-                              Text(
-                                'Margin: ${(item['profit_margin_percent'] as num).toStringAsFixed(1)}%',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: (item['profit_margin_percent'] as num).toDouble() > 0
-                                      ? Colors.green
-                                      : Colors.red,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                          ],
-                        ),
-                        trailing: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              '${quantity.toStringAsFixed(1)} ${item['unit']}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: isLowStock ? Colors.red : Colors.green,
-                              ),
+                                final item = _inventory[index];
+                                final quantity =
+                                    (item['quantity'] as num).toDouble();
+                                final minLevel =
+                                    (item['min_stock_level'] as num).toDouble();
+                                final isLowStock = quantity <= minLevel;
+
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  color: isLowStock ? Colors.red[50] : null,
+                                  child: ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: isLowStock
+                                          ? Colors.red
+                                          : Colors.green,
+                                      child: Text(
+                                        item['product_name']
+                                            .toString()
+                                            .substring(0, 1)
+                                            .toUpperCase(),
+                                        style: const TextStyle(
+                                            color: Colors.white),
+                                      ),
+                                    ),
+                                    title: Text(item['product_name'] as String),
+                                    subtitle: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                            '${item['category_name']} • ${item['unit']}'),
+                                        if (_viewMode == 'report' &&
+                                            item['purchase_price'] != null)
+                                          Text(
+                                            'Cost: ${NumberFormat.currency(symbol: 'NPR ').format(item['purchase_price'])} | '
+                                            'Sell: ${NumberFormat.currency(symbol: 'NPR ').format(item['selling_price'])}',
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.grey[600]),
+                                          ),
+                                        if (_viewMode == 'report' &&
+                                            item['profit_margin_percent'] !=
+                                                null)
+                                          Text(
+                                            'Margin: ${(item['profit_margin_percent'] as num).toStringAsFixed(1)}%',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color:
+                                                  (item['profit_margin_percent']
+                                                                  as num)
+                                                              .toDouble() >
+                                                          0
+                                                      ? Colors.green
+                                                      : Colors.red,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    trailing: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          '${quantity.toStringAsFixed(1)} ${item['unit']}',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: isLowStock
+                                                ? Colors.red
+                                                : Colors.green,
+                                          ),
+                                        ),
+                                        if (isLowStock)
+                                          const Text(
+                                            'Low Stock!',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.red,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    onTap: () =>
+                                        _showAdjustInventoryDialog(item),
+                                  ),
+                                );
+                              },
                             ),
-                            if (isLowStock)
-                              const Text(
-                                'Low Stock!',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                          ],
-                        ),
-                        onTap: () => _showAdjustInventoryDialog(item),
-                      ),
-                    );
-                  },
                 ),
-                ),
-          ],
-        ),
+              ],
+            ),
     );
   }
 
   Future<void> _showAdjustInventoryDialog(Map<String, dynamic> item) async {
-    final quantityController = TextEditingController(text: item['quantity'].toString());
-    final minLevelController = TextEditingController(text: item['min_stock_level'].toString());
+    final quantityController =
+        TextEditingController(text: item['quantity'].toString());
+    final minLevelController =
+        TextEditingController(text: item['min_stock_level'].toString());
     String transactionType = 'adjustment';
     final notesController = TextEditingController();
 
@@ -348,19 +383,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
               children: [
                 TextField(
                   controller: quantityController,
-                  decoration: const InputDecoration(labelText: 'New Quantity *'),
+                  decoration:
+                      const InputDecoration(labelText: 'New Quantity *'),
                   keyboardType: TextInputType.numberWithOptions(decimal: true),
                 ),
                 TextField(
                   controller: minLevelController,
-                  decoration: const InputDecoration(labelText: 'Min Stock Level *'),
+                  decoration:
+                      const InputDecoration(labelText: 'Min Stock Level *'),
                   keyboardType: TextInputType.numberWithOptions(decimal: true),
                 ),
                 DropdownButtonFormField<String>(
                   value: transactionType,
-                  decoration: const InputDecoration(labelText: 'Transaction Type'),
+                  decoration:
+                      const InputDecoration(labelText: 'Transaction Type'),
                   items: const [
-                    DropdownMenuItem(value: 'adjustment', child: Text('Manual Adjustment')),
+                    DropdownMenuItem(
+                        value: 'adjustment', child: Text('Manual Adjustment')),
                     DropdownMenuItem(value: 'in', child: Text('Stock In')),
                     DropdownMenuItem(value: 'out', child: Text('Stock Out')),
                   ],
@@ -370,7 +409,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 ),
                 TextField(
                   controller: notesController,
-                  decoration: const InputDecoration(labelText: 'Notes (optional)'),
+                  decoration:
+                      const InputDecoration(labelText: 'Notes (optional)'),
                   maxLines: 2,
                 ),
               ],
@@ -393,27 +433,28 @@ class _InventoryScreenState extends State<InventoryScreen> {
     if (result == true) {
       try {
         final newQuantity = double.tryParse(quantityController.text) ?? 0;
-        
+
         if (newQuantity < 0) {
           throw Exception('Stock cannot be negative');
         }
 
         // FIXED: Use ledger service to create adjustment entry (not direct update)
-        final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
         await dbProvider.init();
-        
+
         final productId = item['product_id'];
         final productName = item['product_name'] as String;
-        
+
         // FIXED: Get current stock from ledger (not from inventory table)
         final currentStock = await _ledgerService.getCurrentStock(
           context: context,
           productId: productId,
         );
-        
+
         final difference = newQuantity - currentStock;
-        
+
         if (difference == 0) {
           // No change needed
           if (mounted) {
@@ -423,13 +464,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
           }
           return;
         }
-        
+
         // FIXED: Create ledger entry for adjustment instead of direct update
         final now = DateTime.now().millisecondsSinceEpoch;
-        final createdBy = authProvider.currentUserId != null 
-            ? int.tryParse(authProvider.currentUserId!) 
+        final createdBy = authProvider.currentUserId != null
+            ? int.tryParse(authProvider.currentUserId!)
             : null;
-        
+
         // Create adjustment ledger entry
         if (difference > 0) {
           // Stock increase
@@ -444,8 +485,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
               unitPrice: 0.0, // Adjustment doesn't have a cost
               referenceType: 'adjustment',
               referenceId: null,
-              notes: notesController.text.trim().isEmpty 
-                  ? 'Manual stock adjustment' 
+              notes: notesController.text.trim().isEmpty
+                  ? 'Manual stock adjustment'
                   : notesController.text.trim(),
               createdBy: createdBy,
               createdAt: now,
@@ -464,22 +505,24 @@ class _InventoryScreenState extends State<InventoryScreen> {
               unitPrice: 0.0, // Adjustment doesn't have a cost
               referenceType: 'adjustment',
               referenceId: null,
-              notes: notesController.text.trim().isEmpty 
-                  ? 'Manual stock adjustment' 
+              notes: notesController.text.trim().isEmpty
+                  ? 'Manual stock adjustment'
                   : notesController.text.trim(),
               createdBy: createdBy,
               createdAt: now,
             ),
           );
         }
-        
+
         // Note: Min stock level can be stored in products table or a separate settings table
         // For now, we'll skip updating min_stock_level as it's not critical
 
         await _loadInventory(); // Await to ensure data is loaded
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: const Text('Inventory updated successfully'), backgroundColor: AppTheme.successColor),
+            SnackBar(
+                content: const Text('Inventory updated successfully'),
+                backgroundColor: AppTheme.successColor),
           );
         }
       } catch (e) {
@@ -500,13 +543,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        
+
         if (snapshot.hasError) {
           return Center(child: Text('Error: ${snapshot.error}'));
         }
-        
+
         final movements = snapshot.data ?? [];
-        
+
         if (movements.isEmpty) {
           return Center(
             child: Column(
@@ -514,21 +557,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
               children: [
                 Icon(Icons.history, size: 64, color: Colors.grey[400]),
                 const SizedBox(height: 16),
-                Text('No stock movements found', style: TextStyle(color: Colors.grey[600])),
+                Text('No stock movements found',
+                    style: TextStyle(color: Colors.grey[600])),
               ],
             ),
           );
         }
-        
+
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: movements.length,
           itemBuilder: (context, index) {
             final movement = movements[index];
-            final date = DateTime.fromMillisecondsSinceEpoch(movement.createdAt);
+            final date =
+                DateTime.fromMillisecondsSinceEpoch(movement.createdAt);
             final isIn = movement.quantityIn > 0;
             final quantity = isIn ? movement.quantityIn : movement.quantityOut;
-            
+
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
@@ -543,9 +588,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('${movement.transactionType} • ${DateFormat('MMM dd, yyyy HH:mm').format(date)}'),
+                    Text(
+                        '${movement.transactionType} • ${DateFormat('MMM dd, yyyy HH:mm').format(date)}'),
                     if (movement.notes != null && movement.notes!.isNotEmpty)
-                      Text(movement.notes!, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+                      Text(movement.notes!,
+                          style:
+                              TextStyle(fontSize: 11, color: Colors.grey[600])),
                   ],
                 ),
                 trailing: Column(
@@ -561,7 +609,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     ),
                     if (movement.unitPrice > 0)
                       Text(
-                        NumberFormat.currency(symbol: 'NPR ').format(movement.unitPrice),
+                        NumberFormat.currency(symbol: 'NPR ')
+                            .format(movement.unitPrice),
                         style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                       ),
                   ],
@@ -577,16 +626,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
   /// FIXED: Get stock movement history from ledger
   Future<List<InventoryLedger>> _getStockMovementHistory() async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
-      
+
       // Get all ledger entries, ordered by most recent
       final entries = await dbProvider.query(
         'inventory_ledger',
         orderBy: 'created_at DESC',
         limit: 100,
       );
-      
+
       return entries.map((e) => InventoryLedger.fromMap(e)).toList();
     } catch (e) {
       debugPrint('Error getting stock movement history: $e');

@@ -91,42 +91,68 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<Widget> get _screens => [
-    _createScreen(0),
-    _createScreen(1),
-    _createScreen(2),
-    _createScreen(3),
-    _createScreen(4),
-    _createScreen(5),
-    _createScreen(6),
-    _createScreen(7),
-    _createScreen(8),
-    _createScreen(9),
-  ];
+        _createScreen(0),
+        _createScreen(1),
+        _createScreen(2),
+        _createScreen(3),
+        _createScreen(4),
+        _createScreen(5),
+        _createScreen(6),
+        _createScreen(7),
+        _createScreen(8),
+        _createScreen(9),
+      ];
 
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
-    
+
     // For small screens (including web on phones/PWA), use the compact mobile navigation
     // so we don't render an over-crowded web bottom bar.
     final isCompact = !kIsWeb || MediaQuery.of(context).size.width < 700;
     // (cleanup) mainNavItems was unused; selection logic uses _selectedIndex directly.
-    
+
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFEF5), // Very light yellow/cream background
-      appBar: _selectedIndex == 0 ? null : AppBar(
-        title: Text(
-          _screenTitles[_selectedIndex],
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _refreshCurrentScreen,
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
+      backgroundColor:
+          const Color(0xFFFFFEF5), // Very light yellow/cream background
+      appBar: _selectedIndex == 0
+          ? null
+          : AppBar(
+              title: Row(
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(
+                          color: Colors.white.withOpacity(0.7), width: 1),
+                    ),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/images/logo.jpeg',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            const Icon(Icons.local_cafe, size: 18),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    _screenTitles[_selectedIndex],
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _refreshCurrentScreen,
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
       drawer: isCompact ? _buildDrawer(context, authProvider) : null,
       body: kIsWeb
           ? ResponsiveWrapper(
@@ -268,8 +294,10 @@ class _HomeScreenState extends State<HomeScreen> {
           return _selectedIndex;
       }
     }
+
     return NavigationBar(
-      selectedIndex: isMoreSelected ? 3 : mobileIndexFromSelectedIndex(_selectedIndex),
+      selectedIndex:
+          isMoreSelected ? 3 : mobileIndexFromSelectedIndex(_selectedIndex),
       onDestinationSelected: (index) {
         if (index == 3) {
           // Show "More" bottom sheet
@@ -333,7 +361,8 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildMoreOptionTile(context, Icons.people, 'Customers', 7),
             _buildMoreOptionTile(context, Icons.shopping_bag, 'Purchases', 8),
             _buildMoreOptionTile(context, Icons.payments, 'Expenses', 9),
-            _buildMoreOptionTile(context, Icons.settings, 'Settings', -1, isSettings: true),
+            _buildMoreOptionTile(context, Icons.settings, 'Settings', -1,
+                isSettings: true),
             const SizedBox(height: 8),
           ],
         ),
@@ -341,7 +370,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildMoreOptionTile(BuildContext context, IconData icon, String title, int index, {bool isSettings = false}) {
+  Widget _buildMoreOptionTile(
+      BuildContext context, IconData icon, String title, int index,
+      {bool isSettings = false}) {
     return ListTile(
       leading: Icon(icon, color: AppTheme.logoPrimary),
       title: Text(title),
@@ -420,7 +451,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _showLogoutDialog(BuildContext context, AuthProvider authProvider) async {
+  Future<void> _showLogoutDialog(
+      BuildContext context, AuthProvider authProvider) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(

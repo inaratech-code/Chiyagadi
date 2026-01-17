@@ -14,7 +14,8 @@ import 'suppliers_screen.dart';
 class PurchasesScreen extends StatefulWidget {
   final bool hideAppBar;
   final String? preSelectedSupplier;
-  const PurchasesScreen({super.key, this.hideAppBar = false, this.preSelectedSupplier});
+  const PurchasesScreen(
+      {super.key, this.hideAppBar = false, this.preSelectedSupplier});
 
   @override
   State<PurchasesScreen> createState() => _PurchasesScreenState();
@@ -33,7 +34,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
     super.initState();
     _loadPurchases();
     // If supplier is pre-selected, open add purchase dialog
-    if (widget.preSelectedSupplier != null && widget.preSelectedSupplier!.isNotEmpty) {
+    if (widget.preSelectedSupplier != null &&
+        widget.preSelectedSupplier!.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _showAddPurchaseDialog(preSelectedSupplier: widget.preSelectedSupplier);
       });
@@ -44,7 +46,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
       final purchases = await dbProvider.query(
         'purchases',
@@ -75,31 +78,33 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
-    
+
     return Scaffold(
-      appBar: widget.hideAppBar ? null : AppBar(
-        title: const Text('Purchase Management'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.business),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SuppliersScreen(),
+      appBar: widget.hideAppBar
+          ? null
+          : AppBar(
+              title: const Text('Purchase Management'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.business),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SuppliersScreen(),
+                      ),
+                    ).then((_) => _loadPurchases());
+                  },
+                  tooltip: 'Suppliers / Parties',
                 ),
-              ).then((_) => _loadPurchases());
-            },
-            tooltip: 'Suppliers / Parties',
-          ),
-          if (authProvider.isAdmin)
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: () => _showAddPurchaseDialog(),
-              tooltip: 'Add Purchase',
+                if (authProvider.isAdmin)
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: () => _showAddPurchaseDialog(),
+                    tooltip: 'Add Purchase',
+                  ),
+              ],
             ),
-        ],
-      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _purchases.isEmpty
@@ -107,9 +112,11 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.shopping_bag, size: 64, color: Colors.grey[400]),
+                      Icon(Icons.shopping_bag,
+                          size: 64, color: Colors.grey[400]),
                       const SizedBox(height: 16),
-                      Text('No purchases found', style: TextStyle(color: Colors.grey[600])),
+                      Text('No purchases found',
+                          style: TextStyle(color: Colors.grey[600])),
                       if (authProvider.isAdmin) ...[
                         const SizedBox(height: 8),
                         ElevatedButton.icon(
@@ -132,12 +139,20 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                         itemCount: _purchases.length,
                         itemBuilder: (context, index) {
                           final purchase = _purchases[index];
-                          final date = DateTime.fromMillisecondsSinceEpoch((purchase['created_at'] as num).toInt());
-                          final totalAmount = (purchase['total_amount'] as num?)?.toDouble() ?? 0.0;
-                          final paidAmount = (purchase['paid_amount'] as num?)?.toDouble() ?? 0.0;
-                          final outstandingAmount = (purchase['outstanding_amount'] as num?)?.toDouble() ?? (totalAmount - paidAmount);
+                          final date = DateTime.fromMillisecondsSinceEpoch(
+                              (purchase['created_at'] as num).toInt());
+                          final totalAmount =
+                              (purchase['total_amount'] as num?)?.toDouble() ??
+                                  0.0;
+                          final paidAmount =
+                              (purchase['paid_amount'] as num?)?.toDouble() ??
+                                  0.0;
+                          final outstandingAmount =
+                              (purchase['outstanding_amount'] as num?)
+                                      ?.toDouble() ??
+                                  (totalAmount - paidAmount);
                           final hasOutstanding = outstandingAmount > 0;
-                          
+
                           return Card(
                             margin: const EdgeInsets.only(bottom: 8),
                             // Softer, logo-matching palette
@@ -148,25 +163,32 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                               borderRadius: BorderRadius.circular(12),
                               onTap: () => _showPurchaseDetails(purchase),
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
                                 child: LayoutBuilder(
                                   builder: (context, constraints) {
                                     final isNarrow = constraints.maxWidth < 420;
 
                                     final right = Column(
                                       mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
                                       children: [
                                         Text(
-                                          NumberFormat.currency(symbol: 'NPR ').format(totalAmount),
-                                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                          NumberFormat.currency(symbol: 'NPR ')
+                                              .format(totalAmount),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium
+                                              ?.copyWith(
                                                 fontWeight: FontWeight.bold,
                                                 color: Colors.black87,
                                               ),
                                         ),
                                         if (paidAmount > 0)
                                           Padding(
-                                            padding: const EdgeInsets.only(top: 2),
+                                            padding:
+                                                const EdgeInsets.only(top: 2),
                                             child: Text(
                                               'Paid: ${NumberFormat.currency(symbol: 'NPR ').format(paidAmount)}',
                                               style: const TextStyle(
@@ -175,22 +197,35 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                                               ),
                                             ),
                                           ),
-                                        if (authProvider.isAdmin && hasOutstanding) ...[
+                                        if (authProvider.isAdmin &&
+                                            hasOutstanding) ...[
                                           const SizedBox(height: 8),
                                           SizedBox(
                                             height: 32,
                                             child: ElevatedButton.icon(
-                                              onPressed: () => _showPurchasePaymentDialog(purchase),
-                                              icon: const Icon(Icons.payment, size: 16),
-                                              label: const Text('Receive', style: TextStyle(fontSize: 12)),
+                                              onPressed: () =>
+                                                  _showPurchasePaymentDialog(
+                                                      purchase),
+                                              icon: const Icon(Icons.payment,
+                                                  size: 16),
+                                              label: const Text('Receive',
+                                                  style:
+                                                      TextStyle(fontSize: 12)),
                                               style: ElevatedButton.styleFrom(
-                                                backgroundColor: AppTheme.logoPrimary,
-                                                foregroundColor: AppTheme.logoAccent,
-                                                padding: const EdgeInsets.symmetric(horizontal: 10),
-                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                backgroundColor:
+                                                    AppTheme.logoPrimary,
+                                                foregroundColor:
+                                                    AppTheme.logoAccent,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 10),
+                                                tapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
                                                 minimumSize: const Size(0, 32),
                                                 shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(10),
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
                                                 ),
                                               ),
                                             ),
@@ -200,28 +235,38 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                                     );
 
                                     final left = Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           'Purchase #${purchase['purchase_number']}',
-                                          style: const TextStyle(fontWeight: FontWeight.w600),
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w600),
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
                                           '${purchase['supplier_name']} • ${DateFormat('MMM dd, yyyy').format(date)}',
-                                          style: TextStyle(color: Colors.grey[800]),
+                                          style: TextStyle(
+                                              color: Colors.grey[800]),
                                         ),
-                                        if ((purchase['bill_number'] as String?)?.trim().isNotEmpty == true)
+                                        if ((purchase['bill_number'] as String?)
+                                                ?.trim()
+                                                .isNotEmpty ==
+                                            true)
                                           Padding(
-                                            padding: const EdgeInsets.only(top: 2),
+                                            padding:
+                                                const EdgeInsets.only(top: 2),
                                             child: Text(
                                               'Bill: ${purchase['bill_number']}',
-                                              style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                                              style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[700]),
                                             ),
                                           ),
                                         if (hasOutstanding)
                                           Padding(
-                                            padding: const EdgeInsets.only(top: 4),
+                                            padding:
+                                                const EdgeInsets.only(top: 4),
                                             child: Text(
                                               'Outstanding: ${NumberFormat.currency(symbol: 'NPR ').format(outstandingAmount)}',
                                               style: TextStyle(
@@ -236,17 +281,21 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
 
                                     if (isNarrow) {
                                       return Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Row(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               CircleAvatar(
                                                 backgroundColor: hasOutstanding
                                                     ? AppTheme.warningColor
                                                     : AppTheme.successColor,
                                                 child: Icon(
-                                                  hasOutstanding ? Icons.pending : Icons.check_circle,
+                                                  hasOutstanding
+                                                      ? Icons.pending
+                                                      : Icons.check_circle,
                                                   color: Colors.white,
                                                 ),
                                               ),
@@ -264,14 +313,17 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                                     }
 
                                     return Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         CircleAvatar(
                                           backgroundColor: hasOutstanding
                                               ? AppTheme.warningColor
                                               : AppTheme.successColor,
                                           child: Icon(
-                                            hasOutstanding ? Icons.pending : Icons.check_circle,
+                                            hasOutstanding
+                                                ? Icons.pending
+                                                : Icons.check_circle,
                                             color: Colors.white,
                                           ),
                                         ),
@@ -303,18 +355,20 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
   }
 
   Future<void> _showAddPurchaseDialog({String? preSelectedSupplier}) async {
-    final supplierController = TextEditingController(text: preSelectedSupplier ?? '');
+    final supplierController =
+        TextEditingController(text: preSelectedSupplier ?? '');
     final billNumberController = TextEditingController();
     final notesController = TextEditingController();
     final List<Map<String, dynamic>> items = [];
-    
+
     // IMPORTANT: Purchase items should be manually entered and MUST NOT be linked with Menu items.
     // We intentionally do NOT load products into a dropdown here.
-    final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+    final dbProvider =
+        Provider.of<UnifiedDatabaseProvider>(context, listen: false);
     await dbProvider.init();
-    
+
     final List<Product> products = [];
-    
+
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -326,7 +380,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
               children: [
                 TextField(
                   controller: supplierController,
-                  decoration: const InputDecoration(labelText: 'Supplier Name *'),
+                  decoration:
+                      const InputDecoration(labelText: 'Supplier Name *'),
                   autofocus: true,
                 ),
                 const SizedBox(height: 12),
@@ -339,23 +394,28 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                 ),
                 TextField(
                   controller: notesController,
-                  decoration: const InputDecoration(labelText: 'Notes (optional)'),
+                  decoration:
+                      const InputDecoration(labelText: 'Notes (optional)'),
                   maxLines: 2,
                 ),
                 const SizedBox(height: 16),
-                const Text('Purchase Items', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('Purchase Items',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 ...items.asMap().entries.map((entry) {
                   final index = entry.key;
                   final item = entry.value;
-                  final displayName = (item['product_name'] as String?)?.trim().isNotEmpty == true
-                      ? (item['product_name'] as String).trim()
-                      : 'Item';
+                  final displayName =
+                      (item['product_name'] as String?)?.trim().isNotEmpty ==
+                              true
+                          ? (item['product_name'] as String).trim()
+                          : 'Item';
                   return Card(
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
                       title: Text(displayName),
-                      subtitle: Text('Qty: ${item['quantity']}, Cost: ${NumberFormat.currency(symbol: 'NPR ').format(item['unit_price'])}'),
+                      subtitle: Text(
+                          'Qty: ${item['quantity']}, Cost: ${NumberFormat.currency(symbol: 'NPR ').format(item['unit_price'])}'),
                       trailing: IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
                         onPressed: () {
@@ -366,7 +426,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                   );
                 }),
                 ElevatedButton.icon(
-                  onPressed: () => _showAddPurchaseItemDialog(context, setDialogState, items, products),
+                  onPressed: () => _showAddPurchaseItemDialog(
+                      context, setDialogState, items, products),
                   icon: const Icon(Icons.add),
                   label: const Text('Add Item'),
                 ),
@@ -379,7 +440,9 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: (items.isEmpty || supplierController.text.isEmpty || _isCreatingPurchase)
+              onPressed: (items.isEmpty ||
+                      supplierController.text.isEmpty ||
+                      _isCreatingPurchase)
                   ? null
                   : () => Navigator.pop(context, true),
               child: _isCreatingPurchase
@@ -395,12 +458,14 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
       ),
     );
 
-    if (result == true && supplierController.text.isNotEmpty && items.isNotEmpty) {
+    if (result == true &&
+        supplierController.text.isNotEmpty &&
+        items.isNotEmpty) {
       // Prevent duplicate submissions
       if (_isCreatingPurchase) return;
-      
+
       setState(() => _isCreatingPurchase = true);
-      
+
       try {
         // Ensure supplier exists and link purchase to supplier_id (connect suppliers ↔ purchases)
         final supplierName = supplierController.text.trim();
@@ -411,14 +476,17 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
 
         // Convert items to PurchaseItem models
         final purchaseItems = <PurchaseItem>[];
-        final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-        
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+
         for (final item in items) {
           final isManual = item['is_manual'] == true;
           dynamic productId = item['product_id'];
           String productName = item['product_name'] ?? 'Unknown';
-          final unit = (item['unit'] as String?)?.trim().isNotEmpty == true ? (item['unit'] as String).trim() : 'pcs';
-          
+          final unit = (item['unit'] as String?)?.trim().isNotEmpty == true
+              ? (item['unit'] as String).trim()
+              : 'pcs';
+
           // For manual entries, try to find or create the product
           if (isManual && productId == null) {
             productName = item['product_name'] as String;
@@ -430,7 +498,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
               where: 'name = ? AND is_purchasable = ? AND is_sellable = ?',
               whereArgs: [productName, 1, 0],
             );
-            
+
             if (existingProducts.isNotEmpty) {
               final existing = Product.fromMap(existingProducts.first);
               productId = kIsWeb ? existing.documentId : existing.id;
@@ -467,7 +535,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
               debugPrint('Product not found in list, using stored name');
             }
           }
-          
+
           purchaseItems.add(PurchaseItem(
             purchaseId: null, // Will be set by service
             productId: productId,
@@ -475,7 +543,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
             unit: unit,
             quantity: (item['quantity'] as num).toDouble(),
             unitPrice: (item['unit_price'] as num).toDouble(),
-            totalPrice: (item['quantity'] as num).toDouble() * (item['unit_price'] as num).toDouble(),
+            totalPrice: (item['quantity'] as num).toDouble() *
+                (item['unit_price'] as num).toDouble(),
             notes: null,
           ));
         }
@@ -485,18 +554,23 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
           context: context,
           supplierId: supplierId,
           supplierName: supplierName,
-          billNumber: billNumberController.text.trim().isEmpty ? null : billNumberController.text.trim(),
+          billNumber: billNumberController.text.trim().isEmpty
+              ? null
+              : billNumberController.text.trim(),
           items: purchaseItems,
           discountAmount: null,
           taxAmount: null,
-          notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+          notes: notesController.text.trim().isEmpty
+              ? null
+              : notesController.text.trim(),
         );
 
         await _loadPurchases(); // Await to ensure data is loaded
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Purchase added successfully. Stock updated via ledger.'),
+              content: const Text(
+                  'Purchase added successfully. Stock updated via ledger.'),
               backgroundColor: const Color(0xFF00B894),
             ),
           );
@@ -580,7 +654,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: priceController,
-                  decoration: const InputDecoration(labelText: 'Unit Price (Cost) *'),
+                  decoration:
+                      const InputDecoration(labelText: 'Unit Price (Cost) *'),
                   keyboardType: TextInputType.numberWithOptions(decimal: true),
                   onChanged: (_) => setItemState(() {}),
                 ),
@@ -598,14 +673,16 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                       priceController.text.isEmpty
                   ? null
                   : () {
-                      final quantity = double.tryParse(quantityController.text) ?? 0;
+                      final quantity =
+                          double.tryParse(quantityController.text) ?? 0;
                       final price = double.tryParse(priceController.text) ?? 0;
                       if (quantity > 0 && price >= 0) {
                         setDialogState(() {
                           // Manual entry: create a temporary product entry
                           // The product will be created on-the-fly or referenced by name
                           items.add({
-                            'product_id': null, // Will be handled during purchase creation
+                            'product_id':
+                                null, // Will be handled during purchase creation
                             'product_name': nameController.text.trim(),
                             'unit': selectedUnit,
                             'quantity': quantity,
@@ -628,17 +705,19 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
     double totalPurchases = 0.0;
     double totalPaid = 0.0;
     double totalOutstanding = 0.0;
-    
+
     for (var purchase in _purchases) {
       final total = (purchase['total_amount'] as num?)?.toDouble() ?? 0.0;
       final paid = (purchase['paid_amount'] as num?)?.toDouble() ?? 0.0;
-      final outstanding = (purchase['outstanding_amount'] as num?)?.toDouble() ?? (total - paid);
-      
+      final outstanding =
+          (purchase['outstanding_amount'] as num?)?.toDouble() ??
+              (total - paid);
+
       totalPurchases += total;
       totalPaid += paid;
       totalOutstanding += outstanding;
     }
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -688,7 +767,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
     );
   }
 
-  Widget _buildSummaryCard(String label, double amount, Color color, IconData icon) {
+  Widget _buildSummaryCard(
+      String label, double amount, Color color, IconData icon) {
     return Card(
       color: color.withOpacity(0.1),
       child: Padding(
@@ -722,7 +802,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
 
   Future<void> _loadPurchasePayments(dynamic purchaseId) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       _purchasePayments = await dbProvider.query(
         'purchase_payments',
         where: 'purchase_id = ?',
@@ -737,7 +818,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
 
   Future<void> _showPurchaseDetails(Map<String, dynamic> purchase) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
       // Handle both int (SQLite) and String (Firestore) IDs
       final purchaseId = purchase['id'] ?? purchase['documentId'];
@@ -749,150 +831,184 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
         }
         return;
       }
-      
+
       final items = await dbProvider.query(
         'purchase_items',
         where: 'purchase_id = ?',
         whereArgs: [purchaseId],
       );
-      
+
       await _loadPurchasePayments(purchaseId);
-      
+
       if (!mounted) return;
-      
+
       final totalAmount = (purchase['total_amount'] as num?)?.toDouble() ?? 0.0;
       final paidAmount = (purchase['paid_amount'] as num?)?.toDouble() ?? 0.0;
-      final outstandingAmount = (purchase['outstanding_amount'] as num?)?.toDouble() ?? (totalAmount - paidAmount);
+      final outstandingAmount =
+          (purchase['outstanding_amount'] as num?)?.toDouble() ??
+              (totalAmount - paidAmount);
       final hasOutstanding = outstandingAmount > 0;
-      
+
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
+
       await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Purchase #${purchase['purchase_number']}'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Supplier: ${purchase['supplier_name']}'),
-              if ((purchase['bill_number'] as String?)?.trim().isNotEmpty == true)
-                Text('Bill: ${purchase['bill_number']}'),
-              Text('Date: ${DateFormat('MMM dd, yyyy').format(DateTime.fromMillisecondsSinceEpoch((purchase['created_at'] as num).toInt()))}'),
-              if (purchase['notes'] != null) Text('Notes: ${purchase['notes']}'),
-              const Divider(),
-              // Payment Summary
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: hasOutstanding ? const Color(0xFFFF6B6B).withOpacity(0.1) : const Color(0xFF00B894).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: hasOutstanding ? const Color(0xFFFF6B6B) : const Color(0xFF00B894),
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Purchase #${purchase['purchase_number']}'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Supplier: ${purchase['supplier_name']}'),
+                if ((purchase['bill_number'] as String?)?.trim().isNotEmpty ==
+                    true)
+                  Text('Bill: ${purchase['bill_number']}'),
+                Text(
+                    'Date: ${DateFormat('MMM dd, yyyy').format(DateTime.fromMillisecondsSinceEpoch((purchase['created_at'] as num).toInt()))}'),
+                if (purchase['notes'] != null)
+                  Text('Notes: ${purchase['notes']}'),
+                const Divider(),
+                // Payment Summary
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: hasOutstanding
+                        ? const Color(0xFFFF6B6B).withOpacity(0.1)
+                        : const Color(0xFF00B894).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: hasOutstanding
+                          ? const Color(0xFFFF6B6B)
+                          : const Color(0xFF00B894),
+                    ),
                   ),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Total Amount:', style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text(
-                          NumberFormat.currency(symbol: 'NPR ').format(totalAmount),
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Total Amount:',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text(
+                            NumberFormat.currency(symbol: 'NPR ')
+                                .format(totalAmount),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      if (paidAmount > 0) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Paid:',
+                                style: TextStyle(color: Color(0xFF00B894))),
+                            Text(
+                              NumberFormat.currency(symbol: 'NPR ')
+                                  .format(paidAmount),
+                              style: const TextStyle(
+                                  color: Color(0xFF00B894),
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ],
                         ),
                       ],
-                    ),
-                    if (paidAmount > 0) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Paid:', style: TextStyle(color: Color(0xFF00B894))),
-                          Text(
-                            NumberFormat.currency(symbol: 'NPR ').format(paidAmount),
-                            style: const TextStyle(color: Color(0xFF00B894), fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ],
-                    if (hasOutstanding) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Outstanding:', style: TextStyle(color: Color(0xFFFF6B6B), fontWeight: FontWeight.bold)),
-                          Text(
-                            NumberFormat.currency(symbol: 'NPR ').format(outstandingAmount),
-                            style: const TextStyle(color: Color(0xFFFF6B6B), fontWeight: FontWeight.bold, fontSize: 16),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const Divider(),
-              const Text('Items:', style: TextStyle(fontWeight: FontWeight.bold)),
-              ...items.map((item) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Product ${item['product_id']} x ${item['quantity']}'),
-                    Text(NumberFormat.currency(symbol: 'NPR ').format(item['total_price'])),
-                  ],
-                ),
-              )),
-              if (_purchasePayments.isNotEmpty) ...[
-                const Divider(),
-                const Text('Payment History:', style: TextStyle(fontWeight: FontWeight.bold)),
-                ..._purchasePayments.map((payment) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(DateFormat('MMM dd, yyyy').format(DateTime.fromMillisecondsSinceEpoch((payment['created_at'] as num).toInt()))),
-                          if (payment['payment_method'] != null)
+                      if (hasOutstanding) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Outstanding:',
+                                style: TextStyle(
+                                    color: Color(0xFFFF6B6B),
+                                    fontWeight: FontWeight.bold)),
                             Text(
-                              payment['payment_method'] as String,
-                              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                              NumberFormat.currency(symbol: 'NPR ')
+                                  .format(outstandingAmount),
+                              style: const TextStyle(
+                                  color: Color(0xFFFF6B6B),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16),
                             ),
-                        ],
-                      ),
-                      Text(
-                        NumberFormat.currency(symbol: 'NPR ').format(payment['amount']),
-                        style: const TextStyle(color: Color(0xFF00B894), fontWeight: FontWeight.bold),
-                      ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
-                )),
+                ),
+                const Divider(),
+                const Text('Items:',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                ...items.map((item) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                              'Product ${item['product_id']} x ${item['quantity']}'),
+                          Text(NumberFormat.currency(symbol: 'NPR ')
+                              .format(item['total_price'])),
+                        ],
+                      ),
+                    )),
+                if (_purchasePayments.isNotEmpty) ...[
+                  const Divider(),
+                  const Text('Payment History:',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  ..._purchasePayments.map((payment) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(DateFormat('MMM dd, yyyy').format(
+                                    DateTime.fromMillisecondsSinceEpoch(
+                                        (payment['created_at'] as num)
+                                            .toInt()))),
+                                if (payment['payment_method'] != null)
+                                  Text(
+                                    payment['payment_method'] as String,
+                                    style: TextStyle(
+                                        fontSize: 11, color: Colors.grey[600]),
+                                  ),
+                              ],
+                            ),
+                            Text(
+                              NumberFormat.currency(symbol: 'NPR ')
+                                  .format(payment['amount']),
+                              style: const TextStyle(
+                                  color: Color(0xFF00B894),
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      )),
+                ],
               ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-          if (hasOutstanding && authProvider.isAdmin)
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                _showPurchasePaymentDialog(purchase);
-              },
-              icon: const Icon(Icons.payment),
-              label: const Text('Make Payment'),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B894)),
             ),
-        ],
-      ),
-    );
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+            if (hasOutstanding && authProvider.isAdmin)
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _showPurchasePaymentDialog(purchase);
+                },
+                icon: const Icon(Icons.payment),
+                label: const Text('Make Payment'),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00B894)),
+              ),
+          ],
+        ),
+      );
     } catch (e) {
       debugPrint('Error showing purchase details: $e');
       if (mounted) {
@@ -911,7 +1027,9 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
 
     final totalAmount = (purchase['total_amount'] as num?)?.toDouble() ?? 0.0;
     final paidAmount = (purchase['paid_amount'] as num?)?.toDouble() ?? 0.0;
-    final outstandingAmount = (purchase['outstanding_amount'] as num?)?.toDouble() ?? (totalAmount - paidAmount);
+    final outstandingAmount =
+        (purchase['outstanding_amount'] as num?)?.toDouble() ??
+            (totalAmount - paidAmount);
 
     final result = await showDialog<Map<String, dynamic>?>(
       context: context,
@@ -924,7 +1042,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
               children: [
                 Text(
                   'Purchase #${purchase['purchase_number']}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 const SizedBox(height: 8),
                 Container(
@@ -939,7 +1058,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                     children: [
                       const Text('Outstanding Amount:'),
                       Text(
-                        NumberFormat.currency(symbol: 'NPR ').format(outstandingAmount),
+                        NumberFormat.currency(symbol: 'NPR ')
+                            .format(outstandingAmount),
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -964,14 +1084,17 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                   onChanged: (value) {
                     final amount = double.tryParse(value) ?? 0;
                     setDialogState(() {
-                      isPartialPaymentNotifier.value = amount > 0 && amount < outstandingAmount;
+                      isPartialPaymentNotifier.value =
+                          amount > 0 && amount < outstandingAmount;
                     });
                   },
                 ),
                 ValueListenableBuilder<bool>(
                   valueListenable: isPartialPaymentNotifier,
                   builder: (context, isPartial, _) {
-                    if (!isPartial || amountController.text.isEmpty) return const SizedBox.shrink();
+                    if (!isPartial || amountController.text.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
                     return Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Container(
@@ -982,12 +1105,14 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.info_outline, size: 16, color: Colors.blue[700]),
+                            Icon(Icons.info_outline,
+                                size: 16, color: Colors.blue[700]),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 'Partial payment. Remaining: ${NumberFormat.currency(symbol: 'NPR ').format(outstandingAmount - (double.tryParse(amountController.text) ?? 0))}',
-                                style: TextStyle(fontSize: 12, color: Colors.blue[700]),
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.blue[700]),
                               ),
                             ),
                           ],
@@ -999,7 +1124,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                 const SizedBox(height: 16),
                 ValueListenableBuilder<String>(
                   valueListenable: paymentMethodNotifier,
-                  builder: (context, paymentMethod, _) => DropdownButtonFormField<String>(
+                  builder: (context, paymentMethod, _) =>
+                      DropdownButtonFormField<String>(
                     value: paymentMethod,
                     decoration: const InputDecoration(
                       labelText: 'Payment Method *',
@@ -1009,7 +1135,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                     items: const [
                       DropdownMenuItem(value: 'cash', child: Text('Cash')),
                       DropdownMenuItem(value: 'card', child: Text('Card')),
-                      DropdownMenuItem(value: 'bank_transfer', child: Text('Bank Transfer')),
+                      DropdownMenuItem(
+                          value: 'bank_transfer', child: Text('Bank Transfer')),
                       DropdownMenuItem(value: 'other', child: Text('Other')),
                     ],
                     onChanged: (value) {
@@ -1040,13 +1167,16 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                 final amount = double.tryParse(amountController.text) ?? 0;
                 if (amount <= 0) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter a valid amount')),
+                    const SnackBar(
+                        content: Text('Please enter a valid amount')),
                   );
                   return;
                 }
                 if (amount > outstandingAmount) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Amount cannot exceed outstanding balance of ${NumberFormat.currency(symbol: 'NPR ').format(outstandingAmount)}')),
+                    SnackBar(
+                        content: Text(
+                            'Amount cannot exceed outstanding balance of ${NumberFormat.currency(symbol: 'NPR ').format(outstandingAmount)}')),
                   );
                   return;
                 }
@@ -1056,7 +1186,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                   'notes': notesController.text.trim(),
                 });
               },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B894)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00B894)),
               child: const Text('Make Payment'),
             ),
           ],
@@ -1064,30 +1195,41 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
       ),
     );
 
-    if (result != null && result['amount'] != null && (result['amount'] as double) > 0) {
+    if (result != null &&
+        result['amount'] != null &&
+        (result['amount'] as double) > 0) {
       final paymentMethod = result['paymentMethod'] as String? ?? 'cash';
       final notes = result['notes'] as String? ?? '';
       try {
-        final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        final purchaseId = kIsWeb ? (purchase['documentId'] ?? purchase['id']) : purchase['id'];
+        final purchaseId = kIsWeb
+            ? (purchase['documentId'] ?? purchase['id'])
+            : purchase['id'];
         if (purchaseId == null) return;
-        
+
         final amount = result['amount'] as double;
         final now = DateTime.now().millisecondsSinceEpoch;
         final currentPaid = paidAmount;
         final newPaid = currentPaid + amount;
-        final newOutstanding = (totalAmount - newPaid).clamp(0.0, double.infinity);
-        final newPaymentStatus = newOutstanding <= 0 ? 'paid' : (newPaid > 0 ? 'partial' : 'unpaid');
+        final newOutstanding =
+            (totalAmount - newPaid).clamp(0.0, double.infinity);
+        final newPaymentStatus =
+            newOutstanding <= 0 ? 'paid' : (newPaid > 0 ? 'partial' : 'unpaid');
 
         // Create payment record
         await dbProvider.insert('purchase_payments', {
           'purchase_id': purchaseId,
           'amount': amount,
           'payment_method': paymentMethod,
-          'notes': notes.isEmpty ? (newOutstanding > 0 ? 'Partial payment' : null) : notes,
-          'created_by': authProvider.currentUserId != null 
-              ? (kIsWeb ? authProvider.currentUserId! : int.tryParse(authProvider.currentUserId!))
+          'notes': notes.isEmpty
+              ? (newOutstanding > 0 ? 'Partial payment' : null)
+              : notes,
+          'created_by': authProvider.currentUserId != null
+              ? (kIsWeb
+                  ? authProvider.currentUserId!
+                  : int.tryParse(authProvider.currentUserId!))
               : null,
           'created_at': now,
           'synced': 0,

@@ -5,12 +5,14 @@ class Purchase {
   final String? documentId; // Firestore document ID (string)
   final dynamic supplierId; // Can be int (SQLite) or String (Firestore)
   final String? supplierName; // Denormalized for display
-  final String purchaseNumber; // Unique purchase number (e.g., PUR-20240101-001)
+  final String
+      purchaseNumber; // Unique purchase number (e.g., PUR-20240101-001)
   final double totalAmount;
   final double? discountAmount;
   final double? taxAmount;
   final double paidAmount; // Amount paid so far
-  final double? outstandingAmount; // Remaining amount to pay (nullable, calculated if not provided)
+  final double?
+      outstandingAmount; // Remaining amount to pay (nullable, calculated if not provided)
   final String paymentStatus; // 'unpaid', 'partial', 'paid'
   final String? notes;
   final String status; // 'pending', 'completed', 'cancelled'
@@ -99,7 +101,9 @@ class Purchase {
       discountAmount: (map['discount_amount'] as num?)?.toDouble(),
       taxAmount: (map['tax_amount'] as num?)?.toDouble(),
       paidAmount: (map['paid_amount'] as num?)?.toDouble() ?? 0.0,
-      outstandingAmount: (map['outstanding_amount'] as num?)?.toDouble() ?? ((map['total_amount'] as num).toDouble() - ((map['paid_amount'] as num?)?.toDouble() ?? 0.0)),
+      outstandingAmount: (map['outstanding_amount'] as num?)?.toDouble() ??
+          ((map['total_amount'] as num).toDouble() -
+              ((map['paid_amount'] as num?)?.toDouble() ?? 0.0)),
       paymentStatus: map['payment_status'] as String? ?? 'unpaid',
       notes: map['notes'] as String?,
       status: map['status'] as String? ?? 'completed',

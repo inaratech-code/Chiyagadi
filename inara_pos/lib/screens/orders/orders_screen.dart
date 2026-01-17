@@ -8,7 +8,9 @@ import '../../services/inventory_ledger_service.dart';
 import '../../models/product.dart';
 import '../../widgets/responsive_wrapper.dart';
 import '../../utils/theme.dart';
+import '../../utils/app_messenger.dart';
 import 'order_detail_screen.dart';
+import 'order_payment_dialog.dart';
 import 'package:intl/intl.dart';
 
 class OrdersScreen extends StatefulWidget {
@@ -35,17 +37,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
-      
+
       String? whereClause;
       List<dynamic>? whereArgs;
-      
+
       if (_filterStatus != 'all') {
         whereClause = 'status = ?';
         whereArgs = [_filterStatus];
       }
-      
+
       final orders = await dbProvider.query(
         'orders',
         where: whereClause,
@@ -96,7 +99,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
   String _getPaymentStatusLabel(Map<String, dynamic> order) {
     final paymentStatus = order['payment_status'] as String? ?? 'unpaid';
     final creditAmount = (order['credit_amount'] as num? ?? 0).toDouble();
-    
+    final paymentMethod = order['payment_method'] as String?;
+
+    // If there is credit due, always show "Credit" (not Paid).
+    if (creditAmount > 0 || paymentMethod == 'credit') {
+      return 'Credit';
+    }
+
     if (paymentStatus == 'paid') {
       return 'Paid';
     } else if (paymentStatus == 'partial') {
@@ -113,7 +122,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Color _getPaymentStatusColor(Map<String, dynamic> order) {
     final paymentStatus = order['payment_status'] as String? ?? 'unpaid';
     final creditAmount = (order['credit_amount'] as num? ?? 0).toDouble();
-    
+    final paymentMethod = order['payment_method'] as String?;
+
+    if (creditAmount > 0 || paymentMethod == 'credit') {
+      return AppTheme.warningColor;
+    }
     if (paymentStatus == 'paid') {
       return Colors.green;
     } else if (paymentStatus == 'partial' || creditAmount > 0) {
@@ -138,20 +151,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: widget.hideAppBar ? null : AppBar(
-        elevation: 0,
-        title: const Text(
-          'Orders',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadOrders,
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
+      appBar: widget.hideAppBar
+          ? null
+          : AppBar(
+              elevation: 0,
+              title: const Text(
+                'Orders',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _loadOrders,
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateOrderDialog(),
         backgroundColor: Theme.of(context).primaryColor,
@@ -185,7 +200,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ),
             ),
           ),
-          
+
           // Orders list
           Expanded(
             child: kIsWeb
@@ -227,39 +242,39 @@ class _OrdersScreenState extends State<OrdersScreen> {
                               ),
                   )
                 : _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredOrders.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.receipt_long,
-                              size: 64,
-                              color: Colors.grey[400],
+                    ? const Center(child: CircularProgressIndicator())
+                    : _filteredOrders.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.receipt_long,
+                                  size: 64,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No orders found',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No orders found',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 16,
-                              ),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: _loadOrders,
+                            child: ListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: _filteredOrders.length,
+                              itemBuilder: (context, index) {
+                                final order = _filteredOrders[index];
+                                return _buildOrderCard(order);
+                              },
                             ),
-                          ],
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadOrders,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _filteredOrders.length,
-                          itemBuilder: (context, index) {
-                            final order = _filteredOrders[index];
-                            return _buildOrderCard(order);
-                          },
-                        ),
-                      ),
+                          ),
           ),
         ],
       ),
@@ -290,10 +305,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
     final status = order['status'] as String? ?? 'pending';
     final statusColor = _getStatusColor(status);
     final orderType = order['order_type'] as String? ?? 'dine_in';
-    
+
     // FIXED: Handle both SQLite (id) and Firestore (documentId) order IDs
     final orderId = kIsWeb ? (order['documentId'] ?? order['id']) : order['id'];
-    
+    final totalAmount = (order['total_amount'] as num? ?? 0).toDouble();
+    final paymentStatus = order['payment_status'] as String? ?? 'unpaid';
+    final creditAmount = (order['credit_amount'] as num? ?? 0).toDouble();
+    final paymentMethod = order['payment_method'] as String?;
+
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 12),
@@ -301,7 +320,28 @@ class _OrdersScreenState extends State<OrdersScreen> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: InkWell(
-        onTap: () {
+        // UX change: Tap = Payment dialog. Long-press = Details screen.
+        onTap: () async {
+          if (paymentStatus == 'paid') {
+            AppMessenger.showSnackBar('Order already paid');
+            return;
+          }
+
+          final result = await showDialog<Map<String, dynamic>>(
+            context: context,
+            builder: (_) => OrderPaymentDialog(
+              orderId: orderId,
+              orderNumber: order['order_number'] as String? ?? 'Order',
+              totalAmount: totalAmount,
+              orderService: _orderService,
+            ),
+          );
+
+          if (result != null && result['success'] == true) {
+            await _loadOrders();
+          }
+        },
+        onLongPress: () {
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -336,7 +376,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         Row(
                           children: [
                             Icon(
-                              orderType == 'dine_in' ? Icons.table_restaurant : Icons.shopping_bag,
+                              orderType == 'dine_in'
+                                  ? Icons.table_restaurant
+                                  : Icons.shopping_bag,
                               size: 16,
                               color: Colors.grey[600],
                             ),
@@ -355,7 +397,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: statusColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
@@ -397,7 +440,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
                               color: _getPaymentStatusColor(order),
                             ),
                           ),
-                          if (order['payment_method'] != null)
+                          // Avoid showing "Paid • Credit" (Credit label already displayed above).
+                          if (paymentMethod != null &&
+                              paymentMethod != 'credit')
                             Text(
                               ' • ${_getPaymentMethodLabel(order['payment_method'] as String)}',
                               style: TextStyle(
@@ -421,7 +466,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        NumberFormat.currency(symbol: 'NPR ').format(order['total_amount'] ?? 0),
+                        NumberFormat.currency(symbol: 'NPR ')
+                            .format(order['total_amount'] ?? 0),
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -449,29 +495,31 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   child: Row(
                     children: [
                       Icon(
-                        order['payment_status'] == 'paid'
+                        (paymentStatus == 'paid' && creditAmount <= 0)
                             ? Icons.check_circle
                             : Icons.pending,
                         size: 16,
-                        color: order['payment_status'] == 'paid'
+                        color: (paymentStatus == 'paid' && creditAmount <= 0)
                             ? Colors.green
-                            : Colors.orange,
+                            : AppTheme.warningColor,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        order['payment_status'] == 'paid' ? 'Paid' : 'Unpaid',
+                        (paymentStatus == 'paid' && creditAmount <= 0)
+                            ? 'Paid'
+                            : (creditAmount > 0 ? 'Credit' : 'Unpaid'),
                         style: TextStyle(
                           fontSize: 12,
-                          color: order['payment_status'] == 'paid'
+                          color: (paymentStatus == 'paid' && creditAmount <= 0)
                               ? Colors.green
-                              : Colors.orange,
+                              : AppTheme.warningColor,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
                 ),
-              
+
               // PERF: Don't show item preview here (it forces N+1 queries on web).
               // Item details are shown in Order Detail screen.
             ],
@@ -482,20 +530,33 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   Future<void> _showCreateOrderDialog() async {
-    final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+    final dbProvider =
+        Provider.of<UnifiedDatabaseProvider>(context, listen: false);
     await dbProvider.init();
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     // Dialog state
     String orderType = 'takeaway';
     dynamic selectedTableId;
+    // Default VAT from settings (admin can adjust in Settings)
     double vatPercent = 13.0;
     double discountPercent = 0.0;
     final searchController = TextEditingController();
     final Map<dynamic, int> qty = {};
 
     // Load tables
-    final tables = await dbProvider.query('tables', where: 'status = ?', whereArgs: ['available']);
+    final tables = await dbProvider
+        .query('tables', where: 'status = ?', whereArgs: ['available']);
+
+    // Load VAT from settings if present
+    try {
+      final vatSetting = await dbProvider
+          .query('settings', where: 'key = ?', whereArgs: ['tax_percent']);
+      if (vatSetting.isNotEmpty) {
+        final raw = vatSetting.first['value']?.toString() ?? '';
+        vatPercent = double.tryParse(raw) ?? vatPercent;
+      }
+    } catch (_) {}
 
     // Load sellable products (no category selection needed here)
     List<Map<String, dynamic>> productMaps;
@@ -537,8 +598,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
       return sum;
     }
 
-    double calcDiscountAmount(double subtotal) => subtotal * (discountPercent / 100.0);
-    double calcVatAmount(double discountedSubtotal) => discountedSubtotal * (vatPercent / 100.0);
+    double calcDiscountAmount(double subtotal) =>
+        subtotal * (discountPercent / 100.0);
+    double calcVatAmount(double discountedSubtotal) =>
+        discountedSubtotal * (vatPercent / 100.0);
 
     final result = await showDialog<bool>(
       context: context,
@@ -558,7 +621,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
           final hasItems = qty.values.any((v) => v > 0);
 
           return Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: SizedBox(
               width: 720,
               child: Padding(
@@ -571,7 +635,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         const Expanded(
                           child: Text(
                             'Create Order',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                         ),
                         IconButton(
@@ -593,13 +658,17 @@ class _OrdersScreenState extends State<OrdersScreen> {
                               border: OutlineInputBorder(),
                             ),
                             items: const [
-                              DropdownMenuItem(value: 'dine_in', child: Text('Dine-In')),
-                              DropdownMenuItem(value: 'takeaway', child: Text('Takeaway')),
+                              DropdownMenuItem(
+                                  value: 'dine_in', child: Text('Dine-In')),
+                              DropdownMenuItem(
+                                  value: 'takeaway', child: Text('Takeaway')),
                             ],
                             onChanged: (value) {
                               setDialogState(() {
                                 orderType = value ?? orderType;
-                                if (orderType != 'dine_in') selectedTableId = null;
+                                if (orderType != 'dine_in') {
+                                  selectedTableId = null;
+                                }
                               });
                             },
                           ),
@@ -611,12 +680,17 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             decoration: InputDecoration(
                               labelText: 'Table',
                               border: const OutlineInputBorder(),
-                              helperText: orderType == 'dine_in' ? 'Optional' : 'Only for Dine-In',
+                              helperText: orderType == 'dine_in'
+                                  ? 'Optional'
+                                  : 'Only for Dine-In',
                             ),
                             items: [
-                              const DropdownMenuItem(value: null, child: Text('No Table')),
+                              const DropdownMenuItem(
+                                  value: null, child: Text('No Table')),
                               ...tables.map((table) {
-                                final value = kIsWeb ? (table['documentId'] ?? table['id']) : table['id'];
+                                final value = kIsWeb
+                                    ? (table['documentId'] ?? table['id'])
+                                    : table['id'];
                                 return DropdownMenuItem(
                                   value: value,
                                   child: Text('Table ${table['table_number']}'),
@@ -624,7 +698,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                               }),
                             ],
                             onChanged: orderType == 'dine_in'
-                                ? (value) => setDialogState(() => selectedTableId = value)
+                                ? (value) => setDialogState(
+                                    () => selectedTableId = value)
                                 : null,
                           ),
                         ),
@@ -644,10 +719,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
                               border: OutlineInputBorder(),
                               suffixText: '%',
                             ),
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
                             onChanged: (v) {
                               final parsed = double.tryParse(v) ?? vatPercent;
-                              setDialogState(() => vatPercent = parsed.clamp(0, 100));
+                              setDialogState(
+                                  () => vatPercent = parsed.clamp(0, 100));
                             },
                           ),
                         ),
@@ -660,10 +737,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
                               border: OutlineInputBorder(),
                               suffixText: '%',
                             ),
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
                             onChanged: (v) {
-                              final parsed = double.tryParse(v) ?? discountPercent;
-                              setDialogState(() => discountPercent = parsed.clamp(0, 100));
+                              final parsed =
+                                  double.tryParse(v) ?? discountPercent;
+                              setDialogState(
+                                  () => discountPercent = parsed.clamp(0, 100));
                             },
                           ),
                         ),
@@ -707,16 +787,21 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
                             return ListTile(
                               dense: true,
-                              title: Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                              title: Text(p.name,
+                                  maxLines: 1, overflow: TextOverflow.ellipsis),
                               subtitle: Text(
                                 'Price: ${NumberFormat.currency(symbol: 'NPR ').format(p.price)}',
-                                style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.grey[700]),
                               ),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   IconButton(
-                                    onPressed: canDec ? () => setDialogState(() => qty[pid] = current - 1) : null,
+                                    onPressed: canDec
+                                        ? () => setDialogState(
+                                            () => qty[pid] = current - 1)
+                                        : null,
                                     icon: const Icon(Icons.remove),
                                   ),
                                   SizedBox(
@@ -724,11 +809,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                     child: Text(
                                       '$current',
                                       textAlign: TextAlign.center,
-                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold),
                                     ),
                                   ),
                                   IconButton(
-                                    onPressed: canInc ? () => setDialogState(() => qty[pid] = current + 1) : null,
+                                    onPressed: canInc
+                                        ? () => setDialogState(
+                                            () => qty[pid] = current + 1)
+                                        : null,
                                     icon: const Icon(Icons.add),
                                   ),
                                 ],
@@ -752,8 +841,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       child: Column(
                         children: [
                           _totalRow('Subtotal', subtotal),
-                          _totalRow('Discount (${discountPercent.toStringAsFixed(1)}%)', -discountAmount),
-                          _totalRow('VAT (${vatPercent.toStringAsFixed(1)}%)', vatAmount),
+                          _totalRow(
+                              'Discount (${discountPercent.toStringAsFixed(1)}%)',
+                              -discountAmount),
+                          _totalRow('VAT (${vatPercent.toStringAsFixed(1)}%)',
+                              vatAmount),
                           const Divider(),
                           _totalRow('Total', total, isTotal: true),
                         ],
@@ -773,7 +865,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: hasItems ? () => Navigator.pop(context, true) : null,
+                            onPressed: hasItems
+                                ? () => Navigator.pop(context, true)
+                                : null,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppTheme.logoPrimary,
                               foregroundColor: AppTheme.logoAccent,
@@ -798,11 +892,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
         // Validate stock for selected items only (fast).
         final selectedEntries = qty.entries.where((e) => e.value > 0).toList();
         final selectedIds = selectedEntries.map((e) => e.key).toList();
-        final selectedStock = await ledgerService.getCurrentStockBatch(context: context, productIds: selectedIds);
+        final selectedStock = await ledgerService.getCurrentStockBatch(
+            context: context, productIds: selectedIds);
         for (final e in selectedEntries) {
           final available = selectedStock[e.key] ?? 0.0;
           if (e.value > available.floor()) {
-            throw Exception('Insufficient stock for ${products.firstWhere((p) => (kIsWeb ? p.documentId : p.id) == e.key).name}. Available: ${available.toStringAsFixed(1)}, Required: ${e.value}');
+            throw Exception(
+                'Insufficient stock for ${products.firstWhere((p) => (kIsWeb ? p.documentId : p.id) == e.key).name}. Available: ${available.toStringAsFixed(1)}, Required: ${e.value}');
           }
         }
 
@@ -811,8 +907,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
           orderType: orderType,
           tableId: selectedTableId,
           // FIXED: Handle both int (SQLite) and String (Firestore) user IDs
-          createdBy: authProvider.currentUserId != null 
-              ? (kIsWeb ? authProvider.currentUserId! : int.tryParse(authProvider.currentUserId!))
+          createdBy: authProvider.currentUserId != null
+              ? (kIsWeb
+                  ? authProvider.currentUserId!
+                  : int.tryParse(authProvider.currentUserId!))
               : null,
         );
 
@@ -843,28 +941,16 @@ class _OrdersScreenState extends State<OrdersScreen> {
         // Await order loading before navigation
         await _loadOrders();
 
-        // Navigate to order detail screen (items already added in dialog)
-        if (mounted) {
-          final order = await _orderService.getOrderById(dbProvider, orderId);
-          if (order != null) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => OrderDetailScreen(
-                  orderId: orderId,
-                  orderNumber: order.orderNumber,
-                  autoOpenAddItems: false,
-                ),
-              ),
-            );
-          }
-        }
+        // UX change: Stay on Orders list (no auto-navigation).
+        AppMessenger.showSnackBar(
+          'Order placed',
+          backgroundColor: Colors.green,
+          leadingAssetPath: 'assets/images/order_done.jpg',
+          leadingIcon: Icons.receipt_long,
+        );
       } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error creating order: $e')),
-          );
-        }
+        AppMessenger.showSnackBar('Error creating order: $e',
+            backgroundColor: Colors.red);
       }
     }
   }

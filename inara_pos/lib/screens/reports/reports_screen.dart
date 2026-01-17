@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import '../../providers/unified_database_provider.dart';
 import '../customers/customers_screen.dart';
+import '../../utils/theme.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 
@@ -31,17 +32,20 @@ class _ReportsScreenState extends State<ReportsScreen> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
       final start = DateTime(_startDate.year, _startDate.month, _startDate.day)
           .millisecondsSinceEpoch;
-      final end = DateTime(_endDate.year, _endDate.month, _endDate.day, 23, 59, 59)
-          .millisecondsSinceEpoch;
+      final end =
+          DateTime(_endDate.year, _endDate.month, _endDate.day, 23, 59, 59)
+              .millisecondsSinceEpoch;
 
       // Total Sales (include paid and partial payments)
       final orders = await dbProvider.query(
         'orders',
-        where: 'created_at >= ? AND created_at <= ? AND payment_status IN (?, ?)',
+        where:
+            'created_at >= ? AND created_at <= ? AND payment_status IN (?, ?)',
         whereArgs: [start, end, 'paid', 'partial'],
       );
 
@@ -62,34 +66,37 @@ class _ReportsScreenState extends State<ReportsScreen> {
         (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0),
       );
       final netProfit = totalSales - totalExpenses;
-      
+
       // Credit Given (from orders with credit_amount > 0 in date range)
       final allOrdersInRange = await dbProvider.query(
         'orders',
         where: 'created_at >= ? AND created_at <= ?',
         whereArgs: [start, end],
       );
-      final creditGiven = allOrdersInRange.fold(0.0, (sum, o) => sum + (o['credit_amount'] as num? ?? 0).toDouble());
-      
+      final creditGiven = allOrdersInRange.fold(
+          0.0, (sum, o) => sum + (o['credit_amount'] as num? ?? 0).toDouble());
+
       // Credit Collected (from credit transactions of type 'payment')
       final creditTransactions = await dbProvider.query(
         'credit_transactions',
         where: 'created_at >= ? AND created_at <= ? AND transaction_type = ?',
         whereArgs: [start, end, 'payment'],
       );
-      final creditCollected = creditTransactions.fold(0.0, (sum, t) => sum + (t['amount'] as num? ?? 0).toDouble());
-      
+      final creditCollected = creditTransactions.fold(
+          0.0, (sum, t) => sum + (t['amount'] as num? ?? 0).toDouble());
+
       // Today's Credit (total customer credit balances)
       final customers = await dbProvider.query('customers');
-      final todaysCredit = customers.fold(0.0, (sum, c) => sum + (c['credit_balance'] as num? ?? 0).toDouble());
-      
+      final todaysCredit = customers.fold(
+          0.0, (sum, c) => sum + (c['credit_balance'] as num? ?? 0).toDouble());
+
       // Credit Sales (orders paid with credit or partial credit)
       final creditSales = allOrdersInRange.where((o) {
         final paymentMethod = o['payment_method'] as String?;
         final creditAmount = (o['credit_amount'] as num? ?? 0).toDouble();
         return paymentMethod == 'credit' || creditAmount > 0;
       }).fold(0.0, (sum, o) => sum + (o['total_amount'] as num).toDouble());
-      
+
       // Regular Sales (cash, digital, card - excluding credit)
       final regularSales = orders.where((o) {
         final paymentMethod = o['payment_method'] as String?;
@@ -97,12 +104,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
       }).fold(0.0, (sum, o) => sum + (o['total_amount'] as num).toDouble());
 
       // Payment methods breakdown
-      final cash = orders.where((o) => o['payment_method'] == 'cash').fold(
-          0.0, (sum, o) => sum + (o['total_amount'] as num).toDouble());
-      final card = orders.where((o) => o['payment_method'] == 'card').fold(
-          0.0, (sum, o) => sum + (o['total_amount'] as num).toDouble());
-      final digital = orders.where((o) => o['payment_method'] == 'digital').fold(
-          0.0, (sum, o) => sum + (o['total_amount'] as num).toDouble());
+      final cash = orders
+          .where((o) => o['payment_method'] == 'cash')
+          .fold(0.0, (sum, o) => sum + (o['total_amount'] as num).toDouble());
+      final card = orders
+          .where((o) => o['payment_method'] == 'card')
+          .fold(0.0, (sum, o) => sum + (o['total_amount'] as num).toDouble());
+      final digital = orders
+          .where((o) => o['payment_method'] == 'digital')
+          .fold(0.0, (sum, o) => sum + (o['total_amount'] as num).toDouble());
 
       // Daily sales breakdown - group by date and time
       final dailyList = <Map<String, dynamic>>[];
@@ -121,38 +131,44 @@ class _ReportsScreenState extends State<ReportsScreen> {
           'amount': (order['total_amount'] as num).toDouble(),
         });
       }
-      
+
       // Group by date and sum amounts, keep time info
       final dailyMap = <String, Map<String, dynamic>>{};
       for (final item in dailyList) {
         final dateTime = item['datetime'] as DateTime;
         // Use date as key (YYYY-MM-DD format for proper sorting)
         final dateKey = DateFormat('yyyy-MM-dd').format(dateTime);
-        
+
         if (!dailyMap.containsKey(dateKey)) {
           dailyMap[dateKey] = {
             'datetime': dateTime,
-            'dayName': DateFormat('EEE').format(dateTime), // Day name (Sun, Mon, etc.)
+            'dayName':
+                DateFormat('EEE').format(dateTime), // Day name (Sun, Mon, etc.)
             'date': DateFormat('MMM dd').format(dateTime), // Date (Jan 12)
-            'fullDate': DateFormat('MMM dd, yyyy').format(dateTime), // Full date (Jan 12, 2026)
+            'fullDate': DateFormat('MMM dd, yyyy')
+                .format(dateTime), // Full date (Jan 12, 2026)
             'firstOrderTime': dateTime,
             'lastOrderTime': dateTime,
             'amount': 0.0,
           };
         }
-        dailyMap[dateKey]!['amount'] = (dailyMap[dateKey]!['amount'] as double) + (item['amount'] as double);
+        dailyMap[dateKey]!['amount'] =
+            (dailyMap[dateKey]!['amount'] as double) +
+                (item['amount'] as double);
         // Track first and last order times
-        if (dateTime.isBefore(dailyMap[dateKey]!['firstOrderTime'] as DateTime)) {
+        if (dateTime
+            .isBefore(dailyMap[dateKey]!['firstOrderTime'] as DateTime)) {
           dailyMap[dateKey]!['firstOrderTime'] = dateTime;
         }
         if (dateTime.isAfter(dailyMap[dateKey]!['lastOrderTime'] as DateTime)) {
           dailyMap[dateKey]!['lastOrderTime'] = dateTime;
         }
       }
-      
+
       _dailySales = dailyMap.values.toList()
-        ..sort((a, b) => (a['datetime'] as DateTime).compareTo(b['datetime'] as DateTime));
-      
+        ..sort((a, b) =>
+            (a['datetime'] as DateTime).compareTo(b['datetime'] as DateTime));
+
       // If no sales data, create empty entries for each day in the range to show the chart
       if (_dailySales.isEmpty) {
         final days = _endDate.difference(_startDate).inDays + 1;
@@ -179,7 +195,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
             ? <Map<String, dynamic>>[]
             : await dbProvider.query(
                 'order_items',
-                where: 'order_id IN (${List.filled(orderIds.length, '?').join(',')})',
+                where:
+                    'order_id IN (${List.filled(orderIds.length, '?').join(',')})',
                 whereArgs: orderIds,
               );
 
@@ -217,21 +234,52 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
   }
 
+  DateTime _mondayOfWeek(DateTime date) {
+    // DateTime.weekday: Monday=1 ... Sunday=7
+    return DateTime(date.year, date.month, date.day)
+        .subtract(Duration(days: date.weekday - DateTime.monday));
+  }
+
+  void _setWeekFrom(DateTime anyDateInWeek) {
+    final monday = _mondayOfWeek(anyDateInWeek);
+    final sunday = monday.add(const Duration(days: 6));
+    setState(() {
+      _startDate = monday;
+      _endDate = sunday;
+    });
+    _loadReport();
+  }
+
+  Future<void> _pickWeekFromCalendar() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _startDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+      helpText: 'Select any date (week will start from Monday)',
+    );
+    if (picked != null) {
+      _setWeekFrom(picked);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: widget.hideAppBar ? null : AppBar(
-        title: const Text('Reports & Analytics'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              _loadReport();
-            },
-            tooltip: 'Refresh Reports',
-          ),
-        ],
-      ),
+      appBar: widget.hideAppBar
+          ? null
+          : AppBar(
+              title: const Text('Reports & Analytics'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () {
+                    _loadReport();
+                  },
+                  tooltip: 'Refresh Reports',
+                ),
+              ],
+            ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -239,10 +287,46 @@ class _ReportsScreenState extends State<ReportsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Week Calendar (Monday-based)
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Row(
+                        children: [
+                          Icon(Icons.calendar_month,
+                              color: AppTheme.logoPrimary),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Week Report (Monday → Sunday)',
+                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Week of ${DateFormat('MMM dd, yyyy').format(_mondayOfWeek(_startDate))}',
+                                  style: TextStyle(
+                                      color: Colors.grey[700], fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _pickWeekFromCalendar,
+                            child: const Text('Pick Week'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   // Date Range Selector - Compact
                   Card(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8.0, vertical: 8.0),
                       child: Row(
                         children: [
                           Flexible(
@@ -262,12 +346,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
+                                  Icon(Icons.calendar_today,
+                                      size: 14, color: Colors.grey[600]),
                                   const SizedBox(width: 4),
                                   Flexible(
                                     child: Text(
                                       'From: ${DateFormat('MMM dd, yyyy').format(_startDate)}',
-                                      style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey[700]),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
@@ -293,12 +380,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
+                                  Icon(Icons.calendar_today,
+                                      size: 14, color: Colors.grey[600]),
                                   const SizedBox(width: 4),
                                   Flexible(
                                     child: Text(
                                       'To: ${DateFormat('MMM dd, yyyy').format(_endDate)}',
-                                      style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey[700]),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
@@ -317,7 +407,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       Expanded(
                         child: _buildGradientCard(
                           title: 'Total Sales',
-                          value: NumberFormat.currency(symbol: 'NPR ').format(_reportData['totalSales'] ?? 0),
+                          value: NumberFormat.currency(symbol: 'NPR ')
+                              .format(_reportData['totalSales'] ?? 0),
                           gradient: const LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -335,12 +426,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           onTap: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const CustomersScreen()),
+                              MaterialPageRoute(
+                                  builder: (_) => const CustomersScreen()),
                             );
                           },
                           child: _buildGradientCard(
                             title: 'Today\'s Credit',
-                            value: NumberFormat.currency(symbol: 'NPR ').format(_reportData['todaysCredit'] ?? 0),
+                            value: NumberFormat.currency(symbol: 'NPR ')
+                                .format(_reportData['todaysCredit'] ?? 0),
                             gradient: const LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
@@ -364,12 +457,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           onTap: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const CustomersScreen()),
+                              MaterialPageRoute(
+                                  builder: (_) => const CustomersScreen()),
                             );
                           },
                           child: _buildGradientCard(
                             title: 'Credit Given',
-                            value: NumberFormat.currency(symbol: 'NPR ').format(_reportData['creditGiven'] ?? 0),
+                            value: NumberFormat.currency(symbol: 'NPR ')
+                                .format(_reportData['creditGiven'] ?? 0),
                             gradient: const LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
@@ -407,7 +502,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       Expanded(
                         child: _buildGradientCard(
                           title: 'Total Expenses',
-                          value: NumberFormat.currency(symbol: 'NPR ').format(_reportData['totalExpenses'] ?? 0),
+                          value: NumberFormat.currency(symbol: 'NPR ')
+                              .format(_reportData['totalExpenses'] ?? 0),
                           gradient: const LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -423,7 +519,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       Expanded(
                         child: _buildGradientCard(
                           title: 'Net',
-                          value: NumberFormat.currency(symbol: 'NPR ').format(_reportData['netProfit'] ?? 0),
+                          value: NumberFormat.currency(symbol: 'NPR ')
+                              .format(_reportData['netProfit'] ?? 0),
                           gradient: const LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -445,15 +542,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Sales (Credit and Sales)', style: Theme.of(context).textTheme.titleLarge),
+                          Text('Sales (Credit and Sales)',
+                              style: Theme.of(context).textTheme.titleLarge),
                           const SizedBox(height: 16),
                           SizedBox(
                             height: 200,
                             child: _buildSalesPieChart(),
                           ),
                           const SizedBox(height: 16),
-                          _buildPaymentRow('Regular Sales', _reportData['regularSales'] ?? 0, Colors.green),
-                          _buildPaymentRow('Credit Sales', _reportData['creditSales'] ?? 0, Colors.orange),
+                          _buildPaymentRow('Regular Sales',
+                              _reportData['regularSales'] ?? 0, Colors.green),
+                          _buildPaymentRow('Credit Sales',
+                              _reportData['creditSales'] ?? 0, Colors.orange),
                         ],
                       ),
                     ),
@@ -469,7 +569,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text('Daily Sales', style: Theme.of(context).textTheme.titleLarge),
+                              Text('Daily Sales',
+                                  style:
+                                      Theme.of(context).textTheme.titleLarge),
                               TextButton(
                                 onPressed: () {
                                   // Could add trend view toggle here
@@ -502,7 +604,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           ),
                           const SizedBox(height: 16),
                           Padding(
-                            padding: const EdgeInsets.only(left: 0.0, right: 20.0),
+                            padding:
+                                const EdgeInsets.only(left: 0.0, right: 20.0),
                             child: SizedBox(
                               height: 250,
                               child: _buildDailySalesLineChart(),
@@ -525,7 +628,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
     if (total == 0) {
       return Center(
-        child: Text('No sales data available', style: TextStyle(color: Colors.grey[600])),
+        child: Text('No sales data available',
+            style: TextStyle(color: Colors.grey[600])),
       );
     }
 
@@ -554,18 +658,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget _buildDailySalesLineChart() {
     if (_dailySales.isEmpty) {
       return Center(
-        child: Text('No sales data available', style: TextStyle(color: Colors.grey[600])),
+        child: Text('No sales data available',
+            style: TextStyle(color: Colors.grey[600])),
       );
     }
 
     final amounts = _dailySales.map((d) => d['amount'] as double).toList();
-    final maxAmount = amounts.isEmpty ? 100.0 : (amounts.reduce((a, b) => a > b ? a : b));
+    final maxAmount =
+        amounts.isEmpty ? 100.0 : (amounts.reduce((a, b) => a > b ? a : b));
     final minY = 0.0;
-    final maxY = maxAmount > 0 ? maxAmount * 1.2 : 100.0; // Ensure minimum range for visibility
-    
+    final maxY = maxAmount > 0
+        ? maxAmount * 1.2
+        : 100.0; // Ensure minimum range for visibility
+
     // Calculate step size for Y-axis
     final stepSize = (maxY - minY) / 5;
-    
+
     // Prepare line chart spots
     final spots = _dailySales.asMap().entries.map((entry) {
       return FlSpot(entry.key.toDouble(), entry.value['amount'] as double);
@@ -589,8 +697,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   final sale = _dailySales[index];
                   final dayName = sale['dayName'] as String? ?? '';
                   final fullDate = sale['fullDate'] as String? ?? '';
-                  final amount = NumberFormat.currency(symbol: 'Rs. ').format(touchedSpot.y);
-                  
+                  final amount = NumberFormat.currency(symbol: 'Rs. ')
+                      .format(touchedSpot.y);
+
                   return LineTooltipItem(
                     'Day: $dayName\n'
                     'Date: $fullDate\n'
@@ -613,13 +722,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 35,
-              interval: _dailySales.length > 7 ? 2.0 : 1.0, // Show every other label if too many days
+              interval: _dailySales.length > 7
+                  ? 2.0
+                  : 1.0, // Show every other label if too many days
               getTitlesWidget: (value, meta) {
                 final index = value.toInt();
                 if (index >= 0 && index < _dailySales.length) {
                   final sale = _dailySales[index];
-                  final date = sale['date'] as String? ?? ''; // Format: "MMM dd" (e.g., "Jan 7")
-                  
+                  final date = sale['date'] as String? ??
+                      ''; // Format: "MMM dd" (e.g., "Jan 7")
+
                   return Padding(
                     padding: const EdgeInsets.only(top: 4.0),
                     child: Text(
@@ -648,7 +760,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 // Round to avoid floating point issues
                 final roundedValue = (value / stepSize).round() * stepSize;
                 if ((value - roundedValue).abs() > 0.01) return const Text('');
-                
+
                 // Format as Rs. X.XK or shorter format
                 String label;
                 if (value == 0) {
@@ -658,7 +770,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 } else {
                   label = 'Rs.${value.toStringAsFixed(0)}';
                 }
-                
+
                 return Padding(
                   padding: const EdgeInsets.only(right: 2.0),
                   child: Text(
@@ -675,8 +787,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
               },
             ),
           ),
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         ),
         gridData: FlGridData(
           show: true,

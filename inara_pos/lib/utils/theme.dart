@@ -7,11 +7,12 @@ class AppTheme {
   static const Color logoSecondary = Color(0xFFFFB300); // Darker golden
   static const Color logoAccent = Color(0xFF8B4513); // Brown
   static const Color logoLight = Color(0xFFFFEB3B); // Light yellow
-  
+
   // Semantic colors using logo scheme
   static const Color successColor = Color(0xFF4CAF50); // Keep green for success
   static const Color errorColor = Color(0xFFE53935); // Keep red for errors
-  static const Color warningColor = Color(0xFFFFB300); // Use logo secondary for warnings
+  static const Color warningColor =
+      Color(0xFFFFB300); // Use logo secondary for warnings
   static const Color infoColor = Color(0xFFFFC107); // Use logo primary for info
 
   // Typography
@@ -49,13 +50,18 @@ class AppTheme {
 
       // Body
       bodyLarge: TextStyle(fontSize: 16, color: bodyColor, height: 1.35),
-      bodyMedium: TextStyle(fontSize: 14, color: secondaryBodyColor, height: 1.35),
-      bodySmall: TextStyle(fontSize: 12, color: secondaryBodyColor, height: 1.35),
+      bodyMedium:
+          TextStyle(fontSize: 14, color: secondaryBodyColor, height: 1.35),
+      bodySmall:
+          TextStyle(fontSize: 12, color: secondaryBodyColor, height: 1.35),
 
       // Labels
-      labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: bodyColor),
-      labelMedium: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: secondaryBodyColor),
-      labelSmall: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: secondaryBodyColor),
+      labelLarge: TextStyle(
+          fontSize: 14, fontWeight: FontWeight.w600, color: bodyColor),
+      labelMedium: TextStyle(
+          fontSize: 12, fontWeight: FontWeight.w600, color: secondaryBodyColor),
+      labelSmall: TextStyle(
+          fontSize: 11, fontWeight: FontWeight.w500, color: secondaryBodyColor),
     ).apply(
       // Ensure we always prefer the heading font for headings even if other widgets
       // call `copyWith(fontFamily: ...)` elsewhere.
@@ -71,6 +77,7 @@ class AppTheme {
       height: 1.1,
     );
   }
+
   // POS Theme (for billing screens) - Colorful Tea Café Theme
   static ThemeData get darkTheme {
     return ThemeData(
@@ -78,7 +85,8 @@ class AppTheme {
       brightness: Brightness.light, // Changed to light for colorful backgrounds
       primaryColor: logoPrimary,
       primarySwatch: _createMaterialColor(logoPrimary),
-      scaffoldBackgroundColor: const Color(0xFFFFFEF5), // Very light yellow/cream background
+      scaffoldBackgroundColor:
+          const Color(0xFFFFFEF5), // Very light yellow/cream background
       cardColor: const Color(0xFFFFFDE7), // Light golden card background
       dividerColor: logoSecondary.withOpacity(0.3),
       appBarTheme: AppBarTheme(
@@ -188,7 +196,7 @@ class AppTheme {
 
   // POS Screen Theme (dark with large totals)
   static ThemeData get posTheme => darkTheme;
-  
+
   // Helper to create MaterialColor from a single color
   static MaterialColor _createMaterialColor(Color color) {
     List strengths = <double>[.05];

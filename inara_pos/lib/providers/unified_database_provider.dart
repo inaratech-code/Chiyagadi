@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart' show kIsWeb, ChangeNotifier, debugPrint;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, ChangeNotifier, debugPrint;
 import 'database_provider.dart';
 import 'firestore_database_provider.dart';
 
@@ -21,7 +22,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     if (_isInitialized) {
       return;
     }
-    
+
     try {
       await _provider.init();
       _isInitialized = true;
@@ -65,7 +66,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     if (!_isInitialized) {
       await init();
     }
-    
+
     if (kIsWeb) {
       // Firestore returns String (document ID)
       return await _provider.insert(table, values);

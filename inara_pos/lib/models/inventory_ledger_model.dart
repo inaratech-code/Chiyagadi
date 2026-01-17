@@ -10,9 +10,11 @@ class InventoryLedger {
   final double quantityIn; // Stock increase (from purchases, adjustments, etc.)
   final double quantityOut; // Stock decrease (from sales, adjustments, etc.)
   final double unitPrice; // Price per unit at time of transaction
-  final String transactionType; // 'purchase', 'sale', 'adjustment', 'return', 'correction'
+  final String
+      transactionType; // 'purchase', 'sale', 'adjustment', 'return', 'correction'
   final String? referenceType; // 'purchase', 'order', 'adjustment', etc.
-  final dynamic referenceId; // ID of the reference document (purchase_id, order_id, etc.)
+  final dynamic
+      referenceId; // ID of the reference document (purchase_id, order_id, etc.)
   final String? notes;
   final int? createdBy;
   final int createdAt;

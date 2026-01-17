@@ -32,10 +32,12 @@ class _TablesScreenState extends State<TablesScreen> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       // Ensure database is initialized
       await dbProvider.init();
-      final maps = await dbProvider.query('tables', orderBy: 'table_number ASC');
+      final maps =
+          await dbProvider.query('tables', orderBy: 'table_number ASC');
       if (mounted) {
         setState(() {
           _tables = maps.map((map) => CafeTable.fromMap(map)).toList();
@@ -63,21 +65,23 @@ class _TablesScreenState extends State<TablesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: widget.hideAppBar ? null : AppBar(
-        title: const Text('Table Management'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadTables,
-            tooltip: 'Refresh',
-          ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showAddTableDialog(),
-            tooltip: 'Add Table',
-          ),
-        ],
-      ),
+      appBar: widget.hideAppBar
+          ? null
+          : AppBar(
+              title: const Text('Table Management'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _loadTables,
+                  tooltip: 'Refresh',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: () => _showAddTableDialog(),
+                  tooltip: 'Add Table',
+                ),
+              ],
+            ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _tables.isEmpty
@@ -85,9 +89,12 @@ class _TablesScreenState extends State<TablesScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.table_restaurant, size: 64, color: Colors.grey[400]),
+                      Icon(Icons.table_restaurant,
+                          size: 64, color: Colors.grey[400]),
                       const SizedBox(height: 16),
-                      Text('No tables found', style: TextStyle(color: Colors.grey[600], fontSize: 16)),
+                      Text('No tables found',
+                          style:
+                              TextStyle(color: Colors.grey[600], fontSize: 16)),
                       const SizedBox(height: 8),
                       ElevatedButton.icon(
                         onPressed: () => _showAddTableDialog(),
@@ -102,9 +109,13 @@ class _TablesScreenState extends State<TablesScreen> {
                     builder: (context, constraints) {
                       // Responsive grid: 2 columns on mobile, 3 on tablet, 4+ on desktop
                       final crossAxisCount = kIsWeb
-                          ? (constraints.maxWidth > 1200 ? 5 : constraints.maxWidth > 800 ? 4 : 3)
+                          ? (constraints.maxWidth > 1200
+                              ? 5
+                              : constraints.maxWidth > 800
+                                  ? 4
+                                  : 3)
                           : (constraints.maxWidth > 600 ? 3 : 2);
-                      
+
                       return GridView.builder(
                         padding: const EdgeInsets.all(16),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -118,14 +129,20 @@ class _TablesScreenState extends State<TablesScreen> {
                           final table = _tables[index];
                           final isOccupied = table.status == 'occupied';
                           return MouseRegion(
-                            cursor: kIsWeb ? SystemMouseCursors.click : MouseCursor.defer,
+                            cursor: kIsWeb
+                                ? SystemMouseCursors.click
+                                : MouseCursor.defer,
                             child: Card(
                               elevation: isOccupied ? 4 : 2,
-                              color: isOccupied ? AppTheme.errorColor.withOpacity(0.1) : AppTheme.successColor.withOpacity(0.1),
+                              color: isOccupied
+                                  ? AppTheme.errorColor.withOpacity(0.1)
+                                  : AppTheme.successColor.withOpacity(0.1),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 side: BorderSide(
-                                  color: isOccupied ? AppTheme.errorColor : AppTheme.successColor,
+                                  color: isOccupied
+                                      ? AppTheme.errorColor
+                                      : AppTheme.successColor,
                                   width: 2,
                                 ),
                               ),
@@ -140,15 +157,19 @@ class _TablesScreenState extends State<TablesScreen> {
                                       Container(
                                         padding: const EdgeInsets.all(10),
                                         decoration: BoxDecoration(
-                                          color: isOccupied 
-                                              ? AppTheme.errorColor.withOpacity(0.2) 
-                                              : AppTheme.successColor.withOpacity(0.2),
+                                          color: isOccupied
+                                              ? AppTheme.errorColor
+                                                  .withOpacity(0.2)
+                                              : AppTheme.successColor
+                                                  .withOpacity(0.2),
                                           shape: BoxShape.circle,
                                         ),
                                         child: Icon(
                                           Icons.table_restaurant,
                                           size: 36,
-                                          color: isOccupied ? AppTheme.errorColor : AppTheme.successColor,
+                                          color: isOccupied
+                                              ? AppTheme.errorColor
+                                              : AppTheme.successColor,
                                         ),
                                       ),
                                       const SizedBox(height: 8),
@@ -157,11 +178,14 @@ class _TablesScreenState extends State<TablesScreen> {
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 15,
-                                          color: isOccupied ? AppTheme.errorColor : AppTheme.successColor,
+                                          color: isOccupied
+                                              ? AppTheme.errorColor
+                                              : AppTheme.successColor,
                                         ),
                                         textAlign: TextAlign.center,
                                       ),
-                                      if (table.positionLabel != null && table.positionLabel!.isNotEmpty) ...[
+                                      if (table.positionLabel != null &&
+                                          table.positionLabel!.isNotEmpty) ...[
                                         const SizedBox(height: 4),
                                         Text(
                                           table.positionLabel!,
@@ -177,7 +201,8 @@ class _TablesScreenState extends State<TablesScreen> {
                                       ],
                                       const SizedBox(height: 6),
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: [
                                           Icon(
                                             Icons.people,
@@ -197,17 +222,25 @@ class _TablesScreenState extends State<TablesScreen> {
                                       ),
                                       const SizedBox(height: 6),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
-                                          color: isOccupied ? AppTheme.errorColor.withOpacity(0.3) : AppTheme.successColor.withOpacity(0.3),
-                                          borderRadius: BorderRadius.circular(12),
+                                          color: isOccupied
+                                              ? AppTheme.errorColor
+                                                  .withOpacity(0.3)
+                                              : AppTheme.successColor
+                                                  .withOpacity(0.3),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
                                         ),
                                         child: Text(
                                           isOccupied ? 'OCCUPIED' : 'AVAILABLE',
                                           style: TextStyle(
                                             fontSize: 9,
                                             fontWeight: FontWeight.bold,
-                                            color: isOccupied ? AppTheme.errorColor : AppTheme.successColor,
+                                            color: isOccupied
+                                                ? AppTheme.errorColor
+                                                : AppTheme.successColor,
                                             letterSpacing: 0.5,
                                           ),
                                         ),
@@ -246,7 +279,8 @@ class _TablesScreenState extends State<TablesScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Container(
             width: MediaQuery.of(context).size.width * 0.9,
             constraints: const BoxConstraints(maxWidth: 500),
@@ -349,7 +383,8 @@ class _TablesScreenState extends State<TablesScreen> {
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Text('Add'),
                       ),
@@ -397,7 +432,8 @@ class _TablesScreenState extends State<TablesScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Please enter a valid capacity (number greater than 0)'),
+              content:
+                  Text('Please enter a valid capacity (number greater than 0)'),
               backgroundColor: AppTheme.errorColor,
             ),
           );
@@ -406,19 +442,20 @@ class _TablesScreenState extends State<TablesScreen> {
       }
 
       if (!mounted) return;
-      
+
       try {
-        final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         // Ensure database is initialized
         await dbProvider.init();
-        
+
         // Check if table number already exists
         final existing = await dbProvider.query(
           'tables',
           where: 'table_number = ?',
           whereArgs: [numberController.text.trim()],
         );
-        
+
         if (existing.isNotEmpty) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -442,14 +479,22 @@ class _TablesScreenState extends State<TablesScreen> {
           'table_number': numberController.text.trim(),
           'capacity': capacity,
           'status': 'available',
-          'row_position': rowController.text.trim().isEmpty ? null : int.tryParse(rowController.text.trim()),
-          'column_position': columnController.text.trim().isEmpty ? null : int.tryParse(columnController.text.trim()),
-          'position_label': positionLabelController.text.trim().isEmpty ? null : positionLabelController.text.trim(),
-          'notes': notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+          'row_position': rowController.text.trim().isEmpty
+              ? null
+              : int.tryParse(rowController.text.trim()),
+          'column_position': columnController.text.trim().isEmpty
+              ? null
+              : int.tryParse(columnController.text.trim()),
+          'position_label': positionLabelController.text.trim().isEmpty
+              ? null
+              : positionLabelController.text.trim(),
+          'notes': notesController.text.trim().isEmpty
+              ? null
+              : notesController.text.trim(),
           'created_at': now,
           'updated_at': now,
         });
-        
+
         // Dispose controllers
         numberController.dispose();
         capacityController.dispose();
@@ -457,7 +502,7 @@ class _TablesScreenState extends State<TablesScreen> {
         columnController.dispose();
         positionLabelController.dispose();
         notesController.dispose();
-        
+
         if (mounted) {
           setState(() => _isCreatingTable = false);
           _loadTables();
@@ -507,7 +552,9 @@ class _TablesScreenState extends State<TablesScreen> {
           children: [
             Icon(
               Icons.table_restaurant,
-              color: table.status == 'occupied' ? AppTheme.errorColor : AppTheme.successColor,
+              color: table.status == 'occupied'
+                  ? AppTheme.errorColor
+                  : AppTheme.successColor,
             ),
             const SizedBox(width: 8),
             Text('Table ${table.tableNumber}'),
@@ -522,12 +569,12 @@ class _TablesScreenState extends State<TablesScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: table.status == 'occupied' 
+                  color: table.status == 'occupied'
                       ? AppTheme.errorColor.withOpacity(0.1)
                       : AppTheme.successColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: table.status == 'occupied' 
+                    color: table.status == 'occupied'
                         ? AppTheme.errorColor
                         : AppTheme.successColor,
                     width: 2,
@@ -538,13 +585,13 @@ class _TablesScreenState extends State<TablesScreen> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: table.status == 'occupied' 
+                        color: table.status == 'occupied'
                             ? AppTheme.errorColor
                             : AppTheme.successColor,
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        table.status == 'occupied' 
+                        table.status == 'occupied'
                             ? Icons.event_busy
                             : Icons.event_available,
                         color: Colors.white,
@@ -570,7 +617,7 @@ class _TablesScreenState extends State<TablesScreen> {
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: table.status == 'occupied' 
+                              color: table.status == 'occupied'
                                   ? AppTheme.errorColor
                                   : AppTheme.successColor,
                             ),
@@ -581,10 +628,10 @@ class _TablesScreenState extends State<TablesScreen> {
                     // Status Toggle Button
                     IconButton(
                       icon: Icon(
-                        table.status == 'occupied' 
+                        table.status == 'occupied'
                             ? Icons.check_circle_outline
                             : Icons.cancel_outlined,
-                        color: table.status == 'occupied' 
+                        color: table.status == 'occupied'
                             ? AppTheme.successColor
                             : AppTheme.errorColor,
                       ),
@@ -592,7 +639,7 @@ class _TablesScreenState extends State<TablesScreen> {
                         _toggleTableStatus(table);
                         Navigator.pop(context);
                       },
-                      tooltip: table.status == 'occupied' 
+                      tooltip: table.status == 'occupied'
                           ? 'Mark as Available'
                           : 'Mark as Occupied',
                     ),
@@ -601,11 +648,13 @@ class _TablesScreenState extends State<TablesScreen> {
               ),
               const SizedBox(height: 16),
               _buildDetailRow('Capacity', '${table.capacity} seats'),
-              if (table.positionLabel != null && table.positionLabel!.isNotEmpty) ...[
+              if (table.positionLabel != null &&
+                  table.positionLabel!.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 _buildDetailRow('Position', table.positionLabel!),
               ],
-              if (table.rowPosition != null || table.columnPosition != null) ...[
+              if (table.rowPosition != null ||
+                  table.columnPosition != null) ...[
                 const SizedBox(height: 8),
                 _buildDetailRow(
                   'Location',
@@ -646,9 +695,10 @@ class _TablesScreenState extends State<TablesScreen> {
 
   Future<void> _toggleTableStatus(CafeTable table) async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       final newStatus = table.status == 'occupied' ? 'available' : 'occupied';
-      
+
       // For Firestore, use table_number; for SQLite, use id
       if (kIsWeb && table.documentId != null) {
         await dbProvider.update(
@@ -671,13 +721,16 @@ class _TablesScreenState extends State<TablesScreen> {
           whereArgs: [table.id],
         );
       }
-      
+
       if (mounted) {
         _loadTables();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Table ${table.tableNumber} marked as ${newStatus.toUpperCase()}'),
-            backgroundColor: newStatus == 'occupied' ? AppTheme.errorColor : AppTheme.successColor,
+            content: Text(
+                'Table ${table.tableNumber} marked as ${newStatus.toUpperCase()}'),
+            backgroundColor: newStatus == 'occupied'
+                ? AppTheme.errorColor
+                : AppTheme.successColor,
           ),
         );
       }
@@ -724,7 +777,8 @@ class _TablesScreenState extends State<TablesScreen> {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: const Text('Delete Table?'),
-        content: Text('Are you sure you want to delete Table ${table.tableNumber}? This action cannot be undone.'),
+        content: Text(
+            'Are you sure you want to delete Table ${table.tableNumber}? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -732,7 +786,8 @@ class _TablesScreenState extends State<TablesScreen> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
+            style:
+                ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
             child: const Text('Delete'),
           ),
         ],
@@ -741,16 +796,19 @@ class _TablesScreenState extends State<TablesScreen> {
 
     if (confirm == true && mounted) {
       try {
-        final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         // For Firestore, use table_number; for SQLite, use id
         if (kIsWeb && table.documentId != null) {
           // Firestore: use documentId directly via table_number lookup
-          await dbProvider.delete('tables', where: 'table_number = ?', whereArgs: [table.tableNumber]);
+          await dbProvider.delete('tables',
+              where: 'table_number = ?', whereArgs: [table.tableNumber]);
         } else {
           // SQLite: use integer id
-          await dbProvider.delete('tables', where: 'id = ?', whereArgs: [table.id]);
+          await dbProvider
+              .delete('tables', where: 'id = ?', whereArgs: [table.id]);
         }
-        
+
         if (mounted) {
           _loadTables();
           ScaffoldMessenger.of(context).showSnackBar(
@@ -777,10 +835,14 @@ class _TablesScreenState extends State<TablesScreen> {
 
   Future<void> _showEditTableDialog(CafeTable table) async {
     final numberController = TextEditingController(text: table.tableNumber);
-    final capacityController = TextEditingController(text: table.capacity.toString());
-    final rowController = TextEditingController(text: table.rowPosition?.toString() ?? '');
-    final columnController = TextEditingController(text: table.columnPosition?.toString() ?? '');
-    final positionLabelController = TextEditingController(text: table.positionLabel ?? '');
+    final capacityController =
+        TextEditingController(text: table.capacity.toString());
+    final rowController =
+        TextEditingController(text: table.rowPosition?.toString() ?? '');
+    final columnController =
+        TextEditingController(text: table.columnPosition?.toString() ?? '');
+    final positionLabelController =
+        TextEditingController(text: table.positionLabel ?? '');
     final notesController = TextEditingController(text: table.notes ?? '');
     String status = table.status;
 
@@ -788,7 +850,8 @@ class _TablesScreenState extends State<TablesScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Container(
             width: MediaQuery.of(context).size.width * 0.9,
             constraints: const BoxConstraints(maxWidth: 500),
@@ -832,8 +895,10 @@ class _TablesScreenState extends State<TablesScreen> {
                             border: OutlineInputBorder(),
                           ),
                           items: const [
-                            DropdownMenuItem(value: 'available', child: Text('Available')),
-                            DropdownMenuItem(value: 'occupied', child: Text('Occupied')),
+                            DropdownMenuItem(
+                                value: 'available', child: Text('Available')),
+                            DropdownMenuItem(
+                                value: 'occupied', child: Text('Occupied')),
                           ],
                           onChanged: (value) {
                             setDialogState(() => status = value!);
@@ -979,9 +1044,10 @@ class _TablesScreenState extends State<TablesScreen> {
         notesController.dispose();
         return;
       }
-      
+
       try {
-        final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         // For Firestore, use table_number; for SQLite, use id
         if (kIsWeb && table.documentId != null) {
           // Firestore: use table_number to find the document
@@ -991,10 +1057,18 @@ class _TablesScreenState extends State<TablesScreen> {
               'table_number': numberController.text.trim(),
               'capacity': capacity,
               'status': status,
-              'row_position': rowController.text.trim().isEmpty ? null : int.tryParse(rowController.text.trim()),
-              'column_position': columnController.text.trim().isEmpty ? null : int.tryParse(columnController.text.trim()),
-              'position_label': positionLabelController.text.trim().isEmpty ? null : positionLabelController.text.trim(),
-              'notes': notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+              'row_position': rowController.text.trim().isEmpty
+                  ? null
+                  : int.tryParse(rowController.text.trim()),
+              'column_position': columnController.text.trim().isEmpty
+                  ? null
+                  : int.tryParse(columnController.text.trim()),
+              'position_label': positionLabelController.text.trim().isEmpty
+                  ? null
+                  : positionLabelController.text.trim(),
+              'notes': notesController.text.trim().isEmpty
+                  ? null
+                  : notesController.text.trim(),
               'updated_at': DateTime.now().millisecondsSinceEpoch,
             },
             where: 'table_number = ?',
@@ -1008,17 +1082,25 @@ class _TablesScreenState extends State<TablesScreen> {
               'table_number': numberController.text.trim(),
               'capacity': capacity,
               'status': status,
-              'row_position': rowController.text.trim().isEmpty ? null : int.tryParse(rowController.text.trim()),
-              'column_position': columnController.text.trim().isEmpty ? null : int.tryParse(columnController.text.trim()),
-              'position_label': positionLabelController.text.trim().isEmpty ? null : positionLabelController.text.trim(),
-              'notes': notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+              'row_position': rowController.text.trim().isEmpty
+                  ? null
+                  : int.tryParse(rowController.text.trim()),
+              'column_position': columnController.text.trim().isEmpty
+                  ? null
+                  : int.tryParse(columnController.text.trim()),
+              'position_label': positionLabelController.text.trim().isEmpty
+                  ? null
+                  : positionLabelController.text.trim(),
+              'notes': notesController.text.trim().isEmpty
+                  ? null
+                  : notesController.text.trim(),
               'updated_at': DateTime.now().millisecondsSinceEpoch,
             },
             where: 'id = ?',
             whereArgs: [table.id],
           );
         }
-        
+
         // Dispose controllers
         numberController.dispose();
         capacityController.dispose();
@@ -1026,7 +1108,7 @@ class _TablesScreenState extends State<TablesScreen> {
         columnController.dispose();
         positionLabelController.dispose();
         notesController.dispose();
-        
+
         if (mounted) {
           _loadTables();
           ScaffoldMessenger.of(context).showSnackBar(

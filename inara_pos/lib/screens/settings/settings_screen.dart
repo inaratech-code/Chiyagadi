@@ -4,11 +4,12 @@ import '../../providers/unified_database_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../utils/theme.dart';
+import '../../utils/app_messenger.dart';
 import 'users_management_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final bool showUserManagement;
-  
+
   const SettingsScreen({super.key, this.showUserManagement = false});
 
   @override
@@ -19,15 +20,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _cafeNameController = TextEditingController();
   final _cafeNameEnController = TextEditingController();
   final _addressController = TextEditingController();
-  String? _selectedVat;
+  final _vatPercentController = TextEditingController();
   String? _selectedDefaultDiscount;
   String? _selectedMaxDiscount;
   bool _discountEnabled = true;
   bool _isLoading = true;
 
-  // VAT options (0% to 20%)
-  final List<String> _vatOptions = List.generate(21, (i) => i.toString());
-  
   // Discount options (0% to 100%)
   final List<String> _discountOptions = List.generate(101, (i) => i.toString());
 
@@ -48,10 +46,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadSettings() async {
     setState(() => _isLoading = true);
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
       final settings = await dbProvider.query('settings');
-      
+
       for (final setting in settings) {
         final key = setting['key'] as String;
         final value = setting['value'] as String;
@@ -67,7 +66,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             break;
           case 'tax_percent':
           case 'vat_percent':
-            _selectedVat = value;
+            _vatPercentController.text = value;
             break;
           case 'default_discount_percent':
             _selectedDefaultDiscount = value;
@@ -80,9 +79,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             break;
         }
       }
-      
+
       // Set defaults if not found
-      if (_selectedVat == null) _selectedVat = '13';
+      if (_vatPercentController.text.trim().isEmpty) {
+        _vatPercentController.text = '13';
+      }
       if (_selectedDefaultDiscount == null) _selectedDefaultDiscount = '0';
       if (_selectedMaxDiscount == null) _selectedMaxDiscount = '50';
     } catch (e) {
@@ -94,10 +95,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _saveSettings() async {
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final now = DateTime.now().millisecondsSinceEpoch;
-      
+
+      // Validate VAT percent (admin only can modify, but we still validate on save)
+      final vatRaw = _vatPercentController.text.trim();
+      final vatParsed = double.tryParse(vatRaw);
+      if (vatParsed == null || vatParsed < 0 || vatParsed > 100) {
+        AppMessenger.showSnackBar('Please enter a valid VAT % (0 to 100)');
+        return;
+      }
+
       // Update or insert settings
       final settings = [
         'cafe_name',
@@ -112,19 +122,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _cafeNameController.text.trim(),
         _cafeNameEnController.text.trim(),
         _addressController.text.trim(),
-        _selectedVat ?? '13',
+        // Store as string (works for SQLite + Firestore) and allow decimals
+        vatParsed.toString(),
         if (authProvider.isAdmin) _selectedDefaultDiscount ?? '0',
         if (authProvider.isAdmin) _selectedMaxDiscount ?? '50',
         if (authProvider.isAdmin) _discountEnabled ? '1' : '0',
       ];
-      
+
       for (int i = 0; i < settings.length; i++) {
         final existing = await dbProvider.query(
           'settings',
           where: 'key = ?',
           whereArgs: [settings[i]],
         );
-        
+
         if (existing.isNotEmpty) {
           await dbProvider.update(
             'settings',
@@ -144,24 +155,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
       }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Settings saved successfully')),
-        );
-      }
+      AppMessenger.showSnackBar('Settings saved successfully');
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
+      AppMessenger.showSnackBar('Error: $e', backgroundColor: Colors.red);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
@@ -180,7 +183,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Café Information', style: Theme.of(context).textTheme.titleLarge),
+                          Text('Café Information',
+                              style: Theme.of(context).textTheme.titleLarge),
                           const SizedBox(height: 16),
                           TextField(
                             controller: _cafeNameController,
@@ -218,7 +222,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.dark_mode, color: Color(0xFFFFC107)),
+                              const Icon(Icons.dark_mode,
+                                  color: Color(0xFFFFC107)),
                               const SizedBox(width: 8),
                               Text(
                                 'Appearance',
@@ -244,7 +249,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ),
                                   RadioListTile<ThemeMode>(
                                     title: const Text('Light Mode'),
-                                    subtitle: const Text('Always use light theme'),
+                                    subtitle:
+                                        const Text('Always use light theme'),
                                     value: ThemeMode.light,
                                     groupValue: themeProvider.themeMode,
                                     onChanged: (value) {
@@ -255,7 +261,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ),
                                   RadioListTile<ThemeMode>(
                                     title: const Text('Dark Mode'),
-                                    subtitle: const Text('Always use dark theme'),
+                                    subtitle:
+                                        const Text('Always use dark theme'),
                                     value: ThemeMode.dark,
                                     groupValue: themeProvider.themeMode,
                                     onChanged: (value) {
@@ -283,13 +290,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.receipt_long, color: AppTheme.logoPrimary),
+                              Icon(Icons.receipt_long,
+                                  color: AppTheme.logoPrimary),
                               const SizedBox(width: 8),
                               Text(
                                 'VAT Settings',
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  color: AppTheme.logoAccent,
-                                ),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(
+                                      color: AppTheme.logoAccent,
+                                    ),
                               ),
                             ],
                           ),
@@ -302,40 +313,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          DropdownButtonFormField<String>(
-                            value: _selectedVat ?? '13',
-                            decoration: InputDecoration(
-                              labelText: 'VAT Percentage',
-                              border: const OutlineInputBorder(),
-                              helperText: 'Default VAT rate in Nepal is 13%',
-                              enabled: authProvider.isAdmin,
+                          TextField(
+                            controller: _vatPercentController,
+                            // Allow VAT editing for all users (requested).
+                            enabled: true,
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'VAT % (manual)',
+                              border: OutlineInputBorder(),
+                              helperText:
+                                  'Example: 13 (Nepal default). You can set 0–100 and decimals (e.g., 13.5).',
                             ),
-                            items: _vatOptions.map((value) {
-                              return DropdownMenuItem<String>(
-                                value: value,
-                                child: Text('$value%'),
-                              );
-                            }).toList(),
-                            onChanged: authProvider.isAdmin
-                                ? (value) {
-                                    setState(() {
-                                      _selectedVat = value;
-                                    });
-                                  }
-                                : null,
                           ),
-                          if (!authProvider.isAdmin)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8.0),
-                              child: Text(
-                                'Only admins can modify VAT settings',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
-                            ),
+                          // Discounts remain admin-only below.
                         ],
                       ),
                     ),
@@ -352,13 +343,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.local_offer, color: AppTheme.logoSecondary),
+                                Icon(Icons.local_offer,
+                                    color: AppTheme.logoSecondary),
                                 const SizedBox(width: 8),
                                 Text(
                                   'Discount Settings',
-                                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                    color: AppTheme.logoAccent,
-                                  ),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleLarge
+                                      ?.copyWith(
+                                        color: AppTheme.logoAccent,
+                                      ),
                                 ),
                               ],
                             ),
@@ -389,7 +384,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 decoration: const InputDecoration(
                                   labelText: 'Default Discount Percentage',
                                   border: OutlineInputBorder(),
-                                  helperText: 'Default discount % applied when discount is used',
+                                  helperText:
+                                      'Default discount % applied when discount is used',
                                 ),
                                 items: _discountOptions.map((value) {
                                   return DropdownMenuItem<String>(
@@ -463,8 +459,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ListTile(
                             leading: const Icon(Icons.password),
                             title: const Text('Change My Password'),
-                            subtitle: Text('Current user: ${authProvider.currentUsername ?? 'Unknown'}'),
-                            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                            subtitle: Text(
+                                'Current user: ${authProvider.currentUsername ?? 'Unknown'}'),
+                            trailing:
+                                const Icon(Icons.arrow_forward_ios, size: 16),
                             onTap: () => _showChangePasswordDialog(),
                           ),
                         ],
@@ -483,27 +481,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           children: [
                             Text(
                               'Admin Only',
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                color: AppTheme.errorColor,
-                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge
+                                  ?.copyWith(
+                                    color: AppTheme.errorColor,
+                                  ),
                             ),
                             const SizedBox(height: 16),
                             ListTile(
-                              leading: const Icon(Icons.manage_accounts, color: AppTheme.logoPrimary),
+                              leading: const Icon(Icons.manage_accounts,
+                                  color: AppTheme.logoPrimary),
                               title: const Text('User Management'),
-                              subtitle: const Text('Create users, reset PINs, roles (Admin/Cashier)'),
-                              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                              subtitle: const Text(
+                                  'Create users, reset PINs, roles (Admin/Cashier)'),
+                              trailing:
+                                  const Icon(Icons.arrow_forward_ios, size: 16),
                               onTap: () {
                                 Navigator.of(context).push(
-                                  MaterialPageRoute(builder: (_) => const UsersManagementScreen()),
+                                  MaterialPageRoute(
+                                      builder: (_) =>
+                                          const UsersManagementScreen()),
                                 );
                               },
                             ),
                             const Divider(),
                             ListTile(
-                              leading: const Icon(Icons.delete_forever, color: AppTheme.errorColor),
+                              leading: const Icon(Icons.delete_forever,
+                                  color: AppTheme.errorColor),
                               title: const Text('Reset All Data'),
-                              subtitle: const Text('Delete all data and start fresh'),
+                              subtitle:
+                                  const Text('Delete all data and start fresh'),
                               onTap: () => _showResetDialog(),
                             ),
                           ],
@@ -537,7 +545,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
+            style:
+                ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
             child: const Text('Reset All Data'),
           ),
         ],
@@ -546,7 +555,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (confirm == true && mounted) {
       try {
-        final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         // Delete all data (except users and settings)
         await dbProvider.delete('orders');
         await dbProvider.delete('order_items');
@@ -559,7 +569,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         await dbProvider.delete('purchase_items');
         await dbProvider.delete('day_sessions');
         await dbProvider.delete('tables');
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -601,7 +611,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     labelText: 'Current PIN',
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
-                      icon: Icon(obscureOldPin ? Icons.visibility : Icons.visibility_off),
+                      icon: Icon(obscureOldPin
+                          ? Icons.visibility
+                          : Icons.visibility_off),
                       onPressed: () {
                         setDialogState(() => obscureOldPin = !obscureOldPin);
                       },
@@ -619,7 +631,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     border: const OutlineInputBorder(),
                     helperText: '4-6 digits',
                     suffixIcon: IconButton(
-                      icon: Icon(obscureNewPin ? Icons.visibility : Icons.visibility_off),
+                      icon: Icon(obscureNewPin
+                          ? Icons.visibility
+                          : Icons.visibility_off),
                       onPressed: () {
                         setDialogState(() => obscureNewPin = !obscureNewPin);
                       },
@@ -636,9 +650,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     labelText: 'Confirm New PIN',
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
-                      icon: Icon(obscureConfirmPin ? Icons.visibility : Icons.visibility_off),
+                      icon: Icon(obscureConfirmPin
+                          ? Icons.visibility
+                          : Icons.visibility_off),
                       onPressed: () {
-                        setDialogState(() => obscureConfirmPin = !obscureConfirmPin);
+                        setDialogState(
+                            () => obscureConfirmPin = !obscureConfirmPin);
                       },
                     ),
                   ),
@@ -710,7 +727,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Failed to change password. Please check your current PIN.'),
+                content: Text(
+                    'Failed to change password. Please check your current PIN.'),
                 backgroundColor: AppTheme.errorColor,
               ),
             );
@@ -732,6 +750,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _cafeNameController.dispose();
     _cafeNameEnController.dispose();
     _addressController.dispose();
+    _vatPercentController.dispose();
     super.dispose();
   }
 }
