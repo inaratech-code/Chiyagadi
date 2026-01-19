@@ -41,7 +41,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
-      // FIXED: Get all products (sellable items for inventory management)
+      // Inventory should be separate from Menu/Orders.
+      // We only show *purchasable* items here (raw materials / stock items),
+      // not sellable menu items.
       // Firestore doesn't support OR clauses, so we'll query and filter in memory
       List<Map<String, dynamic>> productMaps;
 
@@ -50,9 +52,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
         // This avoids requiring composite indexes
         final allProducts = await dbProvider.query('products');
         productMaps = allProducts.where((p) {
-          final isSellable = p['is_sellable'];
-          // Include if is_sellable is 1, null, or not set (default to sellable)
-          return isSellable == null || isSellable == 1;
+          final isPurchasable = p['is_purchasable'];
+          return isPurchasable == 1;
         }).toList();
 
         // Sort in memory (Firestore orderBy with where requires index)
@@ -62,10 +63,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
           return nameA.compareTo(nameB);
         });
       } else {
-        // For SQLite: Can use OR clause
+        // For SQLite: simple filter
         productMaps = await dbProvider.query(
           'products',
-          where: 'is_sellable = ? OR is_sellable IS NULL',
+          where: 'is_purchasable = ?',
           whereArgs: [1],
           orderBy: 'name ASC',
         );

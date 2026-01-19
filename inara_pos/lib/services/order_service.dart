@@ -1,20 +1,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../providers/unified_database_provider.dart';
-import '../providers/auth_provider.dart';
 import '../models/order.dart';
 import '../models/order_item.dart';
 import '../models/product.dart';
-import 'inventory_ledger_service.dart';
 
 /// Order Service
 ///
-/// FIXED: Now uses InventoryLedgerService instead of direct inventory updates
-/// Stock is calculated from ledger entries, never stored directly
+/// Inventory is separate from Menu/Orders.
+/// Orders do not check/deduct inventory; inventory is managed via Purchases.
 class OrderService {
-  final InventoryLedgerService _ledgerService = InventoryLedgerService();
-
   // Generate unique order number (ORD yymmdd/000 format)
   Future<String> generateOrderNumber(UnifiedDatabaseProvider dbProvider) async {
     await dbProvider.init();
@@ -114,23 +109,9 @@ class OrderService {
           'This product cannot be sold. Only menu items can be added to orders.');
     }
 
-    // FIXED: Check stock availability using ledger calculation
     final productId = kIsWeb ? product.documentId : product.id;
     if (productId == null) {
       throw Exception('Product ID is required');
-    }
-
-    final availableStock = await _ledgerService.getCurrentStock(
-      context: context,
-      productId: productId,
-    );
-    final currentOrderQty =
-        await _getCurrentOrderQuantity(dbProvider, orderId, productId);
-    final totalRequired = currentOrderQty + quantity;
-
-    if (totalRequired > availableStock) {
-      throw Exception(
-          'Insufficient stock. Available: $availableStock, Required: $totalRequired');
     }
 
     final unitPrice = product.price;
@@ -180,29 +161,6 @@ class OrderService {
 
     // Recalculate order totals
     await _recalculateOrderTotals(dbProvider, orderId);
-  }
-
-  // Get current quantity of product in order
-  // FIXED: Accept dynamic productId (int for SQLite, String for Firestore)
-  Future<int> _getCurrentOrderQuantity(UnifiedDatabaseProvider dbProvider,
-      dynamic orderId, dynamic productId) async {
-    final items = await dbProvider.query(
-      'order_items',
-      where: 'order_id = ? AND product_id = ?',
-      whereArgs: [orderId, productId],
-    );
-
-    if (items.isEmpty) return 0;
-    // FIXED: Handle both int and double for quantity
-    final quantityData = items.first['quantity'];
-    if (quantityData is int) {
-      return quantityData;
-    } else if (quantityData is double) {
-      return quantityData.toInt();
-    } else if (quantityData is num) {
-      return quantityData.toInt();
-    }
-    return 0;
   }
 
   // Remove item from order
@@ -476,7 +434,6 @@ class OrderService {
 
   // Delete order (permanently remove order and its items)
   // FIXED: Handle both SQLite (id) and Firestore (documentId) queries
-  // FIXED: Reverse inventory ledger entries if order was paid
   Future<void> deleteOrder({
     required UnifiedDatabaseProvider dbProvider,
     required BuildContext context,
@@ -488,45 +445,6 @@ class OrderService {
     final order = await getOrderById(dbProvider, orderId);
     if (order == null) {
       throw Exception('Order not found');
-    }
-
-    final wasPaid = order.paymentStatus == 'paid';
-    final orderItems = await getOrderItems(dbProvider, orderId);
-
-    // If order was paid, reverse inventory ledger entries (add back stock)
-    if (wasPaid && orderItems.isNotEmpty) {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final createdBy = authProvider.currentUserId != null
-          ? (kIsWeb
-              ? authProvider.currentUserId!
-              : int.tryParse(authProvider.currentUserId!))
-          : null;
-      final now = DateTime.now().millisecondsSinceEpoch;
-
-      // Use transaction to ensure all reverse entries are created atomically
-      await dbProvider.transaction((txn) async {
-        for (final item in orderItems) {
-          final productId = item['product_id'];
-          final productName =
-              item['product_name'] as String? ?? 'Unknown Product';
-          final quantityOut = (item['quantity'] as num).toDouble();
-
-          // Create reverse entry: quantityIn = quantityOut (add back stock)
-          await txn.insert('inventory_ledger', {
-            'product_id': productId,
-            'product_name': productName,
-            'quantity_in': quantityOut, // Add back the stock
-            'quantity_out': 0.0,
-            'unit_price': (item['unit_price'] as num?)?.toDouble() ?? 0.0,
-            'transaction_type': 'adjustment',
-            'reference_type': 'order_deletion',
-            'reference_id': orderId,
-            'notes': 'Stock returned: Order ${order.orderNumber} deleted',
-            'created_by': createdBy,
-            'created_at': now,
-          });
-        }
-      });
     }
 
     // Delete all order items first
@@ -748,13 +666,6 @@ class OrderService {
         }
       });
     }
-
-    // FIXED: Deduct inventory using ledger entries (not direct updates)
-    await _deductInventory(
-      dbProvider: dbProvider,
-      context: context,
-      orderId: orderId,
-    );
   }
 
   // Pay credit (reduce customer balance when credit is paid later)
@@ -900,109 +811,6 @@ class OrderService {
         });
       }
     });
-  }
-
-  /// FIXED: Deduct inventory on sale using ledger entries (transactional, prevents negative stock)
-  ///
-  /// This method:
-  /// 1. Gets all order items
-  /// 2. For each item, checks current stock from ledger
-  /// 3. Prevents negative stock
-  /// 4. Creates inventory_ledger entries (quantityOut) for each item
-  ///
-  /// Stock is NEVER directly updated - only ledger entries are created
-  Future<void> _deductInventory({
-    required UnifiedDatabaseProvider dbProvider,
-    required BuildContext context,
-    required dynamic orderId,
-  }) async {
-    final items = await getOrderItems(dbProvider, orderId);
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    // FIXED: Handle both int (SQLite) and String (Firestore) user IDs
-    final createdBy = authProvider.currentUserId != null
-        ? (kIsWeb
-            ? authProvider.currentUserId!
-            : int.tryParse(authProvider.currentUserId!))
-        : null;
-
-    final now = DateTime.now().millisecondsSinceEpoch;
-
-    if (kIsWeb) {
-      // Web/Firestore: avoid transactions here (can throw opaque JS errors when mixed with reads).
-      for (final item in items) {
-        // Check stock availability using ledger calculation
-        final productId = item['product_id'];
-        final currentStock = await _ledgerService.getCurrentStock(
-          context: context,
-          productId: productId,
-        );
-
-        final requiredQty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-        final productName =
-            item['product_name'] as String? ?? 'Unknown Product';
-
-        if (currentStock < requiredQty) {
-          throw Exception(
-            'Insufficient stock for $productName. Available: $currentStock, Required: $requiredQty',
-          );
-        }
-
-        await dbProvider.insert('inventory_ledger', {
-          'product_id': item['product_id'],
-          'product_name': productName,
-          'quantity_in': 0.0,
-          'quantity_out': requiredQty,
-          'unit_price': (item['unit_price'] as num?)?.toDouble() ?? 0.0,
-          'transaction_type': 'sale',
-          'reference_type': 'sale',
-          'reference_id': orderId,
-          'notes': 'Sale: Order $orderId',
-          'created_by': createdBy,
-          'created_at': now,
-        });
-      }
-    } else {
-      // SQLite: Use transaction to ensure all ledger entries are created atomically
-      await dbProvider.transaction((txn) async {
-        for (final item in items) {
-          try {
-            final productId = item['product_id'];
-            final currentStock = await _ledgerService.getCurrentStock(
-              context: context,
-              productId: productId,
-            );
-
-            final requiredQty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-            final productName =
-                item['product_name'] as String? ?? 'Unknown Product';
-
-            if (currentStock < requiredQty) {
-              throw Exception(
-                'Insufficient stock for $productName. '
-                'Available: $currentStock, Required: $requiredQty',
-              );
-            }
-
-            await txn.insert('inventory_ledger', {
-              'product_id': item['product_id'],
-              'product_name': productName,
-              'quantity_in': 0.0,
-              'quantity_out': requiredQty,
-              'unit_price': (item['unit_price'] as num?)?.toDouble() ?? 0.0,
-              'transaction_type': 'sale',
-              'reference_type': 'sale',
-              'reference_id': orderId,
-              'notes': 'Sale: Order $orderId',
-              'created_by': createdBy,
-              'created_at': now,
-            });
-          } catch (e) {
-            debugPrint('Error creating ledger entry for sale: $e');
-            rethrow;
-          }
-        }
-      });
-    }
   }
 
   // Get VAT rate from settings (default 13% VAT in Nepal)

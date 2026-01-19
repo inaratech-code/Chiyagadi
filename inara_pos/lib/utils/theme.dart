@@ -80,14 +80,21 @@ class AppTheme {
 
   // POS Theme (for billing screens) - Colorful Tea Café Theme
   static ThemeData get darkTheme {
+    const appBg = Color(0xFFF6EBCB); // slightly darker warm background
+    const cardBg = Color(0xFFFFFDE7);
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light, // Changed to light for colorful backgrounds
       primaryColor: logoPrimary,
       primarySwatch: _createMaterialColor(logoPrimary),
-      scaffoldBackgroundColor:
-          const Color(0xFFFFFEF5), // Very light yellow/cream background
-      cardColor: const Color(0xFFFFFDE7), // Light golden card background
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: logoPrimary,
+        brightness: Brightness.light,
+        background: appBg,
+        surface: cardBg,
+      ),
+      scaffoldBackgroundColor: appBg, // Slightly darker warm background
+      cardColor: cardBg, // Light golden card background
       dividerColor: logoSecondary.withOpacity(0.3),
       appBarTheme: AppBarTheme(
         backgroundColor: logoLight.withOpacity(0.8), // Light golden app bar
@@ -138,13 +145,21 @@ class AppTheme {
 
   // Light Theme (for admin/settings screens) - Colorful Tea Café Theme
   static ThemeData get lightTheme {
+    const appBg = Color(0xFFF4E7C4); // slightly darker warm background
+    const cardBg = Color(0xFFFFFDE7);
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
       primaryColor: logoPrimary,
       primarySwatch: _createMaterialColor(logoPrimary),
-      scaffoldBackgroundColor: const Color(0xFFFFF9E6), // Warm cream background
-      cardColor: const Color(0xFFFFFDE7), // Light golden card background
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: logoPrimary,
+        brightness: Brightness.light,
+        background: appBg,
+        surface: cardBg,
+      ),
+      scaffoldBackgroundColor: appBg, // Slightly darker warm background
+      cardColor: cardBg, // Light golden card background
       dividerColor: logoSecondary.withOpacity(0.3),
       appBarTheme: AppBarTheme(
         backgroundColor: logoLight.withOpacity(0.9), // Light golden app bar

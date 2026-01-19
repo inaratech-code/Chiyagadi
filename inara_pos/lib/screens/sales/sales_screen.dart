@@ -18,6 +18,11 @@ class _SalesScreenState extends State<SalesScreen> {
   bool _isLoading = true;
   DateTime _selectedDate = DateTime.now();
 
+  bool _isPaidOrPartial(dynamic paymentStatus) {
+    final s = (paymentStatus ?? '').toString();
+    return s == 'paid' || s == 'partial';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -35,14 +40,26 @@ class _SalesScreenState extends State<SalesScreen> {
               .millisecondsSinceEpoch;
       final endOfDay = startOfDay + (24 * 60 * 60 * 1000) - 1;
 
-      // Include paid and partial payments (exclude unpaid)
-      _sales = await dbProvider.query(
-        'orders',
-        where:
-            'created_at >= ? AND created_at <= ? AND payment_status IN (?, ?)',
-        whereArgs: [startOfDay, endOfDay, 'paid', 'partial'],
-        orderBy: 'created_at DESC',
-      );
+      // Firestore query wrapper doesn't support SQL-style `IN (?, ?)`.
+      // So on web, we filter payment_status in-memory.
+      if (kIsWeb) {
+        final rows = await dbProvider.query(
+          'orders',
+          where: 'created_at >= ? AND created_at <= ?',
+          whereArgs: [startOfDay, endOfDay],
+          orderBy: 'created_at DESC',
+        );
+        _sales = rows.where((o) => _isPaidOrPartial(o['payment_status'])).toList();
+      } else {
+        // Include paid and partial payments (exclude unpaid)
+        _sales = await dbProvider.query(
+          'orders',
+          where:
+              'created_at >= ? AND created_at <= ? AND payment_status IN (?, ?)',
+          whereArgs: [startOfDay, endOfDay, 'paid', 'partial'],
+          orderBy: 'created_at DESC',
+        );
+      }
 
       // Load order items and products for each sale
       for (var sale in _sales) {

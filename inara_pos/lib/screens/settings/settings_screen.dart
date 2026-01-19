@@ -534,7 +534,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            final canConfirm = confirmController.text.trim().toUpperCase() == 'RESET';
+            final canConfirm =
+                confirmController.text.trim().toUpperCase() == 'RESET';
 
             return AlertDialog(
               title: const Text('Clear App Data?'),
@@ -583,7 +584,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: isWorking ? null : () => Navigator.pop(dialogContext, false),
+                  onPressed: isWorking
+                      ? null
+                      : () => Navigator.pop(dialogContext, false),
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
@@ -592,11 +595,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       : () async {
                           setDialogState(() => isWorking = true);
                           try {
-                            final dbProvider = Provider.of<UnifiedDatabaseProvider>(
+                            final dbProvider =
+                                Provider.of<UnifiedDatabaseProvider>(
                               dialogContext,
                               listen: false,
                             );
-                            await dbProvider.clearBusinessData(seedDefaults: true);
+                            await dbProvider.clearBusinessData(
+                                seedDefaults: true);
                             if (dialogContext.mounted) {
                               Navigator.pop(dialogContext, true);
                             }

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart'
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import '../database/schema.dart';
+import '../utils/chiyagaadi_menu_seed.dart';
 
 class DatabaseProvider with ChangeNotifier {
   static Database? _database;
@@ -219,335 +220,77 @@ class DatabaseProvider with ChangeNotifier {
       debugPrint('Database: Initializing default tea café data...');
       final now = DateTime.now().millisecondsSinceEpoch;
 
-      // Check if data already exists
-      final existingCategories =
-          await txn.rawQuery('SELECT COUNT(*) as count FROM categories');
-      if (existingCategories.first['count'] as int > 0) {
-        debugPrint(
-            'Database: Default data already exists, skipping initialization');
-        return;
+      String norm(String s) =>
+          s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
+      // Load existing categories (for idempotent seeding)
+      final existingCategoryRows = await txn.query(
+        'categories',
+        columns: const ['id', 'name'],
+      );
+      final categoryIdByNormName = <String, int>{};
+      for (final row in existingCategoryRows) {
+        final id = (row['id'] as num?)?.toInt();
+        final name = (row['name'] as String?) ?? '';
+        if (id != null && name.trim().isNotEmpty) {
+          categoryIdByNormName[norm(name)] = id;
+        }
       }
 
-      // Locked Default Categories (cannot be deleted)
-      final categories = [
-        {
-          'name': 'Food (Veg/Non Veg)',
-          'display_order': 1,
-          'is_active': 1,
-          'is_locked': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'name': 'Cigarette',
-          'display_order': 2,
-          'is_active': 1,
-          'is_locked': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'name': 'Beverages',
-          'display_order': 3,
-          'is_active': 1,
-          'is_locked': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-      ];
+      // Ensure Chiyagaadi menu seed categories exist
+      for (final cat in chiyagaadiSeedCategories) {
+        final key = norm(cat.name);
+        if (categoryIdByNormName.containsKey(key)) continue;
 
-      final categoryIds = <int>[];
-      for (final cat in categories) {
-        final id = await txn.insert('categories', cat);
-        categoryIds.add(id);
-        debugPrint('Database: Created category: ${cat['name']} (ID: $id)');
-      }
-
-      // Default Products for Café
-      final products = [
-        // Food (Veg/Non Veg) Category (index 0)
-        {
-          'category_id': categoryIds[0],
-          'name': 'मोमो (Veg)',
-          'description': 'Vegetable Momos',
-          'price': 80.0,
-          'cost': 30.0,
-          'is_veg': 1,
+        final id = await txn.insert('categories', {
+          'name': cat.name,
+          'display_order': cat.displayOrder,
           'is_active': 1,
+          'is_locked': cat.isLocked ? 1 : 0,
           'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[0],
-          'name': 'मोमो (Non Veg)',
-          'description': 'Chicken Momos',
-          'price': 100.0,
-          'cost': 40.0,
-          'is_veg': 0,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[0],
-          'name': 'चाउमिन (Veg)',
-          'description': 'Vegetable Chowmein',
-          'price': 70.0,
-          'cost': 25.0,
-          'is_veg': 1,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[0],
-          'name': 'चाउमिन (Non Veg)',
-          'description': 'Chicken Chowmein',
-          'price': 90.0,
-          'cost': 35.0,
-          'is_veg': 0,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[0],
-          'name': 'समोसा',
-          'description': 'Samosa',
-          'price': 25.0,
-          'cost': 10.0,
-          'is_veg': 1,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[0],
-          'name': 'पकौडा',
-          'description': 'Pakoda',
-          'price': 30.0,
-          'cost': 12.0,
-          'is_veg': 1,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[0],
-          'name': 'स्प्रिंग रोल',
-          'description': 'Spring Roll',
-          'price': 40.0,
-          'cost': 15.0,
-          'is_veg': 1,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-
-        // Cigarette Category (index 1)
-        {
-          'category_id': categoryIds[1],
-          'name': 'Marlboro',
-          'description': 'Marlboro Cigarette',
-          'price': 150.0,
-          'cost': 120.0,
-          'is_veg': 0,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[1],
-          'name': 'Gold Flake',
-          'description': 'Gold Flake Cigarette',
-          'price': 120.0,
-          'cost': 100.0,
-          'is_veg': 0,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[1],
-          'name': '555',
-          'description': '555 Cigarette',
-          'price': 130.0,
-          'cost': 110.0,
-          'is_veg': 0,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[1],
-          'name': 'Red & White',
-          'description': 'Red & White Cigarette',
-          'price': 110.0,
-          'cost': 90.0,
-          'is_veg': 0,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-
-        // Beverages Category (index 2)
-        {
-          'category_id': categoryIds[2],
-          'name': 'मसाला चिया',
-          'description': 'Masala Tea',
-          'price': 30.0,
-          'cost': 10.0,
-          'is_veg': 1,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[2],
-          'name': 'दूध चिया',
-          'description': 'Milk Tea',
-          'price': 25.0,
-          'cost': 8.0,
-          'is_veg': 1,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[2],
-          'name': 'कालो चिया',
-          'description': 'Black Tea',
-          'price': 20.0,
-          'cost': 5.0,
-          'is_veg': 1,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[2],
-          'name': 'कफी',
-          'description': 'Coffee',
-          'price': 40.0,
-          'cost': 15.0,
-          'is_veg': 1,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[2],
-          'name': 'कोल्ड ड्रिंक',
-          'description': 'Cold Drink',
-          'price': 40.0,
-          'cost': 15.0,
-          'is_veg': 1,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[2],
-          'name': 'जुस',
-          'description': 'Juice',
-          'price': 50.0,
-          'cost': 20.0,
-          'is_veg': 1,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[2],
-          'name': 'ओरेंज जुस',
-          'description': 'Orange Juice',
-          'price': 60.0,
-          'cost': 25.0,
-          'is_veg': 1,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[2],
-          'name': 'एप्पल जुस',
-          'description': 'Apple Juice',
-          'price': 60.0,
-          'cost': 25.0,
-          'is_veg': 1,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[2],
-          'name': 'मिक्स जुस',
-          'description': 'Mixed Juice',
-          'price': 70.0,
-          'cost': 30.0,
-          'is_veg': 1,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[2],
-          'name': 'लस्सी',
-          'description': 'Lassi',
-          'price': 55.0,
-          'cost': 22.0,
-          'is_veg': 1,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[2],
-          'name': 'मंगो लस्सी',
-          'description': 'Mango Lassi',
-          'price': 65.0,
-          'cost': 28.0,
-          'is_veg': 1,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[2],
-          'name': 'सोडा',
-          'description': 'Soda',
-          'price': 35.0,
-          'cost': 12.0,
-          'is_veg': 1,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-        {
-          'category_id': categoryIds[2],
-          'name': 'पानी',
-          'description': 'Water',
-          'price': 15.0,
-          'cost': 5.0,
-          'is_veg': 1,
-          'is_active': 1,
-          'created_at': now,
-          'updated_at': now
-        },
-      ];
-
-      for (final product in products) {
-        final id = await txn.insert('products', product);
-        debugPrint('Database: Created product: ${product['name']} (ID: $id)');
-
-        // Initialize inventory for each product
-        await txn.insert('inventory', {
-          'product_id': id,
-          'quantity': 100.0,
-          'unit': 'pcs',
-          'min_stock_level': 10.0,
           'updated_at': now,
         });
+        categoryIdByNormName[key] = id;
+        debugPrint('Database: Seeded category: ${cat.name} (ID: $id)');
+      }
+
+      // Load existing sellable products (for idempotent seeding)
+      final existingProductRows = await txn.query(
+        'products',
+        columns: const ['name'],
+        where: 'is_sellable = ?',
+        whereArgs: const [1],
+      );
+      final existingProductNames = <String>{};
+      for (final row in existingProductRows) {
+        final name = (row['name'] as String?) ?? '';
+        if (name.trim().isNotEmpty) existingProductNames.add(norm(name));
+      }
+
+      // Ensure Chiyagaadi menu seed products exist
+      for (final p in chiyagaadiSeedProducts) {
+        final key = norm(p.name);
+        if (existingProductNames.contains(key)) continue;
+
+        final categoryId = categoryIdByNormName[norm(p.categoryName)];
+        if (categoryId == null) continue;
+
+        await txn.insert('products', {
+          'category_id': categoryId,
+          'name': p.name,
+          'description': p.description,
+          'price': p.price,
+          'cost': 0.0,
+          'image_url': chiyagaadiImageAssetForName(p.name),
+          'is_veg': p.isVeg ? 1 : 0,
+          'is_active': p.isActive ? 1 : 0,
+          'is_purchasable': 0,
+          'is_sellable': 1,
+          'created_at': now,
+          'updated_at': now,
+        });
+        existingProductNames.add(key);
+        debugPrint('Database: Seeded menu product: ${p.name}');
       }
 
       // Default Settings

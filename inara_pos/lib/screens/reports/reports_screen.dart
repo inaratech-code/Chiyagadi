@@ -22,6 +22,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
   List<Map<String, dynamic>> _dailySales = [];
   bool _isLoading = false;
 
+  bool _isPaidOrPartial(dynamic paymentStatus) {
+    final s = (paymentStatus ?? '').toString();
+    return s == 'paid' || s == 'partial';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -41,13 +46,23 @@ class _ReportsScreenState extends State<ReportsScreen> {
           DateTime(_endDate.year, _endDate.month, _endDate.day, 23, 59, 59)
               .millisecondsSinceEpoch;
 
-      // Total Sales (include paid and partial payments)
-      final orders = await dbProvider.query(
+      // Fetch all orders in range once.
+      final allOrdersInRange = await dbProvider.query(
         'orders',
-        where:
-            'created_at >= ? AND created_at <= ? AND payment_status IN (?, ?)',
-        whereArgs: [start, end, 'paid', 'partial'],
+        where: 'created_at >= ? AND created_at <= ?',
+        whereArgs: [start, end],
       );
+
+      // Total Sales (include paid and partial payments)
+      // Firestore query wrapper doesn't support SQL-style `IN (?, ?)`, so filter in-memory.
+      final orders = kIsWeb
+          ? allOrdersInRange.where((o) => _isPaidOrPartial(o['payment_status'])).toList()
+          : await dbProvider.query(
+              'orders',
+              where:
+                  'created_at >= ? AND created_at <= ? AND payment_status IN (?, ?)',
+              whereArgs: [start, end, 'paid', 'partial'],
+            );
 
       final totalSales = orders.fold<double>(
         0.0,
@@ -67,12 +82,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       );
       final netProfit = totalSales - totalExpenses;
 
-      // Credit Given (from orders with credit_amount > 0 in date range)
-      final allOrdersInRange = await dbProvider.query(
-        'orders',
-        where: 'created_at >= ? AND created_at <= ?',
-        whereArgs: [start, end],
-      );
+      // Credit Given (from all orders in date range)
       final creditGiven = allOrdersInRange.fold(
           0.0, (sum, o) => sum + (o['credit_amount'] as num? ?? 0).toDouble());
 

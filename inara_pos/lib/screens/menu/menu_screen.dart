@@ -6,6 +6,7 @@ import '../../providers/unified_database_provider.dart';
 import '../../models/category.dart';
 import '../../models/product.dart';
 import '../../utils/theme.dart';
+import '../../utils/chiyagaadi_menu_seed.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io' as io;
@@ -23,6 +24,52 @@ class _MenuScreenState extends State<MenuScreen> {
   List<Product> _products = [];
   bool _isLoading = true;
   String _searchQuery = '';
+
+  String _normalizeNameKey(String s) {
+    return s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  String _defaultMenuImageForName(String name) {
+    return chiyagaadiImageAssetForName(name);
+  }
+
+  Widget _buildProductImage(String? imageUrl, String name) {
+    final effectiveUrl =
+        (imageUrl == null || imageUrl.trim().isEmpty) ? _defaultMenuImageForName(name) : imageUrl.trim();
+
+    Widget fallback() => const Icon(Icons.image, size: 40, color: Colors.grey);
+
+    if (effectiveUrl.startsWith('http')) {
+      return Image.network(
+        effectiveUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => fallback(),
+      );
+    }
+
+    if (effectiveUrl.startsWith('assets/')) {
+      return Image.asset(
+        effectiveUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => fallback(),
+      );
+    }
+
+    // Web: XFile from ImagePicker returns a blob/object URL which can be loaded via network.
+    if (kIsWeb) {
+      return Image.network(
+        effectiveUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => fallback(),
+      );
+    }
+
+    return Image.file(
+      io.File(effectiveUrl),
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => fallback(),
+    );
+  }
 
   @override
   void initState() {
@@ -173,7 +220,7 @@ class _MenuScreenState extends State<MenuScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppTheme.logoLight.withOpacity(0.22),
               boxShadow: [
                 BoxShadow(
                   color: Colors.grey.withOpacity(0.1),
@@ -182,6 +229,12 @@ class _MenuScreenState extends State<MenuScreen> {
                   offset: const Offset(0, 1),
                 ),
               ],
+              border: Border(
+                bottom: BorderSide(
+                  color: AppTheme.logoSecondary.withOpacity(0.25),
+                  width: 1,
+                ),
+              ),
             ),
             child: Row(
               children: [
@@ -210,7 +263,7 @@ class _MenuScreenState extends State<MenuScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Colors.white.withOpacity(0.92),
               boxShadow: [
                 BoxShadow(
                   color: Colors.grey.withOpacity(0.1),
@@ -320,14 +373,14 @@ class _MenuScreenState extends State<MenuScreen> {
                                       // Category Heading
                                       Padding(
                                         padding: const EdgeInsets.symmetric(
-                                            horizontal: 8, vertical: 12),
+                                            horizontal: 8, vertical: 10),
                                         child: Row(
                                           children: [
                                             Container(
                                               padding:
                                                   const EdgeInsets.symmetric(
-                                                      horizontal: 12,
-                                                      vertical: 6),
+                                                      horizontal: 10,
+                                                      vertical: 5),
                                               decoration: BoxDecoration(
                                                 color: AppTheme.logoPrimary
                                                     .withOpacity(0.1),
@@ -335,14 +388,14 @@ class _MenuScreenState extends State<MenuScreen> {
                                                     BorderRadius.circular(8),
                                                 border: Border.all(
                                                   color: AppTheme.logoPrimary,
-                                                  width: 1.5,
+                                                  width: 1,
                                                 ),
                                               ),
                                               child: Text(
                                                 category.name.toUpperCase(),
                                                 style: TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w700,
                                                   color: AppTheme.logoPrimary,
                                                   letterSpacing: 0.5,
                                                 ),
@@ -352,7 +405,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                             Text(
                                               '(${categoryProducts.length} items)',
                                               style: TextStyle(
-                                                fontSize: 12,
+                                                fontSize: 11,
                                                 color: Colors.grey[600],
                                                 fontStyle: FontStyle.italic,
                                               ),
@@ -368,11 +421,21 @@ class _MenuScreenState extends State<MenuScreen> {
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 8),
                                         gridDelegate:
-                                            const SliverGridDelegateWithFixedCrossAxisCount(
-                                          crossAxisCount: 5,
-                                          childAspectRatio: 0.72,
-                                          crossAxisSpacing: 8,
-                                          mainAxisSpacing: 8,
+                                            SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount: () {
+                                            final w =
+                                                MediaQuery.of(context).size.width;
+                                            // Smaller, cleaner boxes: increase columns on wide screens.
+                                            // - phones: 2-3
+                                            // - tablets: 4-5
+                                            // - desktop: up to 8
+                                            return (w / 150)
+                                                .floor()
+                                                .clamp(2, 8);
+                                          }(),
+                                          childAspectRatio: 0.86,
+                                          crossAxisSpacing: 6,
+                                          mainAxisSpacing: 6,
                                         ),
                                         itemCount: categoryProducts.length,
                                         itemBuilder: (context, productIndex) {
@@ -420,87 +483,25 @@ class _MenuScreenState extends State<MenuScreen> {
     );
 
     return Card(
-      elevation: 2,
+      elevation: 1,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
       ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _showEditProductDialog(product),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Category badge at top
-            Container(
+            // Image
+            SizedBox(
+              height: 72,
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: AppTheme.logoPrimary.withOpacity(0.1),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(8),
-                  topRight: Radius.circular(8),
-                ),
+              child: DecoratedBox(
+                decoration: BoxDecoration(color: Colors.grey[200]),
+                child: _buildProductImage(product.imageUrl, product.name),
               ),
-              child: Text(
-                category.name.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.logoPrimary,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            // Image placeholder
-            Container(
-              height: 90,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-              ),
-              child: product.imageUrl != null && product.imageUrl!.isNotEmpty
-                  ? ClipRRect(
-                      child: product.imageUrl!.startsWith('http')
-                          ? Image.network(
-                              product.imageUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Icon(Icons.image,
-                                    size: 40, color: Colors.grey);
-                              },
-                            )
-                          : kIsWeb
-                              ? Image.network(
-                                  product.imageUrl!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Icon(Icons.image,
-                                        size: 40, color: Colors.grey);
-                                  },
-                                )
-                              : kIsWeb
-                                  ? Image.network(
-                                      product.imageUrl!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                        return const Icon(Icons.image,
-                                            size: 40, color: Colors.grey);
-                                      },
-                                    )
-                                  : Image.file(
-                                      io.File(product.imageUrl!),
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                        return const Icon(Icons.image,
-                                            size: 40, color: Colors.grey);
-                                      },
-                                    ),
-                    )
-                  : const Icon(Icons.image, size: 40, color: Colors.grey),
             ),
 
             // Content
@@ -512,51 +513,68 @@ class _MenuScreenState extends State<MenuScreen> {
                   children: [
                     Row(
                       children: [
+                        // compact veg/non-veg indicator
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 4, vertical: 2),
+                          width: 8,
+                          height: 8,
                           decoration: BoxDecoration(
                             color: product.isVeg
                                 ? AppTheme.successColor
                                 : AppTheme.errorColor,
-                            borderRadius: BorderRadius.circular(4),
+                            shape: BoxShape.circle,
                           ),
-                          child: Text(
-                            product.isVeg ? 'VEG' : 'NON-VEG',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          product.isVeg ? 'Veg' : 'Non-veg',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[800],
                           ),
                         ),
                         if (!product.isActive) ...[
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 4, vertical: 2),
+                                horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.grey,
+                              color: Colors.grey[700],
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Text(
-                              'UNAVAILABLE',
+                              'OFF',
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 9,
+                                fontSize: 10,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
                         ],
+                        const Spacer(),
+                        // category as subtle hint (clean)
+                        Flexible(
+                          child: Text(
+                            category.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.right,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 6),
                     Text(
                       product.name,
                       style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -570,20 +588,13 @@ class _MenuScreenState extends State<MenuScreen> {
                             NumberFormat.currency(symbol: 'NPR ')
                                 .format(product.price),
                             style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
                               color: AppTheme.logoPrimary,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.edit, size: 16),
-                          color: AppTheme.logoPrimary,
-                          onPressed: () => _showEditProductDialog(product),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
                         ),
                       ],
                     ),
@@ -710,6 +721,23 @@ class _MenuScreenState extends State<MenuScreen> {
 
         // Get the max display_order to add new category at the end
         final existingCategories = await dbProvider.query('categories');
+        final normalizedNew = _normalizeNameKey(categoryName);
+        final isDuplicate = existingCategories.any((c) {
+          final existingName = (c['name'] as String?) ?? '';
+          return _normalizeNameKey(existingName) == normalizedNew;
+        });
+        if (isDuplicate) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Category "$categoryName" already exists'),
+                backgroundColor: AppTheme.errorColor,
+              ),
+            );
+          }
+          return false;
+        }
+
         final maxOrder = existingCategories.isEmpty
             ? 0
             : (existingCategories
@@ -1055,6 +1083,23 @@ class _MenuScreenState extends State<MenuScreen> {
         selectedCategoryId != null) {
       try {
         final now = DateTime.now().millisecondsSinceEpoch;
+
+        // Disallow duplicate menu item names (case-insensitive).
+        final newName = nameController.text.trim();
+        final normalizedNew = _normalizeNameKey(newName);
+        final isDuplicate = _products.any((p) => _normalizeNameKey(p.name) == normalizedNew);
+        if (isDuplicate) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Menu item "$newName" already exists'),
+                backgroundColor: AppTheme.errorColor,
+              ),
+            );
+          }
+          return;
+        }
+
         String? finalImageUrl = imageUrlController.text.trim().isEmpty
             ? null
             : imageUrlController.text.trim();
@@ -1077,11 +1122,14 @@ class _MenuScreenState extends State<MenuScreen> {
           }
         }
 
+        // Auto-assign image by name if none provided.
+        finalImageUrl ??= _defaultMenuImageForName(newName);
+
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         await dbProvider.insert('products', {
           'category_id': selectedCategoryId,
-          'name': nameController.text.trim(),
+          'name': newName,
           'description': descController.text.trim().isEmpty
               ? null
               : descController.text.trim(),
@@ -1447,8 +1495,31 @@ class _MenuScreenState extends State<MenuScreen> {
         nameController.text.isNotEmpty &&
         priceController.text.isNotEmpty &&
         selectedCategoryId != null &&
-        product.id != null) {
+        (kIsWeb ? product.documentId != null : product.id != null)) {
       try {
+        final newName = nameController.text.trim();
+
+        // Disallow duplicate menu item names (case-insensitive), excluding self.
+        final normalizedNew = _normalizeNameKey(newName);
+        final isDuplicate = _products.any((p) {
+          final sameRecord = kIsWeb
+              ? (p.documentId != null && p.documentId == product.documentId)
+              : (p.id != null && p.id == product.id);
+          if (sameRecord) return false;
+          return _normalizeNameKey(p.name) == normalizedNew;
+        });
+        if (isDuplicate) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Menu item "$newName" already exists'),
+                backgroundColor: AppTheme.errorColor,
+              ),
+            );
+          }
+          return;
+        }
+
         String? finalImageUrl = imageUrlController.text.trim().isEmpty
             ? null
             : imageUrlController.text.trim();
@@ -1474,11 +1545,15 @@ class _MenuScreenState extends State<MenuScreen> {
 
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+
+        // Auto-assign image by name if none provided.
+        finalImageUrl ??= _defaultMenuImageForName(newName);
+
         await dbProvider.update(
           'products',
           values: {
             'category_id': selectedCategoryId,
-            'name': nameController.text.trim(),
+            'name': newName,
             'description': descController.text.trim().isEmpty
                 ? null
                 : descController.text.trim(),
@@ -1488,8 +1563,8 @@ class _MenuScreenState extends State<MenuScreen> {
             'is_active': isActive ? 1 : 0,
             'updated_at': DateTime.now().millisecondsSinceEpoch,
           },
-          where: 'id = ?',
-          whereArgs: [product.id],
+          where: kIsWeb ? 'documentId = ?' : 'id = ?',
+          whereArgs: [kIsWeb ? product.documentId : product.id],
         );
         await _loadData(); // Await to ensure data is loaded
         if (mounted) {

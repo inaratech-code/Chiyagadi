@@ -94,12 +94,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
             sum + ((transaction['amount'] as num?)?.toDouble() ?? 0.0),
       );
 
-      // FIXED: Calculate low stock count from ledger (not from inventory table)
-      final products = await dbProvider.query(
-        'products',
-        where: 'is_sellable = ? OR is_sellable IS NULL',
-        whereArgs: [1],
-      );
+      // Inventory is separate from Menu/Orders.
+      // Low-stock should reflect *purchasable* stock items only.
+      final List<Map<String, dynamic>> products;
+      if (kIsWeb) {
+        final all = await dbProvider.query('products');
+        products = all.where((p) => p['is_purchasable'] == 1).toList();
+      } else {
+        products = await dbProvider.query(
+          'products',
+          where: 'is_purchasable = ?',
+          whereArgs: [1],
+        );
+      }
 
       if (!mounted) return;
       final productIds = products
@@ -599,7 +606,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       {
         'icon': Icons.restaurant_menu,
         'label': 'Menu',
-        'color': const Color(0xFF10B981),
+          // Use brand gold for Menu section
+          'color': AppTheme.logoPrimary,
         'onTap': () => navigateToScreen('Menu', const MenuScreen()),
       },
       {

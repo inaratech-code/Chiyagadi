@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart' show ChangeNotifier, debugPrint;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../utils/chiyagaadi_menu_seed.dart';
 
 /// Firestore-based database provider for web platform
 /// Provides the same interface as DatabaseProvider but uses Firestore instead of SQLite
@@ -88,7 +89,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
   }) async {
     int totalDeleted = 0;
     while (true) {
-      final snapshot = await firestore.collection(collectionName).limit(batchSize).get();
+      final snapshot =
+          await firestore.collection(collectionName).limit(batchSize).get();
       if (snapshot.docs.isEmpty) break;
 
       final batch = firestore.batch();
@@ -153,10 +155,81 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
         debugPrint('FirestoreDatabase: Default settings created');
       }
+
+      // Ensure menu seed exists (adds missing items without duplicating).
+      await _ensureChiyagaadiMenuSeed();
     } catch (e) {
       debugPrint('FirestoreDatabase: Error initializing default data: $e');
       // Don't throw - app can continue without default data
     }
+  }
+
+  Future<void> _ensureChiyagaadiMenuSeed() async {
+    debugPrint('FirestoreDatabase: Ensuring Chiyagaadi menu seed...');
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    final batch = firestore.batch();
+
+    String norm(String s) =>
+        s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
+    // Ensure categories exist (by exact name match first, then normalized as fallback)
+    final Map<String, String> categoryIdByNormName = {};
+    for (final cat in chiyagaadiSeedCategories) {
+      final snap = await firestore
+          .collection('categories')
+          .where('name', isEqualTo: cat.name)
+          .limit(1)
+          .get();
+      if (snap.docs.isNotEmpty) {
+        categoryIdByNormName[norm(cat.name)] = snap.docs.first.id;
+        continue;
+      }
+
+      final docRef = firestore.collection('categories').doc();
+      categoryIdByNormName[norm(cat.name)] = docRef.id;
+      batch.set(docRef, {
+        'name': cat.name,
+        'display_order': cat.displayOrder,
+        'is_active': 1,
+        'is_locked': cat.isLocked ? 1 : 0,
+        'created_at': now,
+        'updated_at': now,
+      });
+    }
+
+    // Create products (menu items). Inventory is handled separately using
+    // purchasable items + purchases, not menu sales.
+    for (final p in chiyagaadiSeedProducts) {
+      final categoryId = categoryIdByNormName[norm(p.categoryName)];
+      if (categoryId == null) continue;
+
+      final existing = await firestore
+          .collection('products')
+          .where('name', isEqualTo: p.name)
+          .limit(1)
+          .get();
+      if (existing.docs.isNotEmpty) continue;
+
+      final productRef = firestore.collection('products').doc();
+      batch.set(productRef, {
+        'category_id': categoryId,
+        'name': p.name,
+        'description': p.description,
+        'price': p.price,
+        'cost': 0.0,
+        'image_url': chiyagaadiImageAssetForName(p.name),
+        'is_veg': p.isVeg ? 1 : 0,
+        'is_active': p.isActive ? 1 : 0,
+        'is_purchasable': 0,
+        'is_sellable': 1,
+        'created_at': now,
+        'updated_at': now,
+      });
+    }
+
+    await batch.commit();
+    debugPrint('FirestoreDatabase: Chiyagaadi menu seed ensured');
   }
 
   // Query methods compatible with DatabaseProvider interface
@@ -593,10 +666,11 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       totalDeleted += await _deleteCollectionInBatches(name);
     }
 
-    debugPrint('FirestoreDatabase: Cleared business data. Deleted $totalDeleted documents');
+    debugPrint(
+        'FirestoreDatabase: Cleared business data. Deleted $totalDeleted documents');
 
     if (seedDefaults) {
-      // On web, we only seed defaults that are safe to create (settings).
+      // Re-seed settings + menu.
       await _initializeDefaultData();
     }
   }

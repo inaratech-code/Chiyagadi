@@ -85,9 +85,20 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     if (!_isInitialized) {
       await init();
     }
+    if (kIsWeb) {
+      // FirestoreDatabaseProvider.update expects `data: ...`
+      return await _provider.update(
+        table,
+        data: values,
+        where: where,
+        whereArgs: whereArgs,
+      );
+    }
+
+    // DatabaseProvider.update (SQLite) expects the values map as the 2nd positional argument.
     return await _provider.update(
       table,
-      data: values,
+      values,
       where: where,
       whereArgs: whereArgs,
     );

@@ -13,7 +13,10 @@ void main() {
   testWidgets('App boots', (WidgetTester tester) async {
     // Smoke test: ensure the root widget builds without throwing.
     await tester.pumpWidget(const InaraPOSApp());
-    await tester.pumpAndSettle();
+    // Don't use pumpAndSettle here: the app can show indefinite animations
+    // (e.g., loading indicators) during async initialization which will never
+    // "settle" in a widget test environment.
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.byType(InaraPOSApp), findsOneWidget);
   });
 }
