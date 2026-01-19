@@ -113,8 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // (cleanup) mainNavItems was unused; selection logic uses _selectedIndex directly.
 
     return Scaffold(
-      backgroundColor:
-          const Color(0xFFFFFEF5), // Very light yellow/cream background
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: _selectedIndex == 0
           ? null
           : AppBar(

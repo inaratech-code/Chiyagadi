@@ -52,8 +52,9 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Widget _buildProductImage(String? imageUrl, String name) {
-    final effectiveUrl =
-        (imageUrl == null || imageUrl.trim().isEmpty) ? _defaultMenuImageForName(name) : imageUrl.trim();
+    final effectiveUrl = (imageUrl == null || imageUrl.trim().isEmpty)
+        ? _defaultMenuImageForName(name)
+        : imageUrl.trim();
 
     Widget fallback() => const Icon(Icons.image, size: 40, color: Colors.grey);
 
@@ -108,12 +109,33 @@ class _MenuScreenState extends State<MenuScreen> {
       );
       _categories = categoryMaps.map((map) => Category.fromMap(map)).toList();
 
-      final productMaps = await dbProvider.query(
-        'products',
-        where:
-            'is_sellable = ? OR (is_sellable IS NULL OR is_sellable = 1)', // Default to sellable for backward compatibility
-        whereArgs: [1],
-      );
+      // PERF/Web: avoid complex SQL (OR/IS NULL) on Firestore; fetch sellable and sort/filter in memory.
+      List<Map<String, dynamic>> productMaps;
+      if (kIsWeb) {
+        // First try the fast path: explicitly sellable.
+        final sellable = await dbProvider.query(
+          'products',
+          where: 'is_sellable = ?',
+          whereArgs: [1],
+        );
+        if (sellable.isNotEmpty) {
+          productMaps = sellable;
+        } else {
+          // Fallback for legacy docs (missing is_sellable): fetch all and filter.
+          final all = await dbProvider.query('products');
+          productMaps = all.where((p) {
+            final v = p['is_sellable'];
+            return v == null || v == 1;
+          }).toList();
+        }
+      } else {
+        productMaps = await dbProvider.query(
+          'products',
+          where:
+              'is_sellable = ? OR (is_sellable IS NULL OR is_sellable = 1)', // SQLite supports this
+          whereArgs: [1],
+        );
+      }
       _products = productMaps.map((map) => Product.fromMap(map)).toList();
     } catch (e) {
       debugPrint('Error loading menu data: $e');
@@ -441,8 +463,9 @@ class _MenuScreenState extends State<MenuScreen> {
                                         gridDelegate:
                                             SliverGridDelegateWithFixedCrossAxisCount(
                                           crossAxisCount: () {
-                                            final w =
-                                                MediaQuery.of(context).size.width;
+                                            final w = MediaQuery.of(context)
+                                                .size
+                                                .width;
                                             // Smaller, cleaner boxes: increase columns on wide screens.
                                             // - phones: 2-3
                                             // - tablets: 4-5
@@ -1059,8 +1082,8 @@ class _MenuScreenState extends State<MenuScreen> {
                                   if (v == true) {
                                     selectedCategoryId = smokesId;
                                   } else {
-                                    selectedCategoryId =
-                                        _getCategoryIdentifier(_categories.first);
+                                    selectedCategoryId = _getCategoryIdentifier(
+                                        _categories.first);
                                   }
                                 });
                               },
@@ -1101,8 +1124,8 @@ class _MenuScreenState extends State<MenuScreen> {
                                   if (v == true) {
                                     selectedCategoryId = drinksId;
                                   } else {
-                                    selectedCategoryId =
-                                        _getCategoryIdentifier(_categories.first);
+                                    selectedCategoryId = _getCategoryIdentifier(
+                                        _categories.first);
                                   }
                                 });
                               },
@@ -1172,7 +1195,8 @@ class _MenuScreenState extends State<MenuScreen> {
         // Disallow duplicate menu item names (case-insensitive).
         final newName = nameController.text.trim();
         final normalizedNew = _normalizeNameKey(newName);
-        final isDuplicate = _products.any((p) => _normalizeNameKey(p.name) == normalizedNew);
+        final isDuplicate =
+            _products.any((p) => _normalizeNameKey(p.name) == normalizedNew);
         if (isDuplicate) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1563,8 +1587,8 @@ class _MenuScreenState extends State<MenuScreen> {
                                   if (v == true) {
                                     selectedCategoryId = smokesId;
                                   } else {
-                                    selectedCategoryId =
-                                        _getCategoryIdentifier(_categories.first);
+                                    selectedCategoryId = _getCategoryIdentifier(
+                                        _categories.first);
                                   }
                                 });
                               },
@@ -1605,8 +1629,8 @@ class _MenuScreenState extends State<MenuScreen> {
                                   if (v == true) {
                                     selectedCategoryId = drinksId;
                                   } else {
-                                    selectedCategoryId =
-                                        _getCategoryIdentifier(_categories.first);
+                                    selectedCategoryId = _getCategoryIdentifier(
+                                        _categories.first);
                                   }
                                 });
                               },

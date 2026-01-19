@@ -49,7 +49,8 @@ class _SalesScreenState extends State<SalesScreen> {
           whereArgs: [startOfDay, endOfDay],
           orderBy: 'created_at DESC',
         );
-        _sales = rows.where((o) => _isPaidOrPartial(o['payment_status'])).toList();
+        _sales =
+            rows.where((o) => _isPaidOrPartial(o['payment_status'])).toList();
       } else {
         // Include paid and partial payments (exclude unpaid)
         _sales = await dbProvider.query(
@@ -62,7 +63,8 @@ class _SalesScreenState extends State<SalesScreen> {
       }
 
       // PERF: Batch load all order_items for these orders (avoids N+1 queries).
-      final orderIds = _sales.map((s) => s['id']).where((id) => id != null).toList();
+      final orderIds =
+          _sales.map((s) => s['id']).where((id) => id != null).toList();
       if (orderIds.isNotEmpty) {
         final placeholders = List.filled(orderIds.length, '?').join(',');
         final allItems = await dbProvider.query(

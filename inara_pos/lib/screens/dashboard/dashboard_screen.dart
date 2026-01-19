@@ -34,6 +34,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // FIXED: Use ledger service instead of direct inventory service
   final InventoryLedgerService _ledgerService = InventoryLedgerService();
 
+  bool _isPaidOrPartial(dynamic paymentStatus) {
+    final s = (paymentStatus ?? '').toString();
+    return s == 'paid' || s == 'partial';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -52,15 +57,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       int nextLowStockCount = 0;
       List<_ActivityItem> nextRecent = [];
 
-      // Get shop name from settings
-      final settings = await dbProvider.query('settings');
-      for (final setting in settings) {
-        if (setting['key'] == 'cafe_name_en') {
-          nextShopName = setting['value'] as String? ?? 'Shop';
-          break;
-        }
-      }
-
       // Get today's sales and credit
       final now = DateTime.now();
       final startOfDay =
@@ -68,12 +64,71 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59)
           .millisecondsSinceEpoch;
 
-      final todayOrders = await dbProvider.query(
-        'orders',
-        where:
-            'created_at >= ? AND created_at <= ? AND payment_status IN (?, ?)',
-        whereArgs: [startOfDay, endOfDay, 'paid', 'partial'],
-      );
+      // PERF: Run independent queries in parallel.
+      final results = await Future.wait<List<Map<String, dynamic>>>([
+        // 0: settings
+        dbProvider.query('settings'),
+        // 1: orders in today's range (filter paid/partial in-memory on web)
+        kIsWeb
+            ? dbProvider.query(
+                'orders',
+                where: 'created_at >= ? AND created_at <= ?',
+                whereArgs: [startOfDay, endOfDay],
+              )
+            : dbProvider.query(
+                'orders',
+                where:
+                    'created_at >= ? AND created_at <= ? AND payment_status IN (?, ?)',
+                whereArgs: [startOfDay, endOfDay, 'paid', 'partial'],
+              ),
+        // 2: today's credit transactions
+        dbProvider.query(
+          'credit_transactions',
+          where: 'created_at >= ? AND created_at <= ? AND transaction_type = ?',
+          whereArgs: [startOfDay, endOfDay, 'credit'],
+        ),
+        // 3: purchasable products for low stock
+        kIsWeb
+            ? dbProvider.query(
+                'products',
+                where: 'is_purchasable = ?',
+                whereArgs: [1],
+              )
+            : dbProvider.query(
+                'products',
+                where: 'is_purchasable = ?',
+                whereArgs: [1],
+              ),
+        // 4: recent orders
+        dbProvider.query('orders', orderBy: 'created_at DESC', limit: 5),
+        // 5: recent expenses
+        dbProvider.query('expenses', orderBy: 'created_at DESC', limit: 5),
+        // 6: recent credits
+        dbProvider.query('credit_transactions',
+            orderBy: 'created_at DESC', limit: 5),
+      ]);
+
+      final settingsRows = results[0];
+      final todayOrdersRaw = results[1];
+      final todayCreditTransactions = results[2];
+      final products = results[3];
+      final recentOrders = results[4];
+      final recentExpenses = results[5];
+      final recentCredits = results[6];
+
+      // Get shop name from settings
+      for (final setting in settingsRows) {
+        if (setting['key'] == 'cafe_name_en') {
+          nextShopName = setting['value'] as String? ?? 'Shop';
+          break;
+        }
+      }
+
+      final todayOrders = kIsWeb
+          ? todayOrdersRaw
+              .where((o) => _isPaidOrPartial(o['payment_status']))
+              .toList()
+          : todayOrdersRaw;
 
       nextTodaySales = todayOrders.fold<double>(
         0.0,
@@ -81,32 +136,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             sum + ((order['total_amount'] as num?)?.toDouble() ?? 0.0),
       );
 
-      // Get today's credit from credit_transactions (matching customer credit section)
-      final todayCreditTransactions = await dbProvider.query(
-        'credit_transactions',
-        where: 'created_at >= ? AND created_at <= ? AND transaction_type = ?',
-        whereArgs: [startOfDay, endOfDay, 'credit'],
-      );
-
       nextTodayCredit = todayCreditTransactions.fold<double>(
         0.0,
         (sum, transaction) =>
             sum + ((transaction['amount'] as num?)?.toDouble() ?? 0.0),
       );
-
-      // Inventory is separate from Menu/Orders.
-      // Low-stock should reflect *purchasable* stock items only.
-      final List<Map<String, dynamic>> products;
-      if (kIsWeb) {
-        final all = await dbProvider.query('products');
-        products = all.where((p) => p['is_purchasable'] == 1).toList();
-      } else {
-        products = await dbProvider.query(
-          'products',
-          where: 'is_purchasable = ?',
-          whereArgs: [1],
-        );
-      }
 
       if (!mounted) return;
       final productIds = products
@@ -127,12 +161,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       nextLowStockCount = lowStockCount;
 
-      // Recent Activity (latest orders / expenses / credit transactions)
-      final recentOrders = await dbProvider.query(
-        'orders',
-        orderBy: 'created_at DESC',
-        limit: 5,
-      );
       for (final o in recentOrders) {
         final createdAt = (o['created_at'] as num?)?.toInt() ?? 0;
         final orderNumber = (o['order_number'] as String?) ?? 'Order';
@@ -150,11 +178,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       }
 
-      final recentExpenses = await dbProvider.query(
-        'expenses',
-        orderBy: 'created_at DESC',
-        limit: 5,
-      );
       for (final e in recentExpenses) {
         final createdAt = (e['created_at'] as num?)?.toInt() ?? 0;
         final title = (e['title'] as String?) ?? 'Expense';
@@ -174,11 +197,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       }
 
-      final recentCredits = await dbProvider.query(
-        'credit_transactions',
-        orderBy: 'created_at DESC',
-        limit: 5,
-      );
       for (final t in recentCredits) {
         final createdAt = (t['created_at'] as num?)?.toInt() ?? 0;
         final type = (t['transaction_type'] as String?) ?? 'credit';
@@ -215,10 +233,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
+    final width = MediaQuery.of(context).size.width;
+    final horizontalPadding = width < 380 ? 14.0 : 16.0;
 
     return Scaffold(
-      backgroundColor:
-          const Color(0xFFFFFEF5), // Very light yellow/cream background
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadDashboardData,
@@ -236,8 +255,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 )
               : SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding, vertical: 14),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: _buildContent(context, authProvider),
@@ -606,8 +625,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       {
         'icon': Icons.restaurant_menu,
         'label': 'Menu',
-          // Use brand gold for Menu section
-          'color': AppTheme.logoPrimary,
+        // Use brand gold for Menu section
+        'color': AppTheme.logoPrimary,
         'onTap': () => navigateToScreen('Menu', const MenuScreen()),
       },
       {
@@ -730,12 +749,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Text(
                 label,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontSize: 12,
+                      fontSize: isCompact ? 11 : 12,
                       fontWeight: FontWeight.w600,
                       color: Colors.grey[800],
                     ),
                 textAlign: TextAlign.center,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
             ],

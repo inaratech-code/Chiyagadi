@@ -42,7 +42,9 @@ class ChiyagaadiSeedProduct {
 String _slugifyForAsset(String name) {
   final trimmed = name.trim().toLowerCase();
   final replaced = trimmed.replaceAll(RegExp(r'[^a-z0-9]+'), '_');
-  return replaced.replaceAll(RegExp(r'_+'), '_').replaceAll(RegExp(r'^_|_$'), '');
+  return replaced
+      .replaceAll(RegExp(r'_+'), '_')
+      .replaceAll(RegExp(r'^_|_$'), '');
 }
 
 /// Default image asset path derived from product name.
@@ -274,4 +276,3 @@ const List<ChiyagaadiSeedProduct> chiyagaadiSeedProducts = [
     isVeg: false,
   ),
 ];
-

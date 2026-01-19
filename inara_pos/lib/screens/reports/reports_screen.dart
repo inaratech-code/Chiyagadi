@@ -56,7 +56,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
       // Total Sales (include paid and partial payments)
       // Firestore query wrapper doesn't support SQL-style `IN (?, ?)`, so filter in-memory.
       final orders = kIsWeb
-          ? allOrdersInRange.where((o) => _isPaidOrPartial(o['payment_status'])).toList()
+          ? allOrdersInRange
+              .where((o) => _isPaidOrPartial(o['payment_status']))
+              .toList()
           : await dbProvider.query(
               'orders',
               where:

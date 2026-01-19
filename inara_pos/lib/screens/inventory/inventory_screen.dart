@@ -44,17 +44,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
       // Inventory should be separate from Menu/Orders.
       // We only show *purchasable* items here (raw materials / stock items),
       // not sellable menu items.
-      // Firestore doesn't support OR clauses, so we'll query and filter in memory
       List<Map<String, dynamic>> productMaps;
 
       if (kIsWeb) {
-        // For Firestore: Query all products, then filter in memory
-        // This avoids requiring composite indexes
-        final allProducts = await dbProvider.query('products');
-        productMaps = allProducts.where((p) {
-          final isPurchasable = p['is_purchasable'];
-          return isPurchasable == 1;
-        }).toList();
+        // Firestore: use a simple filter (server-side), then sort in memory
+        productMaps = await dbProvider.query(
+          'products',
+          where: 'is_purchasable = ?',
+          whereArgs: [1],
+        );
 
         // Sort in memory (Firestore orderBy with where requires index)
         productMaps.sort((a, b) {

@@ -290,7 +290,9 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         // Format: "field = ?" or "field1 = ? AND field2 = ?"
         final conditions = where.split(' AND ');
         var argIndex = 0;
-        for (var i = 0; i < conditions.length && argIndex < whereArgs.length; i++) {
+        for (var i = 0;
+            i < conditions.length && argIndex < whereArgs.length;
+            i++) {
           final condition = conditions[i].trim();
           if (condition.contains(' = ?')) {
             final field = condition.split(' = ?')[0].trim();
@@ -299,6 +301,16 @@ class FirestoreDatabaseProvider with ChangeNotifier {
           } else if (condition.contains(' != ?')) {
             final field = condition.split(' != ?')[0].trim();
             query = query.where(field, isNotEqualTo: whereArgs[argIndex]);
+            argIndex++;
+          } else if (condition.contains(' >= ?')) {
+            final field = condition.split(' >= ?')[0].trim();
+            query =
+                query.where(field, isGreaterThanOrEqualTo: whereArgs[argIndex]);
+            argIndex++;
+          } else if (condition.contains(' <= ?')) {
+            final field = condition.split(' <= ?')[0].trim();
+            query =
+                query.where(field, isLessThanOrEqualTo: whereArgs[argIndex]);
             argIndex++;
           } else if (condition.contains(' > ?')) {
             final field = condition.split(' > ?')[0].trim();
@@ -380,7 +392,9 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         if (where != null && whereArgs != null && whereArgs.isNotEmpty) {
           final conditions = where.split(' AND ');
           var argIndex = 0;
-          for (var i = 0; i < conditions.length && argIndex < whereArgs.length; i++) {
+          for (var i = 0;
+              i < conditions.length && argIndex < whereArgs.length;
+              i++) {
             final condition = conditions[i].trim();
             if (condition.contains(' = ?')) {
               final field = condition.split(' = ?')[0].trim();
@@ -392,10 +406,20 @@ class FirestoreDatabaseProvider with ChangeNotifier {
               fallbackQuery =
                   fallbackQuery.where(field, isNotEqualTo: whereArgs[argIndex]);
               argIndex++;
+            } else if (condition.contains(' >= ?')) {
+              final field = condition.split(' >= ?')[0].trim();
+              fallbackQuery = fallbackQuery.where(field,
+                  isGreaterThanOrEqualTo: whereArgs[argIndex]);
+              argIndex++;
+            } else if (condition.contains(' <= ?')) {
+              final field = condition.split(' <= ?')[0].trim();
+              fallbackQuery = fallbackQuery.where(field,
+                  isLessThanOrEqualTo: whereArgs[argIndex]);
+              argIndex++;
             } else if (condition.contains(' > ?')) {
               final field = condition.split(' > ?')[0].trim();
-              fallbackQuery =
-                  fallbackQuery.where(field, isGreaterThan: whereArgs[argIndex]);
+              fallbackQuery = fallbackQuery.where(field,
+                  isGreaterThan: whereArgs[argIndex]);
               argIndex++;
             } else if (condition.contains(' < ?')) {
               final field = condition.split(' < ?')[0].trim();
@@ -451,7 +475,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       final m = inRe.firstMatch(cond);
       if (m != null) {
         // Count placeholders
-        final placeholderCount = RegExp(r'\?').allMatches(m.group(2) ?? '').length;
+        final placeholderCount =
+            RegExp(r'\?').allMatches(m.group(2) ?? '').length;
         inField = (m.group(1) ?? '').trim();
         final end = (argIndex + placeholderCount).clamp(0, whereArgs.length);
         inValues = whereArgs.sublist(argIndex, end);
@@ -469,6 +494,18 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         final field = cond.split(' != ?')[0].trim();
         if (argIndex < whereArgs.length) {
           other.add((field: field, op: '!=', value: whereArgs[argIndex]));
+          argIndex++;
+        }
+      } else if (cond.contains(' >= ?')) {
+        final field = cond.split(' >= ?')[0].trim();
+        if (argIndex < whereArgs.length) {
+          other.add((field: field, op: '>=', value: whereArgs[argIndex]));
+          argIndex++;
+        }
+      } else if (cond.contains(' <= ?')) {
+        final field = cond.split(' <= ?')[0].trim();
+        if (argIndex < whereArgs.length) {
+          other.add((field: field, op: '<=', value: whereArgs[argIndex]));
           argIndex++;
         }
       } else if (cond.contains(' > ?')) {
@@ -511,6 +548,10 @@ class FirestoreDatabaseProvider with ChangeNotifier {
           q = q.where(p.field, isEqualTo: p.value);
         } else if (p.op == '!=') {
           q = q.where(p.field, isNotEqualTo: p.value);
+        } else if (p.op == '>=') {
+          q = q.where(p.field, isGreaterThanOrEqualTo: p.value);
+        } else if (p.op == '<=') {
+          q = q.where(p.field, isLessThanOrEqualTo: p.value);
         } else if (p.op == '>') {
           q = q.where(p.field, isGreaterThan: p.value);
         } else if (p.op == '<') {
@@ -522,8 +563,9 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
     Future<List<QueryDocumentSnapshot>> runChunk(List<Object?> vals) async {
       Query q = buildBase();
-      final isDocIdField =
-          inField == 'id' || inField == 'documentId' || inField == 'document_id';
+      final isDocIdField = inField == 'id' ||
+          inField == 'documentId' ||
+          inField == 'document_id';
       if (isDocIdField) {
         q = q.where(FieldPath.documentId, whereIn: vals);
       } else {
