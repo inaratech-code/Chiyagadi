@@ -82,6 +82,25 @@ class FirestoreDatabaseProvider with ChangeNotifier {
     }
   }
 
+  Future<int> _deleteCollectionInBatches(
+    String collectionName, {
+    int batchSize = 400,
+  }) async {
+    int totalDeleted = 0;
+    while (true) {
+      final snapshot = await firestore.collection(collectionName).limit(batchSize).get();
+      if (snapshot.docs.isEmpty) break;
+
+      final batch = firestore.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+      totalDeleted += snapshot.docs.length;
+    }
+    return totalDeleted;
+  }
+
   Future<void> _initializeDefaultData() async {
     try {
       // Check if settings already exist
@@ -456,13 +475,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         }
       } else {
         // Delete all documents (use with caution)
-        final snapshot = await firestore.collection(collection).get();
-        final batch = firestore.batch();
-        for (var doc in snapshot.docs) {
-          batch.delete(doc.reference);
-          count++;
-        }
-        await batch.commit();
+        count = await _deleteCollectionInBatches(collection);
       }
 
       debugPrint(
@@ -516,6 +529,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         'purchases',
         'purchase_items',
         'purchase_payments',
+        'expenses',
         'stock_transactions',
         'credit_transactions',
         'payments',
@@ -526,18 +540,12 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         'inventory_ledger'
       ];
 
-      final batch = firestore.batch();
       int totalDeleted = 0;
 
       for (final collectionName in collections) {
-        final snapshot = await firestore.collection(collectionName).get();
-        for (var doc in snapshot.docs) {
-          batch.delete(doc.reference);
-          totalDeleted++;
-        }
+        totalDeleted += await _deleteCollectionInBatches(collectionName);
       }
 
-      await batch.commit();
       debugPrint(
           'FirestoreDatabase: Reset complete. Deleted $totalDeleted documents');
 
@@ -546,6 +554,50 @@ class FirestoreDatabaseProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('FirestoreDatabase: Reset error: $e');
       rethrow;
+    }
+  }
+
+  /// Clears business data created/entered through the app while keeping
+  /// authentication/users and settings intact.
+  ///
+  /// Note: Firestore deletes are executed in safe batches to avoid the 500 write limit.
+  Future<void> clearBusinessData({bool seedDefaults = true}) async {
+    if (!_isInitialized) {
+      await init();
+    }
+
+    // Keep: users, settings
+    final collectionsToClear = <String>[
+      'orders',
+      'order_items',
+      'payments',
+      'products',
+      'categories',
+      'customers',
+      'inventory',
+      'purchases',
+      'purchase_items',
+      'purchase_payments',
+      'expenses',
+      'stock_transactions',
+      'credit_transactions',
+      'tables',
+      'day_sessions',
+      'audit_log',
+      'suppliers',
+      'inventory_ledger',
+    ];
+
+    int totalDeleted = 0;
+    for (final name in collectionsToClear) {
+      totalDeleted += await _deleteCollectionInBatches(name);
+    }
+
+    debugPrint('FirestoreDatabase: Cleared business data. Deleted $totalDeleted documents');
+
+    if (seedDefaults) {
+      // On web, we only seed defaults that are safe to create (settings).
+      await _initializeDefaultData();
     }
   }
 

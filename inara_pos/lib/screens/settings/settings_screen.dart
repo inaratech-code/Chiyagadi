@@ -509,9 +509,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ListTile(
                               leading: const Icon(Icons.delete_forever,
                                   color: AppTheme.errorColor),
-                              title: const Text('Reset All Data'),
-                              subtitle:
-                                  const Text('Delete all data and start fresh'),
+                              title: const Text('Clear App Data'),
+                              subtitle: const Text(
+                                  'Delete all business data entered through the app'),
                               onTap: () => _showResetDialog(),
                             ),
                           ],
@@ -526,65 +526,108 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _showResetDialog() async {
+    final confirmController = TextEditingController();
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reset All Data?'),
-        content: const Text(
-          'This will delete ALL data including:\n'
-          '- All products and categories\n'
-          '- All sales and orders\n'
-          '- All inventory\n'
-          '- All purchases\n\n'
-          'This action cannot be undone!',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style:
-                ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
-            child: const Text('Reset All Data'),
-          ),
-        ],
-      ),
+      builder: (dialogContext) {
+        bool isWorking = false;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final canConfirm = confirmController.text.trim().toUpperCase() == 'RESET';
+
+            return AlertDialog(
+              title: const Text('Clear App Data?'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'This will permanently delete business data entered through the app, including:\n'
+                      '- Orders, payments, and credit records\n'
+                      '- Products and categories\n'
+                      '- Inventory, stock transactions, inventory ledger\n'
+                      '- Purchases, suppliers, and purchase payments\n'
+                      '- Customers and expenses\n'
+                      '- Tables, day sessions, sync queue, and audit logs\n\n'
+                      'Users and settings will be kept.\n'
+                      'This action cannot be undone.',
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: confirmController,
+                      enabled: !isWorking,
+                      decoration: const InputDecoration(
+                        labelText: 'Type RESET to confirm',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    if (isWorking) ...[
+                      const SizedBox(height: 16),
+                      const Row(
+                        children: [
+                          SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          SizedBox(width: 12),
+                          Text('Clearing data...'),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isWorking ? null : () => Navigator.pop(dialogContext, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: (!canConfirm || isWorking)
+                      ? null
+                      : () async {
+                          setDialogState(() => isWorking = true);
+                          try {
+                            final dbProvider = Provider.of<UnifiedDatabaseProvider>(
+                              dialogContext,
+                              listen: false,
+                            );
+                            await dbProvider.clearBusinessData(seedDefaults: true);
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext, true);
+                            }
+                          } catch (e) {
+                            setDialogState(() => isWorking = false);
+                            AppMessenger.showSnackBar(
+                              'Error: $e',
+                              backgroundColor: Colors.red,
+                            );
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.errorColor,
+                  ),
+                  child: const Text('Clear Data'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
+    confirmController.dispose();
 
     if (confirm == true && mounted) {
-      try {
-        final dbProvider =
-            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-        // Delete all data (except users and settings)
-        await dbProvider.delete('orders');
-        await dbProvider.delete('order_items');
-        await dbProvider.delete('payments');
-        await dbProvider.delete('products');
-        await dbProvider.delete('categories');
-        await dbProvider.delete('inventory');
-        await dbProvider.delete('stock_transactions');
-        await dbProvider.delete('purchases');
-        await dbProvider.delete('purchase_items');
-        await dbProvider.delete('day_sessions');
-        await dbProvider.delete('tables');
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('All data has been reset'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
-          );
-        }
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('App data cleared successfully'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 

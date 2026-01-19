@@ -551,25 +551,23 @@ class DatabaseProvider with ChangeNotifier {
       }
 
       // Default Settings
-      await txn.insert('settings',
-          {'key': 'cafe_name', 'value': 'चिया गढी', 'updated_at': now});
-      await txn.insert('settings',
-          {'key': 'cafe_name_en', 'value': 'Chiya Gadhi', 'updated_at': now});
-      await txn.insert('settings',
-          {'key': 'cafe_address', 'value': 'Nepal', 'updated_at': now});
-      await txn.insert('settings', {
-        'key': 'tax_percent',
-        'value': '13',
-        'updated_at': now
-      }); // VAT percentage (stored as tax_percent for compatibility)
-      await txn.insert(
-          'settings', {'key': 'currency', 'value': 'NPR', 'updated_at': now});
-      await txn.insert('settings',
-          {'key': 'discount_enabled', 'value': '1', 'updated_at': now});
-      await txn.insert('settings',
-          {'key': 'default_discount_percent', 'value': '0', 'updated_at': now});
-      await txn.insert('settings',
-          {'key': 'max_discount_percent', 'value': '50', 'updated_at': now});
+      // Use INSERT OR IGNORE so we don't overwrite existing settings.
+      Future<void> insertSettingIfMissing(String key, String value) async {
+        await txn.rawInsert(
+          'INSERT OR IGNORE INTO settings(key, value, updated_at) VALUES(?, ?, ?)',
+          [key, value, now],
+        );
+      }
+
+      await insertSettingIfMissing('cafe_name', 'चिया गढी');
+      await insertSettingIfMissing('cafe_name_en', 'Chiya Gadhi');
+      await insertSettingIfMissing('cafe_address', 'Nepal');
+      // VAT percentage (stored as tax_percent for compatibility)
+      await insertSettingIfMissing('tax_percent', '13');
+      await insertSettingIfMissing('currency', 'NPR');
+      await insertSettingIfMissing('discount_enabled', '1');
+      await insertSettingIfMissing('default_discount_percent', '0');
+      await insertSettingIfMissing('max_discount_percent', '50');
 
       debugPrint('Database: Default tea café data initialized successfully');
     } catch (e) {
@@ -905,6 +903,58 @@ CREATE TABLE IF NOT EXISTS expenses (
         rethrow;
       }
     }
+  }
+
+  /// Clears only the business data created through the app, keeping `users` and
+  /// `settings` intact. Optionally reseeds default categories/products.
+  Future<void> clearBusinessData({bool seedDefaults = true}) async {
+    if (kIsWeb) {
+      throw UnsupportedError('SQLite is not supported on web.');
+    }
+    final db = await database;
+    await db.transaction((txn) async {
+      // Delete in foreign-key-safe order (children before parents).
+      const tablesToClear = <String>[
+        // Purchases
+        'purchase_payments',
+        'purchase_items',
+        'purchases',
+
+        // Customer credit
+        'credit_transactions',
+
+        // Sales / orders
+        'payments',
+        'order_items',
+        'orders',
+
+        // Stock / inventory
+        'inventory_ledger',
+        'stock_transactions',
+        'inventory',
+
+        // Master data
+        'products',
+        'categories',
+        'customers',
+        'suppliers',
+        'expenses',
+        'tables',
+
+        // Operational / logs
+        'day_sessions',
+        'audit_log',
+        'sync_queue',
+      ];
+
+      for (final table in tablesToClear) {
+        await txn.delete(table);
+      }
+
+      if (seedDefaults) {
+        await _initializeDefaultData(txn);
+      }
+    });
   }
 
   // Generic query methods

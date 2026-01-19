@@ -122,6 +122,18 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     return await _provider.resetDatabase();
   }
 
+  /// Clears business data created/entered through the app while keeping
+  /// authentication/users and settings intact.
+  ///
+  /// On SQLite (mobile), this also optionally reseeds default categories/products.
+  /// On Firestore (web), deletion is performed in safe batches.
+  Future<void> clearBusinessData({bool seedDefaults = true}) async {
+    if (!_isInitialized) {
+      await init();
+    }
+    return await _provider.clearBusinessData(seedDefaults: seedDefaults);
+  }
+
   Future<void> close() async {
     if (_isInitialized) {
       await _provider.close();
