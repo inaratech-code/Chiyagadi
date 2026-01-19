@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/unified_database_provider.dart';
 import '../models/inventory_ledger_model.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 /// Inventory Ledger Service
 ///
@@ -67,47 +66,25 @@ class InventoryLedgerService {
 
       if (productIds.isEmpty) return stockMap;
 
-      // Get all ledger entries for these products
-      // For Firestore, we need to query differently
-      if (kIsWeb) {
-        // Firestore: Query each product separately (or use batch query if supported)
-        for (final productId in productIds) {
-          final ledgerEntries = await dbProvider.query(
-            'inventory_ledger',
-            where: 'product_id = ?',
-            whereArgs: [productId],
-          );
+      // Get all ledger entries for these products.
+      // With Firestore `IN (...)` support, we can use the same approach on web and mobile.
+      final placeholders = List.filled(productIds.length, '?').join(',');
+      final ledgerEntries = await dbProvider.query(
+        'inventory_ledger',
+        where: 'product_id IN ($placeholders)',
+        whereArgs: productIds,
+      );
 
-          double totalIn = 0.0;
-          double totalOut = 0.0;
-
-          for (final entry in ledgerEntries) {
-            totalIn += (entry['quantity_in'] as num?)?.toDouble() ?? 0.0;
-            totalOut += (entry['quantity_out'] as num?)?.toDouble() ?? 0.0;
-          }
-
-          stockMap[productId] = totalIn - totalOut;
+      // Group by product_id and calculate
+      for (final entry in ledgerEntries) {
+        final productId = entry['product_id'];
+        if (!stockMap.containsKey(productId)) {
+          stockMap[productId] = 0.0;
         }
-      } else {
-        // SQLite: Can use IN clause
-        final placeholders = List.filled(productIds.length, '?').join(',');
-        final ledgerEntries = await dbProvider.query(
-          'inventory_ledger',
-          where: 'product_id IN ($placeholders)',
-          whereArgs: productIds,
-        );
 
-        // Group by product_id and calculate
-        for (final entry in ledgerEntries) {
-          final productId = entry['product_id'];
-          if (!stockMap.containsKey(productId)) {
-            stockMap[productId] = 0.0;
-          }
-
-          stockMap[productId] = (stockMap[productId] ?? 0.0) +
-              ((entry['quantity_in'] as num?)?.toDouble() ?? 0.0) -
-              ((entry['quantity_out'] as num?)?.toDouble() ?? 0.0);
-        }
+        stockMap[productId] = (stockMap[productId] ?? 0.0) +
+            ((entry['quantity_in'] as num?)?.toDouble() ?? 0.0) -
+            ((entry['quantity_out'] as num?)?.toDouble() ?? 0.0);
       }
 
       return stockMap;

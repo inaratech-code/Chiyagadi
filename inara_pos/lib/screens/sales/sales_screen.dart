@@ -61,47 +61,46 @@ class _SalesScreenState extends State<SalesScreen> {
         );
       }
 
-      // Load order items and products for each sale
-      for (var sale in _sales) {
-        final orderId = sale['id'];
-        final items = await dbProvider.query(
+      // PERF: Batch load all order_items for these orders (avoids N+1 queries).
+      final orderIds = _sales.map((s) => s['id']).where((id) => id != null).toList();
+      if (orderIds.isNotEmpty) {
+        final placeholders = List.filled(orderIds.length, '?').join(',');
+        final allItems = await dbProvider.query(
           'order_items',
-          where: 'order_id = ?',
-          whereArgs: [orderId],
+          where: 'order_id IN ($placeholders)',
+          whereArgs: orderIds,
         );
-        sale['items'] = items;
 
-        // Load product details for each item
-        final productIds =
-            items.map((item) => item['product_id']).toSet().toList();
+        // Group items by order_id
+        final itemsByOrderId = <dynamic, List<Map<String, dynamic>>>{};
+        for (final item in allItems) {
+          final oid = item['order_id'];
+          (itemsByOrderId[oid] ??= []).add(item);
+        }
+
+        // Attach items to each sale
+        for (final sale in _sales) {
+          final oid = sale['id'];
+          sale['items'] = itemsByOrderId[oid] ?? <Map<String, dynamic>>[];
+        }
+
+        // PERF: Batch load all products used by these order items.
+        final productIds = allItems
+            .map((i) => i['product_id'])
+            .where((id) => id != null)
+            .toSet()
+            .toList();
         if (productIds.isNotEmpty) {
-          if (kIsWeb) {
-            // Firestore wrapper doesn't support IN(...) queries. Fetch by doc id one-by-one.
-            final productMap = <dynamic, Map<String, dynamic>>{};
-            for (final pid in productIds) {
-              if (pid == null) continue;
-              try {
-                final rows = await dbProvider.query(
-                  'products',
-                  where: 'id = ?',
-                  whereArgs: [pid.toString()],
-                );
-                if (rows.isNotEmpty) {
-                  final p = rows.first;
-                  productMap[p['id']] = p;
-                }
-              } catch (_) {
-                // Ignore missing products
-              }
-            }
-            sale['products'] = productMap;
-          } else {
-            final products = await dbProvider.query(
-              'products',
-              where: 'id IN (${List.filled(productIds.length, '?').join(',')})',
-              whereArgs: productIds,
-            );
-            final productMap = {for (var p in products) p['id']: p};
+          final pPlaceholders = List.filled(productIds.length, '?').join(',');
+          final products = await dbProvider.query(
+            'products',
+            where: 'id IN ($pPlaceholders)',
+            whereArgs: productIds.map((e) => e.toString()).toList(),
+          );
+          final productMap = {for (final p in products) p['id']: p};
+
+          // Attach product map to each sale for quick lookup in UI.
+          for (final sale in _sales) {
             sale['products'] = productMap;
           }
         }

@@ -33,6 +33,24 @@ class _MenuScreenState extends State<MenuScreen> {
     return chiyagaadiImageAssetForName(name);
   }
 
+  dynamic _categoryIdForName(String categoryName) {
+    final target = _normalizeNameKey(categoryName);
+    for (final c in _categories) {
+      if (_normalizeNameKey(c.name) == target) {
+        return _getCategoryIdentifier(c);
+      }
+    }
+    return null;
+  }
+
+  Color _categoryColorForName(String categoryName) {
+    final key = _normalizeNameKey(categoryName);
+    if (key == _normalizeNameKey('Smokes')) return const Color(0xFF424242);
+    if (key == _normalizeNameKey('Drinks')) return const Color(0xFF1976D2);
+    // default accent for other categories
+    return AppTheme.logoPrimary;
+  }
+
   Widget _buildProductImage(String? imageUrl, String name) {
     final effectiveUrl =
         (imageUrl == null || imageUrl.trim().isEmpty) ? _defaultMenuImageForName(name) : imageUrl.trim();
@@ -513,24 +531,16 @@ class _MenuScreenState extends State<MenuScreen> {
                   children: [
                     Row(
                       children: [
-                        // compact veg/non-veg indicator
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: product.isVeg
-                                ? AppTheme.successColor
-                                : AppTheme.errorColor,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          product.isVeg ? 'Veg' : 'Non-veg',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[800],
+                        // Single indicator (category color only)
+                        Tooltip(
+                          message: category.name,
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: _categoryColorForName(category.name),
+                              shape: BoxShape.circle,
+                            ),
                           ),
                         ),
                         if (!product.isActive) ...[
@@ -552,21 +562,6 @@ class _MenuScreenState extends State<MenuScreen> {
                             ),
                           ),
                         ],
-                        const Spacer(),
-                        // category as subtle hint (clean)
-                        Flexible(
-                          child: Text(
-                            category.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.right,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -1045,6 +1040,96 @@ class _MenuScreenState extends State<MenuScreen> {
                       const Text('Available'),
                     ],
                   ),
+                  const SizedBox(height: 10),
+
+                  // Quick category toggles (Smokes / Drinks) – checkbox + color only
+                  Row(
+                    children: [
+                      Tooltip(
+                        message: 'Smokes',
+                        child: Row(
+                          children: [
+                            Checkbox(
+                              value: selectedCategoryId?.toString() ==
+                                  _categoryIdForName('Smokes')?.toString(),
+                              onChanged: (v) {
+                                final smokesId = _categoryIdForName('Smokes');
+                                if (smokesId == null) return;
+                                setDialogState(() {
+                                  if (v == true) {
+                                    selectedCategoryId = smokesId;
+                                  } else {
+                                    selectedCategoryId =
+                                        _getCategoryIdentifier(_categories.first);
+                                  }
+                                });
+                              },
+                            ),
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: _categoryColorForName('Smokes'),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'SM',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.grey[700],
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 18),
+                      Tooltip(
+                        message: 'Drinks',
+                        child: Row(
+                          children: [
+                            Checkbox(
+                              value: selectedCategoryId?.toString() ==
+                                  _categoryIdForName('Drinks')?.toString(),
+                              onChanged: (v) {
+                                final drinksId = _categoryIdForName('Drinks');
+                                if (drinksId == null) return;
+                                setDialogState(() {
+                                  if (v == true) {
+                                    selectedCategoryId = drinksId;
+                                  } else {
+                                    selectedCategoryId =
+                                        _getCategoryIdentifier(_categories.first);
+                                  }
+                                });
+                              },
+                            ),
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: _categoryColorForName('Drinks'),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'DR',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.grey[700],
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
 
                   const SizedBox(height: 24),
 
@@ -1457,6 +1542,96 @@ class _MenuScreenState extends State<MenuScreen> {
                         },
                       ),
                       const Text('Available'),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Quick category toggles (Smokes / Drinks) – checkbox + color only
+                  Row(
+                    children: [
+                      Tooltip(
+                        message: 'Smokes',
+                        child: Row(
+                          children: [
+                            Checkbox(
+                              value: selectedCategoryId?.toString() ==
+                                  _categoryIdForName('Smokes')?.toString(),
+                              onChanged: (v) {
+                                final smokesId = _categoryIdForName('Smokes');
+                                if (smokesId == null) return;
+                                setDialogState(() {
+                                  if (v == true) {
+                                    selectedCategoryId = smokesId;
+                                  } else {
+                                    selectedCategoryId =
+                                        _getCategoryIdentifier(_categories.first);
+                                  }
+                                });
+                              },
+                            ),
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: _categoryColorForName('Smokes'),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'SM',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.grey[700],
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 18),
+                      Tooltip(
+                        message: 'Drinks',
+                        child: Row(
+                          children: [
+                            Checkbox(
+                              value: selectedCategoryId?.toString() ==
+                                  _categoryIdForName('Drinks')?.toString(),
+                              onChanged: (v) {
+                                final drinksId = _categoryIdForName('Drinks');
+                                if (drinksId == null) return;
+                                setDialogState(() {
+                                  if (v == true) {
+                                    selectedCategoryId = drinksId;
+                                  } else {
+                                    selectedCategoryId =
+                                        _getCategoryIdentifier(_categories.first);
+                                  }
+                                });
+                              },
+                            ),
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: _categoryColorForName('Drinks'),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'DR',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.grey[700],
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
 

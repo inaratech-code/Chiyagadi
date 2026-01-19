@@ -265,6 +265,23 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         return [data];
       }
 
+      // Optimize: support SQL-style `IN (...)` clauses by translating them to Firestore `whereIn`
+      // (chunked to respect Firestore limits). This avoids N+1 queries on web.
+      if (where != null &&
+          whereArgs != null &&
+          where.toUpperCase().contains(' IN (') &&
+          whereArgs.isNotEmpty) {
+        final rows = await _queryWithWhereIn(
+          collection: collection,
+          where: where,
+          whereArgs: whereArgs,
+          orderBy: orderBy,
+          limit: limit,
+          offset: offset,
+        );
+        return rows;
+      }
+
       Query query = firestore.collection(collection);
 
       // Apply where clause
@@ -272,20 +289,25 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         // Simple where clause parser for common cases
         // Format: "field = ?" or "field1 = ? AND field2 = ?"
         final conditions = where.split(' AND ');
-        for (var i = 0; i < conditions.length && i < whereArgs.length; i++) {
+        var argIndex = 0;
+        for (var i = 0; i < conditions.length && argIndex < whereArgs.length; i++) {
           final condition = conditions[i].trim();
           if (condition.contains(' = ?')) {
             final field = condition.split(' = ?')[0].trim();
-            query = query.where(field, isEqualTo: whereArgs[i]);
+            query = query.where(field, isEqualTo: whereArgs[argIndex]);
+            argIndex++;
           } else if (condition.contains(' != ?')) {
             final field = condition.split(' != ?')[0].trim();
-            query = query.where(field, isNotEqualTo: whereArgs[i]);
+            query = query.where(field, isNotEqualTo: whereArgs[argIndex]);
+            argIndex++;
           } else if (condition.contains(' > ?')) {
             final field = condition.split(' > ?')[0].trim();
-            query = query.where(field, isGreaterThan: whereArgs[i]);
+            query = query.where(field, isGreaterThan: whereArgs[argIndex]);
+            argIndex++;
           } else if (condition.contains(' < ?')) {
             final field = condition.split(' < ?')[0].trim();
-            query = query.where(field, isLessThan: whereArgs[i]);
+            query = query.where(field, isLessThan: whereArgs[argIndex]);
+            argIndex++;
           }
         }
       }
@@ -336,29 +358,50 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       }
 
       try {
+        // For IN queries, avoid server-side ordering (often requires composite indexes).
+        // We already have a safe chunked implementation + in-memory sorting.
+        if (where != null &&
+            whereArgs != null &&
+            where.toUpperCase().contains(' IN (') &&
+            whereArgs.isNotEmpty) {
+          return await _queryWithWhereIn(
+            collection: collection,
+            where: where,
+            whereArgs: whereArgs,
+            orderBy: orderBy,
+            limit: limit,
+            offset: offset,
+          );
+        }
+
         Query fallbackQuery = firestore.collection(collection);
 
         // Apply the same where clause (but no orderBy)
         if (where != null && whereArgs != null && whereArgs.isNotEmpty) {
           final conditions = where.split(' AND ');
-          for (var i = 0; i < conditions.length && i < whereArgs.length; i++) {
+          var argIndex = 0;
+          for (var i = 0; i < conditions.length && argIndex < whereArgs.length; i++) {
             final condition = conditions[i].trim();
             if (condition.contains(' = ?')) {
               final field = condition.split(' = ?')[0].trim();
               fallbackQuery =
-                  fallbackQuery.where(field, isEqualTo: whereArgs[i]);
+                  fallbackQuery.where(field, isEqualTo: whereArgs[argIndex]);
+              argIndex++;
             } else if (condition.contains(' != ?')) {
               final field = condition.split(' != ?')[0].trim();
               fallbackQuery =
-                  fallbackQuery.where(field, isNotEqualTo: whereArgs[i]);
+                  fallbackQuery.where(field, isNotEqualTo: whereArgs[argIndex]);
+              argIndex++;
             } else if (condition.contains(' > ?')) {
               final field = condition.split(' > ?')[0].trim();
               fallbackQuery =
-                  fallbackQuery.where(field, isGreaterThan: whereArgs[i]);
+                  fallbackQuery.where(field, isGreaterThan: whereArgs[argIndex]);
+              argIndex++;
             } else if (condition.contains(' < ?')) {
               final field = condition.split(' < ?')[0].trim();
               fallbackQuery =
-                  fallbackQuery.where(field, isLessThan: whereArgs[i]);
+                  fallbackQuery.where(field, isLessThan: whereArgs[argIndex]);
+              argIndex++;
             }
           }
         }
@@ -385,6 +428,136 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       debugPrint('FirestoreDatabase: Query error: $e');
       rethrow;
     }
+  }
+
+  Future<List<Map<String, dynamic>>> _queryWithWhereIn({
+    required String collection,
+    required String where,
+    required List<Object?> whereArgs,
+    String? orderBy,
+    int? limit,
+    int? offset,
+  }) async {
+    // Parse conditions: support ONE `IN (...)` plus other simple comparisons joined by AND.
+    final conditions = where.split(' AND ').map((s) => s.trim()).toList();
+    String? inField;
+    List<Object?> inValues = const [];
+    final other = <({String field, String op, Object? value})>[];
+
+    var argIndex = 0;
+    final inRe = RegExp(r'^(\w+)\s+IN\s*\(([^)]*)\)$', caseSensitive: false);
+
+    for (final cond in conditions) {
+      final m = inRe.firstMatch(cond);
+      if (m != null) {
+        // Count placeholders
+        final placeholderCount = RegExp(r'\?').allMatches(m.group(2) ?? '').length;
+        inField = (m.group(1) ?? '').trim();
+        final end = (argIndex + placeholderCount).clamp(0, whereArgs.length);
+        inValues = whereArgs.sublist(argIndex, end);
+        argIndex = end;
+        continue;
+      }
+
+      if (cond.contains(' = ?')) {
+        final field = cond.split(' = ?')[0].trim();
+        if (argIndex < whereArgs.length) {
+          other.add((field: field, op: '=', value: whereArgs[argIndex]));
+          argIndex++;
+        }
+      } else if (cond.contains(' != ?')) {
+        final field = cond.split(' != ?')[0].trim();
+        if (argIndex < whereArgs.length) {
+          other.add((field: field, op: '!=', value: whereArgs[argIndex]));
+          argIndex++;
+        }
+      } else if (cond.contains(' > ?')) {
+        final field = cond.split(' > ?')[0].trim();
+        if (argIndex < whereArgs.length) {
+          other.add((field: field, op: '>', value: whereArgs[argIndex]));
+          argIndex++;
+        }
+      } else if (cond.contains(' < ?')) {
+        final field = cond.split(' < ?')[0].trim();
+        if (argIndex < whereArgs.length) {
+          other.add((field: field, op: '<', value: whereArgs[argIndex]));
+          argIndex++;
+        }
+      }
+    }
+
+    if (inField == null || inField.isEmpty || inValues.isEmpty) {
+      // Fall back to normal query path if parsing fails.
+      return await query(
+        collection,
+        where: where,
+        whereArgs: whereArgs,
+        orderBy: orderBy,
+        limit: limit,
+        offset: offset,
+      );
+    }
+
+    // Firestore limits whereIn to 10 values.
+    final chunks = <List<Object?>>[];
+    for (var i = 0; i < inValues.length; i += 10) {
+      chunks.add(inValues.sublist(i, (i + 10).clamp(0, inValues.length)));
+    }
+
+    Query buildBase() {
+      Query q = firestore.collection(collection);
+      for (final p in other) {
+        if (p.op == '=') {
+          q = q.where(p.field, isEqualTo: p.value);
+        } else if (p.op == '!=') {
+          q = q.where(p.field, isNotEqualTo: p.value);
+        } else if (p.op == '>') {
+          q = q.where(p.field, isGreaterThan: p.value);
+        } else if (p.op == '<') {
+          q = q.where(p.field, isLessThan: p.value);
+        }
+      }
+      return q;
+    }
+
+    Future<List<QueryDocumentSnapshot>> runChunk(List<Object?> vals) async {
+      Query q = buildBase();
+      final isDocIdField =
+          inField == 'id' || inField == 'documentId' || inField == 'document_id';
+      if (isDocIdField) {
+        q = q.where(FieldPath.documentId, whereIn: vals);
+      } else {
+        q = q.where(inField!, whereIn: vals);
+      }
+
+      // Avoid applying orderBy server-side here to reduce index requirements;
+      // sort in-memory below if requested.
+      final snap = await q.get();
+      return snap.docs;
+    }
+
+    final docsById = <String, Map<String, dynamic>>{};
+    final docLists = await Future.wait(chunks.map(runChunk));
+    for (final docs in docLists) {
+      for (final doc in docs) {
+        final data = (doc.data() as Map<String, dynamic>);
+        data['id'] = doc.id;
+        docsById[doc.id] = data;
+      }
+    }
+
+    final rows = docsById.values.toList();
+    if (orderBy != null) {
+      _sortRowsInMemory(rows, orderBy);
+    }
+
+    // Apply offset/limit in-memory
+    final start = (offset ?? 0).clamp(0, rows.length);
+    final sliced = rows.skip(start);
+    if (limit != null) {
+      return sliced.take(limit).toList();
+    }
+    return sliced.toList();
   }
 
   static void _sortRowsInMemory(
