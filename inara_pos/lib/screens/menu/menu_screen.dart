@@ -659,7 +659,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                   left: 8,
                                   right: 8,
                                   top: 8,
-                                  bottom: kIsWeb ? 8 : 100, // Extra bottom padding on mobile to prevent FAB overlap
+                                  bottom: kIsWeb ? 8 : 120, // Increased bottom padding on mobile to prevent FAB overlap
                                 ),
                                 itemCount: _productsByCategory.length,
                                 itemBuilder: (context, categoryIndex) {
@@ -733,11 +733,11 @@ class _MenuScreenState extends State<MenuScreen> {
                                             if (width < 1200) return 5; // Desktop: 5 columns
                                             return 6; // Large desktop: 6 columns
                                           }(),
-                                          // UPDATED: Aspect ratio optimized for 3-column layout with blue action bar
+                                          // UPDATED: Aspect ratio optimized for 3-column layout with action bar - increased to prevent overlap
                                           childAspectRatio: () {
                                             final width = MediaQuery.of(context).size.width;
-                                            if (!kIsWeb && width < 900) return 0.75; // Mobile (Android/iOS): optimized for 3 columns
-                                            if (width < 600) return 0.75; // Mobile web: optimized for 3 columns
+                                            if (!kIsWeb && width < 900) return 0.72; // Mobile (Android/iOS): slightly taller to prevent overlap
+                                            if (width < 600) return 0.72; // Mobile web: slightly taller to prevent overlap
                                             return 0.80; // Web/Tablet: taller cards
                                           }(),
                                           crossAxisSpacing: 8,
@@ -750,7 +750,8 @@ class _MenuScreenState extends State<MenuScreen> {
                                           return _buildProductCard(product);
                                         },
                                       ),
-                                      const SizedBox(height: 16),
+                                      // Increased spacing between categories to prevent overlap
+                                      SizedBox(height: !kIsWeb ? 24 : 16),
                                     ],
                                   );
                                 },
@@ -857,7 +858,8 @@ class _MenuScreenState extends State<MenuScreen> {
           if (_activeOrderId != null || _isOrderMode(auth)) {
             return Padding(
               padding: EdgeInsets.only(
-                bottom: !kIsWeb ? 16 : 0, // Extra bottom padding on mobile to avoid overlap
+                bottom: !kIsWeb ? 80 : 0, // Extra bottom padding on mobile to avoid overlap with bottom nav
+                right: !kIsWeb ? 8 : 0, // Slight right padding to avoid edge overlap
               ),
               child: FloatingActionButton.extended(
                 onPressed: _isAddingToOrder
@@ -920,7 +922,8 @@ class _MenuScreenState extends State<MenuScreen> {
           // Admin: keep existing menu management
           return Padding(
             padding: EdgeInsets.only(
-              bottom: !kIsWeb ? 16 : 0, // Extra bottom padding on mobile to avoid overlap
+              bottom: !kIsWeb ? 80 : 0, // Extra bottom padding on mobile to avoid overlap with bottom nav
+              right: !kIsWeb ? 8 : 0, // Slight right padding to avoid edge overlap
             ),
             child: FloatingActionButton.extended(
               onPressed: () => _showAddProductDialog(),
