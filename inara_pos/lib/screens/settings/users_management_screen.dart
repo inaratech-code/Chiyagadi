@@ -18,7 +18,8 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUsers();
+    // PERF: Let the screen render first.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadUsers());
   }
 
   Future<void> _loadUsers() async {

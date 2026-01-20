@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart'
     show kIsWeb, ChangeNotifier, debugPrint;
+import 'package:firebase_core/firebase_core.dart';
 import 'database_provider.dart';
 import 'firestore_database_provider.dart';
+import '../firebase_options.dart';
 
 /// Unified database provider that uses SQLite on mobile and Firestore on web
 class UnifiedDatabaseProvider with ChangeNotifier {
@@ -24,6 +26,21 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     }
 
     try {
+      // Ensure Firebase is initialized before any Firestore access (web).
+      if (kIsWeb) {
+        try {
+          if (Firebase.apps.isEmpty) {
+            await Firebase.initializeApp(
+              options: DefaultFirebaseOptions.currentPlatform,
+            );
+            debugPrint('UnifiedDatabase: Firebase initialized (web)');
+          }
+        } catch (e) {
+          debugPrint('UnifiedDatabase: Firebase init failed (web): $e');
+          rethrow;
+        }
+      }
+
       await _provider.init();
       _isInitialized = true;
       debugPrint('UnifiedDatabase: Initialized successfully');

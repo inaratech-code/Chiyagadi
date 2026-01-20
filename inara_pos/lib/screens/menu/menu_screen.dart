@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../providers/unified_database_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../models/category.dart';
 import '../../models/product.dart';
+import '../../services/order_service.dart';
+import '../../widgets/order_overlay_widget.dart';
 import '../../utils/theme.dart';
-import '../../utils/chiyagaadi_menu_seed.dart';
-import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io' as io;
 
@@ -25,12 +26,92 @@ class _MenuScreenState extends State<MenuScreen> {
   bool _isLoading = true;
   String _searchQuery = '';
 
+  // NEW: Quick order flow (cashier-friendly)
+  final OrderService _orderService = OrderService();
+  dynamic _activeOrderId;
+  String? _activeOrderNumber;
+  bool _isAddingToOrder = false;
+  bool _showOrderOverlay = false; // UPDATED: Track overlay visibility
+  int _overlayRefreshKey = 0; // UPDATED: Force overlay refresh
+
+  // NEW: Delete menu item (soft delete)
+  //
+  // SECURITY/DATA INTEGRITY:
+  // We intentionally do NOT hard-delete products because historical orders may reference them.
+  // Instead we mark the product inactive + not sellable, which removes it from the menu.
+  Future<void> _deleteMenuItem(Product product) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (!auth.isAdmin) return;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete menu item?'),
+        content: Text(
+            'Delete "${product.name}"?\n\nThis will hide it from the menu.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    try {
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      await dbProvider.init();
+      final now = DateTime.now().millisecondsSinceEpoch;
+
+      final where = kIsWeb ? 'documentId = ?' : 'id = ?';
+      final id = kIsWeb ? product.documentId : product.id;
+      if (id == null) throw Exception('Missing product id');
+
+      await dbProvider.update(
+        'products',
+        values: {
+          'is_active': 0,
+          'is_sellable': 0,
+          'updated_at': now,
+        },
+        where: where,
+        whereArgs: [id],
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _products.removeWhere((p) {
+          final pid = kIsWeb ? p.documentId : p.id;
+          return pid?.toString() == id.toString();
+        });
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Menu item deleted')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Delete failed: $e')),
+      );
+    }
+  }
+
   String _normalizeNameKey(String s) {
     return s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
   }
 
   String _defaultMenuImageForName(String name) {
-    return chiyagaadiImageAssetForName(name);
+    // PERF/WEB: The repo doesn't ship all per-item images yet (assets/images/menu/*).
+    // Using missing assets triggers repeated 404 fetches while scrolling.
+    // Use a single known-good asset so image decoding is cached and scrolling stays smooth.
+    return 'assets/images/logo.jpeg';
   }
 
   dynamic _categoryIdForName(String categoryName) {
@@ -52,9 +133,20 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Widget _buildProductImage(String? imageUrl, String name) {
-    final effectiveUrl = (imageUrl == null || imageUrl.trim().isEmpty)
+    final rawUrl = (imageUrl ?? '').trim();
+    // UPDATED (perf/web): The repo does not ship per-item menu images under
+    // `assets/images/menu/*` yet. Many seeded products have image_url pointing
+    // there, which causes repeated 404 fetches on Flutter Web while scrolling.
+    // Treat those paths as missing and fall back to a stable asset.
+    final safeUrl = (kIsWeb &&
+            (rawUrl.startsWith('assets/images/menu/') ||
+                rawUrl.startsWith('assets/assets/images/menu/')))
+        ? ''
+        : rawUrl;
+
+    final effectiveUrl = safeUrl.isEmpty
         ? _defaultMenuImageForName(name)
-        : imageUrl.trim();
+        : safeUrl;
 
     Widget fallback() => const Icon(Icons.image, size: 40, color: Colors.grey);
 
@@ -93,7 +185,159 @@ class _MenuScreenState extends State<MenuScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    // PERF: Let the screen render first.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
+      _loadActiveOrder(); // Load active order for cashiers
+    });
+  }
+
+  bool _isOrderMode(AuthProvider auth) {
+    // NEW: Cashier uses Menu as ordering surface (admin keeps menu management).
+    return !auth.isAdmin;
+  }
+
+  Future<void> _loadActiveOrder() async {
+    try {
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      await dbProvider.init();
+
+      // UPDATED: Query by status only, filter order_type in-memory to avoid Firestore composite index
+      final orders = await dbProvider.query(
+        'orders',
+        where: 'status = ?',
+        whereArgs: ['pending'],
+        orderBy: 'created_at DESC',
+        limit: 50, // Get recent pending orders, filter in-memory
+      );
+
+      // Filter for dine_in orders in-memory
+      final dineInOrders = orders.where((o) => o['order_type'] == 'dine_in').toList();
+
+      if (dineInOrders.isNotEmpty) {
+        final order = dineInOrders.first; // Most recent dine_in pending order
+        // UPDATED: Firestore query returns 'id' field (not 'documentId'), use 'id' for both web and mobile
+        // Debug: Check all possible ID fields
+        debugPrint('MenuScreen: Order keys: ${order.keys.toList()}');
+        debugPrint('MenuScreen: Order id field: ${order['id']}, documentId field: ${order['documentId']}');
+        _activeOrderId = order['id'] ?? order['documentId'];
+        _activeOrderNumber = order['order_number'] as String?;
+        debugPrint('MenuScreen: Loaded active order - ID: $_activeOrderId, Number: $_activeOrderNumber');
+      } else {
+        _activeOrderId = null;
+        _activeOrderNumber = null;
+        debugPrint('MenuScreen: No active order found');
+      }
+    } catch (e) {
+      debugPrint('MenuScreen: Error loading active order: $e');
+      // Ignore errors but log them
+    }
+  }
+
+  Future<void> _addToOrder(Product product) async {
+    if (_isAddingToOrder) {
+      debugPrint('Already adding item, skipping...');
+      return;
+    }
+    debugPrint('Adding ${product.name} to order...');
+    setState(() => _isAddingToOrder = true);
+
+    try {
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      await dbProvider.init();
+
+      // UPDATED: Try to load active order first, but if query fails, we'll create a new one
+      // The query might fail due to Firestore index issues, so we handle that gracefully
+      try {
+        await _loadActiveOrder();
+      } catch (e) {
+        debugPrint('MenuScreen: Error loading active order (will create new if needed): $e');
+        // Continue - we'll create a new order if _activeOrderId is still null
+      }
+
+      // Ensure an order exists - create new only if none found
+      if (_activeOrderId == null) {
+        debugPrint('MenuScreen: No active order found, creating new order...');
+        final createdBy = auth.currentUserId != null
+            ? (kIsWeb
+                ? auth.currentUserId!
+                : int.tryParse(auth.currentUserId!))
+            : null;
+
+        _activeOrderId = await _orderService.createOrder(
+          dbProvider: dbProvider,
+          orderType: 'dine_in',
+          createdBy: createdBy,
+        );
+
+        final order = await _orderService.getOrderById(dbProvider, _activeOrderId);
+        _activeOrderNumber = order?.orderNumber ?? 'Order';
+        debugPrint('MenuScreen: Created new order - ID: $_activeOrderId, Number: $_activeOrderNumber');
+        
+        // UPDATED: Store the order ID in state immediately so it persists
+        if (mounted) {
+          setState(() {
+            // State is already updated above, but ensure it's persisted
+          });
+        }
+      } else {
+        debugPrint('MenuScreen: Using existing order - ID: $_activeOrderId');
+      }
+
+      final createdBy = auth.currentUserId != null
+          ? (kIsWeb ? auth.currentUserId! : int.tryParse(auth.currentUserId!))
+          : null;
+
+      await _orderService.addItemToOrder(
+        dbProvider: dbProvider,
+        context: context,
+        orderId: _activeOrderId,
+        product: product,
+        quantity: 1,
+        createdBy: createdBy,
+      );
+
+      if (mounted) {
+        // UPDATED: Don't reload active order - we already have the correct order ID
+        // The order ID is set when creating/loading the order above
+        
+        // UPDATED: Always increment refresh key to ensure overlay shows latest items
+        // Also ensure overlay is shown if items are being added
+        setState(() {
+          _overlayRefreshKey++; // Increment to force overlay refresh
+          // Auto-show overlay when items are added (if not already shown)
+          if (!_showOrderOverlay && _activeOrderId != null) {
+            _showOrderOverlay = true;
+          }
+        });
+        
+        debugPrint('MenuScreen: After adding item - Order ID: $_activeOrderId, Overlay shown: $_showOrderOverlay');
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Added ${product.name}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error adding item to order: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unable to add item: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isAddingToOrder = false);
+    }
   }
 
   Future<void> _loadData() async {
@@ -103,39 +347,48 @@ class _MenuScreenState extends State<MenuScreen> {
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
-      final categoryMaps = await dbProvider.query(
+      // PERF: Categories + products can load in parallel.
+      final categoryFuture = dbProvider.query(
         'categories',
         orderBy: 'display_order ASC',
       );
-      _categories = categoryMaps.map((map) => Category.fromMap(map)).toList();
 
-      // PERF/Web: avoid complex SQL (OR/IS NULL) on Firestore; fetch sellable and sort/filter in memory.
-      List<Map<String, dynamic>> productMaps;
-      if (kIsWeb) {
-        // First try the fast path: explicitly sellable.
-        final sellable = await dbProvider.query(
-          'products',
-          where: 'is_sellable = ?',
-          whereArgs: [1],
-        );
-        if (sellable.isNotEmpty) {
-          productMaps = sellable;
-        } else {
+      final productFuture = () async {
+        // PERF/Web: avoid complex SQL (OR/IS NULL) on Firestore; fetch sellable and sort/filter in memory.
+        if (kIsWeb) {
+          // First try the fast path: explicitly sellable.
+          final sellable = await dbProvider.query(
+            'products',
+            where: 'is_sellable = ?',
+            whereArgs: [1],
+          );
+          if (sellable.isNotEmpty) return sellable;
+
           // Fallback for legacy docs (missing is_sellable): fetch all and filter.
           final all = await dbProvider.query('products');
-          productMaps = all.where((p) {
+          return all.where((p) {
             final v = p['is_sellable'];
             return v == null || v == 1;
           }).toList();
         }
-      } else {
-        productMaps = await dbProvider.query(
+
+        return await dbProvider.query(
           'products',
           where:
               'is_sellable = ? OR (is_sellable IS NULL OR is_sellable = 1)', // SQLite supports this
           whereArgs: [1],
         );
-      }
+      }();
+
+      final results = await Future.wait<List<Map<String, dynamic>>>([
+        categoryFuture,
+        productFuture,
+      ]);
+
+      final categoryMaps = results[0];
+      final productMaps = results[1];
+
+      _categories = categoryMaps.map((map) => Category.fromMap(map)).toList();
       _products = productMaps.map((map) => Product.fromMap(map)).toList();
     } catch (e) {
       debugPrint('Error loading menu data: $e');
@@ -254,7 +507,9 @@ class _MenuScreenState extends State<MenuScreen> {
                 ),
               ],
             ),
-      body: Column(
+      body: Stack(
+        children: [
+          Column(
         children: [
           // Category Section
           Container(
@@ -462,21 +717,20 @@ class _MenuScreenState extends State<MenuScreen> {
                                             horizontal: 8),
                                         gridDelegate:
                                             SliverGridDelegateWithFixedCrossAxisCount(
+                                          // UPDATED: Responsive columns - 3 for mobile, more for web/tablet
                                           crossAxisCount: () {
-                                            final w = MediaQuery.of(context)
-                                                .size
-                                                .width;
-                                            // Smaller, cleaner boxes: increase columns on wide screens.
-                                            // - phones: 2-3
-                                            // - tablets: 4-5
-                                            // - desktop: up to 8
-                                            return (w / 150)
-                                                .floor()
-                                                .clamp(2, 8);
+                                            final width = MediaQuery.of(context).size.width;
+                                            if (width < 600) return 3; // Mobile: 3 columns
+                                            if (width < 900) return 4; // Tablet: 4 columns
+                                            if (width < 1200) return 5; // Desktop: 5 columns
+                                            return 6; // Large desktop: 6 columns
                                           }(),
-                                          childAspectRatio: 0.86,
-                                          crossAxisSpacing: 6,
-                                          mainAxisSpacing: 6,
+                                          // UPDATED: Responsive aspect ratio - taller on web
+                                          childAspectRatio: MediaQuery.of(context).size.width < 600
+                                              ? 0.85 // Mobile: slightly taller
+                                              : 0.75, // Web: taller cards
+                                          crossAxisSpacing: 8,
+                                          mainAxisSpacing: 8,
                                         ),
                                         itemCount: categoryProducts.length,
                                         itemBuilder: (context, productIndex) {
@@ -493,135 +747,277 @@ class _MenuScreenState extends State<MenuScreen> {
                       ),
           ),
         ],
+          ),
+          // UPDATED: Semi-transparent backdrop on left side only (menu area) - allows menu clicks
+          // Responsive: Full screen on mobile, side panel on larger screens
+          if (_showOrderOverlay && _activeOrderId != null)
+            Builder(
+              builder: (context) {
+                final screenWidth = MediaQuery.of(context).size.width;
+                final isMobile = screenWidth < 600;
+                final panelWidth = isMobile ? screenWidth : screenWidth * 0.45;
+                
+                return Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  right: isMobile ? 0 : panelWidth, // Full screen backdrop on mobile
+                  child: IgnorePointer(
+                    // UPDATED: Ignore pointer events so menu items remain fully clickable
+                    ignoring: true,
+                    child: Container(
+                      color: Colors.black.withOpacity(isMobile ? 0.3 : 0.1), // Darker on mobile
+                    ),
+                  ),
+                );
+              },
+            ),
+          // UPDATED: Order overlay as side panel (desktop) or bottom sheet (mobile) - allows menu interaction
+          if (_showOrderOverlay && _activeOrderId != null)
+            Builder(
+              builder: (context) {
+                final screenWidth = MediaQuery.of(context).size.width;
+                final isMobile = screenWidth < 600;
+                final panelWidth = isMobile ? screenWidth : screenWidth * 0.45;
+                
+                if (isMobile) {
+                  // Mobile: Bottom sheet style (takes 70% of screen height)
+                  return Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: MediaQuery.of(context).size.height * 0.7,
+                    child: Material(
+                      elevation: 16,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
+                      ),
+                      color: Colors.white,
+                      child: OrderOverlayWidget(
+                        key: ValueKey('${_activeOrderId}_$_overlayRefreshKey'),
+                        orderId: _activeOrderId,
+                        orderNumber: _activeOrderNumber ?? 'Order',
+                        refreshKey: _overlayRefreshKey,
+                        onClose: () {
+                          setState(() => _showOrderOverlay = false);
+                        },
+                        onOrderUpdated: () async {
+                          await _loadActiveOrder();
+                          if (mounted) setState(() {});
+                        },
+                      ),
+                    ),
+                  );
+                } else {
+                  // Desktop/Tablet: Side panel
+                  return Positioned(
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: panelWidth,
+                    child: Material(
+                      elevation: 8,
+                      color: Colors.white,
+                      child: OrderOverlayWidget(
+                        key: ValueKey('${_activeOrderId}_$_overlayRefreshKey'),
+                        orderId: _activeOrderId,
+                        orderNumber: _activeOrderNumber ?? 'Order',
+                        refreshKey: _overlayRefreshKey,
+                        onClose: () {
+                          setState(() => _showOrderOverlay = false);
+                        },
+                        onOrderUpdated: () async {
+                          await _loadActiveOrder();
+                          if (mounted) setState(() {});
+                        },
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddProductDialog(),
-        backgroundColor: Theme.of(context).primaryColor,
-        icon: const Icon(Icons.add),
-        label: const Text('Add Item'),
+      floatingActionButton: Consumer<AuthProvider>(
+        builder: (context, auth, _) {
+          // UPDATED: Show "View Order" button when there's an active order (for all users)
+          // Cashiers can also create new orders, admins can view existing orders
+          if (_activeOrderId != null || _isOrderMode(auth)) {
+            return FloatingActionButton.extended(
+              onPressed: _isAddingToOrder
+                  ? null
+                  : () async {
+                      // If no active order and user is cashier, create one first
+                      if (_activeOrderId == null && _isOrderMode(auth)) {
+                        try {
+                          final dbProvider =
+                              Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+                          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                          await dbProvider.init();
+
+                          final createdBy = authProvider.currentUserId != null
+                              ? (kIsWeb
+                                  ? authProvider.currentUserId!
+                                  : int.tryParse(authProvider.currentUserId!))
+                              : null;
+
+                          _activeOrderId = await _orderService.createOrder(
+                            dbProvider: dbProvider,
+                            orderType: 'dine_in',
+                            createdBy: createdBy,
+                          );
+
+                          final order = await _orderService.getOrderById(dbProvider, _activeOrderId);
+                          _activeOrderNumber = order?.orderNumber ?? 'Order';
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error creating order: $e')),
+                            );
+                          }
+                          return;
+                        }
+                      }
+
+                      // UPDATED: Load active order before showing overlay to ensure correct order ID
+                      if (_activeOrderId == null) {
+                        await _loadActiveOrder();
+                      }
+                      
+                      // Show overlay if we have an active order
+                      if (mounted && _activeOrderId != null) {
+                        setState(() {
+                          _showOrderOverlay = true;
+                          _overlayRefreshKey++; // Force overlay to reload with latest data
+                        });
+                      }
+                    },
+              backgroundColor: AppTheme.logoPrimary,
+              icon: const Icon(Icons.receipt_long),
+              label: Text(_isAddingToOrder
+                  ? 'Please wait…'
+                  : (_activeOrderId == null ? 'New Order' : 'View Order')),
+            );
+          }
+
+          // Admin: keep existing menu management
+          return FloatingActionButton.extended(
+            onPressed: () => _showAddProductDialog(),
+            backgroundColor: Theme.of(context).primaryColor,
+            icon: const Icon(Icons.add),
+            label: const Text('Add Item'),
+          );
+        },
       ),
     );
   }
 
   Widget _buildProductCard(Product product) {
-    final category = _categories.firstWhere(
-      (c) {
-        final catId = _getCategoryIdentifier(c);
-        // Handle both int and String comparisons
-        if (catId is int && product.categoryId is int) {
-          return catId == product.categoryId;
-        } else if (catId is String && product.categoryId is String) {
-          return catId == product.categoryId;
-        }
-        // Fallback: try converting
-        return catId.toString() == product.categoryId.toString();
-      },
-      orElse: () => Category(
-        name: 'Unknown',
-        createdAt: 0,
-        updatedAt: 0,
-      ),
-    );
-
     return Card(
       elevation: 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => _showEditProductDialog(product),
-        borderRadius: BorderRadius.circular(8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Image
-            SizedBox(
-              height: 72,
-              width: double.infinity,
-              child: DecoratedBox(
-                decoration: BoxDecoration(color: Colors.grey[200]),
-                child: _buildProductImage(product.imageUrl, product.name),
-              ),
-            ),
+      clipBehavior: Clip.none, // UPDATED: Don't clip so edit button is visible
+      child: Stack(
+        children: [
+          InkWell(
+            // UPDATED: Tap to add to order, long-press for admins to edit
+            onTap: () {
+              // Always add menu items to order when clicked
+              _addToOrder(product);
+            },
+            onLongPress: () {
+              // UPDATED: Long-press to edit menu items
+              _showEditProductDialog(product);
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // UPDATED: Responsive image aspect ratio - square on mobile, wider on web
+                AspectRatio(
+                  aspectRatio: MediaQuery.of(context).size.width < 600 ? 1.0 : 1.2,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(color: Colors.grey[200]),
+                    child: _buildProductImage(product.imageUrl, product.name),
+                  ),
+                ),
 
-            // Content
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(6),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+                // UPDATED: Content area - name and price only (centered)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Single indicator (category color only)
-                        Tooltip(
-                          message: category.name,
-                          child: Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: _categoryColorForName(category.name),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                        if (!product.isActive) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[700],
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'OFF',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      product.name,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const Spacer(),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
+                        // UPDATED: Item name (centered, bigger and bolder font)
                         Flexible(
-                          child: Text(
-                            NumberFormat.currency(symbol: 'NPR ')
-                                .format(product.price),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.logoPrimary,
+                          child: Center(
+                            child: Text(
+                              product.name,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.black87,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        // UPDATED: Price (centered, bigger and bolder font)
+                        Text(
+                          'रू${product.price.toStringAsFixed(0)}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.black87,
                           ),
                         ),
                       ],
                     ),
-                  ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // UPDATED: Edit icon button - positioned in top-right corner of card (available for all users)
+          Positioned(
+            top: 4,
+            right: 4,
+            child: Material(
+              elevation: 3,
+              color: Colors.blue,
+              borderRadius: BorderRadius.circular(15),
+              child: InkWell(
+                onTap: () => _showEditProductDialog(product),
+                borderRadius: BorderRadius.circular(15),
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: Colors.blue,
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                  child: const Icon(
+                    Icons.edit,
+                    size: 16,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1298,7 +1694,7 @@ class _MenuScreenState extends State<MenuScreen> {
     bool isActive = product.isActive;
     XFile? selectedImageFile; // Use XFile which works on both platforms
 
-    final result = await showDialog<bool>(
+    final result = await showDialog<String?>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => Dialog(
@@ -1663,15 +2059,24 @@ class _MenuScreenState extends State<MenuScreen> {
 
                   // Buttons
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       TextButton(
-                        onPressed: () => Navigator.pop(context, false),
+                        onPressed: () => Navigator.pop(context, null),
                         child: const Text('Cancel'),
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        // NEW: delete menu item (admin only dialog)
+                        onPressed: () => Navigator.pop(context, 'delete'),
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        label: const Text(
+                          'Delete',
+                          style: TextStyle(color: Colors.red),
+                        ),
                       ),
                       const SizedBox(width: 12),
                       ElevatedButton(
-                        onPressed: () => Navigator.pop(context, true),
+                        onPressed: () => Navigator.pop(context, 'save'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Theme.of(context).primaryColor,
                           foregroundColor: Colors.white,
@@ -1690,7 +2095,12 @@ class _MenuScreenState extends State<MenuScreen> {
       ),
     );
 
-    if (result == true &&
+    if (result == 'delete') {
+      await _deleteMenuItem(product);
+      return;
+    }
+
+    if (result == 'save' &&
         nameController.text.isNotEmpty &&
         priceController.text.isNotEmpty &&
         selectedCategoryId != null &&

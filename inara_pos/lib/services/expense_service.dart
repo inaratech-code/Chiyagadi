@@ -96,6 +96,7 @@ class ExpenseService {
     required BuildContext context,
     int? startMillis,
     int? endMillis,
+    int? limit,
   }) async {
     try {
       final dbProvider =
@@ -114,6 +115,7 @@ class ExpenseService {
         where: where,
         whereArgs: whereArgs,
         orderBy: 'created_at DESC',
+        limit: limit,
       );
 
       return rows.map((m) => Expense.fromMap(m)).toList();

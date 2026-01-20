@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'providers/unified_database_provider.dart';
 import 'providers/sync_provider.dart';
@@ -14,45 +12,23 @@ import 'screens/home/home_screen.dart';
 import 'utils/app_messenger.dart';
 import 'utils/theme.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize Firebase (required for web, optional for mobile)
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    debugPrint('Firebase initialized successfully');
-  } catch (e) {
-    debugPrint('Firebase initialization failed: $e');
-    if (kIsWeb) {
-      debugPrint(
-          'WARNING: Firebase is required for web. Please configure Firebase.');
-      debugPrint('Run: flutterfire configure');
-    }
-  }
-
-  // Initialize database (SQLite for mobile, Firestore for web)
-  try {
-    final databaseProvider = UnifiedDatabaseProvider();
-    await databaseProvider.init();
-    debugPrint('Database initialized successfully');
-  } catch (e) {
-    debugPrint('Database initialization failed: $e');
-    // Continue anyway - some features may not work
-  }
-
-  runApp(const InaraPOSApp());
+  // CRITICAL: Do not block first frame on Firebase/DB init.
+  // We warm these up asynchronously after the UI is on screen.
+  final databaseProvider = UnifiedDatabaseProvider();
+  runApp(InaraPOSApp(databaseProvider: databaseProvider));
 }
 
 class InaraPOSApp extends StatelessWidget {
-  const InaraPOSApp({super.key});
+  final UnifiedDatabaseProvider databaseProvider;
+  const InaraPOSApp({super.key, required this.databaseProvider});
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => UnifiedDatabaseProvider()),
+        ChangeNotifierProvider.value(value: databaseProvider),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(
           create: (_) => AuthProvider(),
@@ -71,7 +47,7 @@ class InaraPOSApp extends StatelessWidget {
             themeMode: themeProvider.themeMode,
             scaffoldMessengerKey: AppMessenger.messengerKey,
             navigatorKey: AppMessenger.navigatorKey,
-            home: const AuthWrapper(),
+            home: const _WarmStart(child: AuthWrapper()),
             routes: {
               '/home': (context) => const HomeScreen(),
             },
@@ -82,6 +58,44 @@ class InaraPOSApp extends StatelessWidget {
   }
 }
 
+/// Starts slow initialization after the first frame so the app shows UI instantly.
+class _WarmStart extends StatefulWidget {
+  final Widget child;
+  const _WarmStart({required this.child});
+
+  @override
+  State<_WarmStart> createState() => _WarmStartState();
+}
+
+class _WarmStartState extends State<_WarmStart> {
+  bool _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+
+    // Run after first frame paint.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Warm up DB (and Firebase on web via UnifiedDatabaseProvider).
+      try {
+        await context.read<UnifiedDatabaseProvider>().init();
+      } catch (e) {
+        debugPrint('WarmStart: DB init failed: $e');
+        if (kIsWeb) {
+          debugPrint(
+              'WarmStart: Firebase/Firestore is required for web. Please configure Firebase.');
+          debugPrint('WarmStart: Run: flutterfire configure');
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 
@@ -89,19 +103,44 @@ class AuthWrapper extends StatefulWidget {
   State<AuthWrapper> createState() => _AuthWrapperState();
 }
 
-class _AuthWrapperState extends State<AuthWrapper> {
+class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkAuth();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // NEW: "Ask password every time" option.
+    // If lockMode == 'always', we lock the app when it goes to background.
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      final auth = context.read<AuthProvider>();
+      if (auth.lockMode == 'always') {
+        auth.logout();
+      }
+    }
   }
 
   Future<void> _checkAuth() async {
     final prefs = await SharedPreferences.getInstance();
     // Check if admin PIN exists (for future use)
     prefs.containsKey('admin_pin');
+
+    // NEW: Load lock mode preference
+    if (mounted) {
+      await context.read<AuthProvider>().loadLockMode();
+    }
 
     setState(() {
       _isLoading = false;

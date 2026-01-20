@@ -25,6 +25,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  static const int _maxAliveScreens = 3;
   final Map<int, GlobalKey> _screenKeys = {
     0: GlobalKey(),
     1: GlobalKey(),
@@ -37,6 +38,12 @@ class _HomeScreenState extends State<HomeScreen> {
     8: GlobalKey(),
     9: GlobalKey(),
   };
+
+  // PERF: Lazily create screens so we don't build/load everything at once.
+  final Map<int, Widget> _screenCache = {};
+  // PERF: Keep a small LRU set of screens mounted offstage so switching tabs
+  // doesn't rebuild/reload and feels instant.
+  final List<int> _alive = <int>[];
 
   final List<String> _screenTitles = [
     'Dashboard',
@@ -51,9 +58,27 @@ class _HomeScreenState extends State<HomeScreen> {
     'Expenses',
   ];
 
-  void _navigateToScreen(int index) {
+  void _navigateToScreen(int index) => _selectIndex(index);
+
+  void _selectIndex(int index) {
+    // NEW: Role-based access control (cashier restrictions)
+    final auth = context.read<AuthProvider>();
+    final isRestrictedForCashier =
+        !auth.isAdmin && (index == 6 || index == 8); // Inventory, Purchases
+    if (isRestrictedForCashier) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Access denied: Admin only'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (index == _selectedIndex && _alive.contains(index)) return;
     setState(() {
       _selectedIndex = index;
+      _ensureAlive(index);
     });
   }
 
@@ -90,22 +115,40 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  List<Widget> get _screens => [
-        _createScreen(0),
-        _createScreen(1),
-        _createScreen(2),
-        _createScreen(3),
-        _createScreen(4),
-        _createScreen(5),
-        _createScreen(6),
-        _createScreen(7),
-        _createScreen(8),
-        _createScreen(9),
-      ];
+  Widget _getScreen(int index) {
+    return _screenCache.putIfAbsent(index, () => _createScreen(index));
+  }
+
+  void _ensureAlive(int index) {
+    // Ensure widget exists
+    _getScreen(index);
+
+    // Update LRU list
+    _alive.remove(index);
+    _alive.add(index);
+
+    // Evict oldest screens (but never evict the currently selected one)
+    while (_alive.length > _maxAliveScreens) {
+      final evict = _alive.first;
+      if (evict == _selectedIndex) {
+        // Move selected to the end and try again
+        _alive.removeAt(0);
+        _alive.add(evict);
+        continue;
+      }
+      _alive.removeAt(0);
+      _screenCache.remove(evict);
+      _screenKeys[evict] = GlobalKey();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
+    // Ensure at least the current screen is alive.
+    if (_alive.isEmpty || !_alive.contains(_selectedIndex)) {
+      _ensureAlive(_selectedIndex);
+    }
 
     // For small screens (including web on phones/PWA), use the compact mobile navigation
     // so we don't render an over-crowded web bottom bar.
@@ -155,13 +198,30 @@ class _HomeScreenState extends State<HomeScreen> {
       drawer: isCompact ? _buildDrawer(context, authProvider) : null,
       body: kIsWeb
           ? ResponsiveWrapper(
-              child: _screens[_selectedIndex],
+              child: _buildOffstageStack(),
               padding: EdgeInsets.zero, // Screens handle their own padding
             )
-          : _screens[_selectedIndex],
+          : _buildOffstageStack(),
       bottomNavigationBar: isCompact
           ? _buildMobileBottomNav(authProvider)
           : _buildWebBottomNav(authProvider),
+    );
+  }
+
+  Widget _buildOffstageStack() {
+    // Keep only a few screens mounted to avoid layout cost explosion.
+    // Offstage keeps state (scroll position, loaded data) while hidden.
+    return Stack(
+      children: [
+        for (final i in _alive)
+          Offstage(
+            offstage: i != _selectedIndex,
+            child: KeyedSubtree(
+              key: ValueKey<int>(i),
+              child: _getScreen(i),
+            ),
+          ),
+      ],
     );
   }
 
@@ -215,9 +275,13 @@ class _HomeScreenState extends State<HomeScreen> {
           _buildDrawerTile(Icons.restaurant_menu, 'Menu', 3),
           _buildDrawerTile(Icons.shopping_cart, 'Sales', 4),
           _buildDrawerTile(Icons.analytics, 'Reports', 5),
-          _buildDrawerTile(Icons.inventory_2, 'Inventory', 6),
+          // UPDATED: Cashier cannot access Inventory
+          if (authProvider.isAdmin)
+            _buildDrawerTile(Icons.inventory_2, 'Inventory', 6),
           _buildDrawerTile(Icons.people, 'Customers', 7),
-          _buildDrawerTile(Icons.shopping_bag, 'Purchases', 8),
+          // UPDATED: Cashier cannot access Purchases
+          if (authProvider.isAdmin)
+            _buildDrawerTile(Icons.shopping_bag, 'Purchases', 8),
           _buildDrawerTile(Icons.payments, 'Expenses', 9),
           const Divider(),
           ListTile(
@@ -255,9 +319,7 @@ class _HomeScreenState extends State<HomeScreen> {
       selected: isSelected,
       onTap: () {
         Navigator.pop(context);
-        setState(() {
-          _selectedIndex = index;
-        });
+        _selectIndex(index);
       },
     );
   }
@@ -302,9 +364,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // Show "More" bottom sheet
           _showMoreOptionsSheet(context, authProvider);
         } else {
-          setState(() {
-            _selectedIndex = selectedIndexFromMobileIndex(index);
-          });
+          _selectIndex(selectedIndexFromMobileIndex(index));
         }
       },
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
@@ -356,9 +416,13 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildMoreOptionTile(context, Icons.table_restaurant, 'Tables', 2),
             _buildMoreOptionTile(context, Icons.shopping_cart, 'Sales', 4),
             _buildMoreOptionTile(context, Icons.analytics, 'Reports', 5),
-            _buildMoreOptionTile(context, Icons.inventory_2, 'Inventory', 6),
+            // UPDATED: Cashier cannot access Inventory
+            if (authProvider.isAdmin)
+              _buildMoreOptionTile(context, Icons.inventory_2, 'Inventory', 6),
             _buildMoreOptionTile(context, Icons.people, 'Customers', 7),
-            _buildMoreOptionTile(context, Icons.shopping_bag, 'Purchases', 8),
+            // UPDATED: Cashier cannot access Purchases
+            if (authProvider.isAdmin)
+              _buildMoreOptionTile(context, Icons.shopping_bag, 'Purchases', 8),
             _buildMoreOptionTile(context, Icons.payments, 'Expenses', 9),
             _buildMoreOptionTile(context, Icons.settings, 'Settings', -1,
                 isSettings: true),
@@ -386,9 +450,7 @@ class _HomeScreenState extends State<HomeScreen> {
             MaterialPageRoute(builder: (_) => const SettingsScreen()),
           );
         } else {
-          setState(() {
-            _selectedIndex = index;
-          });
+          _selectIndex(index);
         }
       },
     );
@@ -399,9 +461,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return NavigationBar(
       selectedIndex: _selectedIndex,
       onDestinationSelected: (index) {
-        setState(() {
-          _selectedIndex = index;
-        });
+        _selectIndex(index);
       },
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       height: 70,
@@ -484,10 +544,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _refreshCurrentScreen() {
-    // Recreate the current screen to trigger refresh
+    // Recreate the current screen to trigger refresh.
     setState(() {
-      // Recreate screen widget which will trigger initState
-      _screens[_selectedIndex] = _createScreen(_selectedIndex);
+      _screenCache.remove(_selectedIndex);
+      _screenKeys[_selectedIndex] = GlobalKey();
+      _ensureAlive(_selectedIndex);
     });
   }
 }

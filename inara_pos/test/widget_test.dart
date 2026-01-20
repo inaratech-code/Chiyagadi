@@ -8,11 +8,14 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:inara_pos/main.dart';
+import 'package:inara_pos/providers/unified_database_provider.dart';
 
 void main() {
   testWidgets('App boots', (WidgetTester tester) async {
     // Smoke test: ensure the root widget builds without throwing.
-    await tester.pumpWidget(const InaraPOSApp());
+    await tester.pumpWidget(
+      InaraPOSApp(databaseProvider: UnifiedDatabaseProvider()),
+    );
     // Don't use pumpAndSettle here: the app can show indefinite animations
     // (e.g., loading indicators) during async initialization which will never
     // "settle" in a widget test environment.

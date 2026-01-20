@@ -28,11 +28,14 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
   List<Map<String, dynamic>> _purchasePayments = []; // Payment history
   bool _isLoading = true;
   bool _isCreatingPurchase = false; // Prevent duplicate submissions
+  int _purchasesLimit = 50;
+  bool _canLoadMore = false;
 
   @override
   void initState() {
     super.initState();
-    _loadPurchases();
+    // PERF: Let the screen render first.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadPurchases());
     // If supplier is pre-selected, open add purchase dialog
     if (widget.preSelectedSupplier != null &&
         widget.preSelectedSupplier!.isNotEmpty) {
@@ -52,10 +55,12 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
       final purchases = await dbProvider.query(
         'purchases',
         orderBy: 'created_at DESC',
+        limit: _purchasesLimit,
       );
       if (mounted) {
         setState(() {
           _purchases = purchases;
+          _canLoadMore = purchases.length >= _purchasesLimit;
         });
       }
     } catch (e) {
@@ -136,8 +141,23 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                     Expanded(
                       child: ListView.builder(
                         padding: const EdgeInsets.all(16),
-                        itemCount: _purchases.length,
+                        itemCount: _purchases.length + (_canLoadMore ? 1 : 0),
                         itemBuilder: (context, index) {
+                          if (_canLoadMore && index == _purchases.length) {
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.only(top: 8, bottom: 24),
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _purchasesLimit += 50;
+                                  });
+                                  _loadPurchases();
+                                },
+                                child: const Text('Load more'),
+                              ),
+                            );
+                          }
                           final purchase = _purchases[index];
                           final date = DateTime.fromMillisecondsSinceEpoch(
                               (purchase['created_at'] as num).toInt());

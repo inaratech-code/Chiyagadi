@@ -21,15 +21,69 @@ class InventoryScreen extends StatefulWidget {
 
 class _InventoryScreenState extends State<InventoryScreen> {
   final InventoryLedgerService _ledgerService = InventoryLedgerService();
+  // UPDATED: Keep the full list and apply filters without losing data.
+  List<Map<String, dynamic>> _allInventory = [];
   List<Map<String, dynamic>> _inventory = [];
   List<Map<String, dynamic>> _lowStockItems = [];
   bool _isLoading = true;
   String _viewMode = 'inventory'; // 'inventory' or 'movement' or 'report'
 
+  // NEW: Inventory category filter (requested)
+  String _categoryFilter = 'all'; // all | cigarettes | cold_drinks | cookies
+  bool _showLowStockOnly = false;
+
+  // NEW: Simple categorization (no schema change; works offline + web)
+  String _categoryForName(String name) {
+    final n = name.trim().toLowerCase();
+    // Cigarettes
+    if (n.contains('marlboro') ||
+        n.contains('gold flake') ||
+        n.contains('red') ||
+        n.contains('white') ||
+        n.contains('555') ||
+        n.contains('cigarette')) {
+      return 'cigarettes';
+    }
+    // Cold Drinks
+    if (n.contains('cold drink') ||
+        n.contains('coke') ||
+        n.contains('pepsi') ||
+        n.contains('dew') ||
+        n.contains('soda') ||
+        n.contains('water') ||
+        n.contains('juice') ||
+        n.contains('lassi')) {
+      return 'cold_drinks';
+    }
+    // Cookies
+    if (n.contains('cookie') || n.contains('cookies') || n.contains('biscuit')) {
+      return 'cookies';
+    }
+    return 'other';
+  }
+
+  void _applyInventoryFilters() {
+    List<Map<String, dynamic>> base = _allInventory;
+
+    if (_showLowStockOnly) {
+      base = _lowStockItems;
+    }
+
+    if (_categoryFilter != 'all') {
+      base = base.where((i) {
+        final name = (i['product_name'] ?? '').toString();
+        return _categoryForName(name) == _categoryFilter;
+      }).toList();
+    }
+
+    _inventory = base;
+  }
+
   @override
   void initState() {
     super.initState();
-    _loadInventory();
+    // PERF: Let the screen render first.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadInventory());
   }
 
   /// FIXED: Load inventory using ledger-based stock calculation
@@ -93,8 +147,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
         final currentStock = stockMap[productId] ?? 0.0;
 
-        // Get min stock level (default to 0 if not set)
-        final minStockLevel = 0.0; // Can be configured per product later
+        // UPDATED: Default min stock level (no manual editing; can be configured later)
+        const minStockLevel = 5.0;
 
         final isLowStock = currentStock <= minStockLevel;
 
@@ -127,8 +181,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
             .compareTo(b['product_name'] as String);
       });
 
-      _inventory = inventoryList;
+      _allInventory = inventoryList;
       _lowStockItems = lowStockList;
+      _applyInventoryFilters();
     } catch (e) {
       debugPrint('Error loading inventory: $e');
       if (mounted) {
@@ -237,10 +292,76 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         TextButton(
                           onPressed: () {
                             setState(() {
-                              _inventory = _lowStockItems;
+                              // NEW: Low-stock view without manual stock editing
+                              _showLowStockOnly = true;
+                              _applyInventoryFilters();
                             });
                           },
                           child: const Text('View'),
+                        ),
+                      ],
+                    ),
+                  ),
+                // NEW: Inventory categories (requested)
+                if (_viewMode == 'inventory')
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      border: Border(
+                        bottom: BorderSide(
+                            color: Colors.black.withOpacity(0.05), width: 1),
+                      ),
+                    ),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('All'),
+                          selected: _categoryFilter == 'all',
+                          onSelected: (_) {
+                            setState(() {
+                              _categoryFilter = 'all';
+                              _showLowStockOnly = false;
+                              _applyInventoryFilters();
+                            });
+                          },
+                        ),
+                        ChoiceChip(
+                          label: const Text('Cigarettes'),
+                          selected: _categoryFilter == 'cigarettes',
+                          onSelected: (_) {
+                            setState(() {
+                              _categoryFilter = 'cigarettes';
+                              _showLowStockOnly = false;
+                              _applyInventoryFilters();
+                            });
+                          },
+                        ),
+                        ChoiceChip(
+                          label: const Text('Cold Drinks'),
+                          selected: _categoryFilter == 'cold_drinks',
+                          onSelected: (_) {
+                            setState(() {
+                              _categoryFilter = 'cold_drinks';
+                              _showLowStockOnly = false;
+                              _applyInventoryFilters();
+                            });
+                          },
+                        ),
+                        ChoiceChip(
+                          label: const Text('Cookies'),
+                          selected: _categoryFilter == 'cookies',
+                          onSelected: (_) {
+                            setState(() {
+                              _categoryFilter = 'cookies';
+                              _showLowStockOnly = false;
+                              _applyInventoryFilters();
+                            });
+                          },
                         ),
                       ],
                     ),
@@ -351,8 +472,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                           ),
                                       ],
                                     ),
-                                    onTap: () =>
-                                        _showAdjustInventoryDialog(item),
+                                    // UPDATED: Manual stock editing is not allowed.
+                                    // Stock must change only via Purchases (inventory_ledger entries).
+                                    onTap: () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              'Manual stock editing is disabled. Use Purchases to increase stock.'),
+                                        ),
+                                      );
+                                    },
                                   ),
                                 );
                               },
@@ -363,7 +492,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
+  // ignore: unused_element
   Future<void> _showAdjustInventoryDialog(Map<String, dynamic> item) async {
+    // NOTE: Manual adjustments are intentionally disabled in UI (see onTap above).
+    // Kept for future migration tooling, but should remain inaccessible for end-users.
     final quantityController =
         TextEditingController(text: item['quantity'].toString());
     final minLevelController =

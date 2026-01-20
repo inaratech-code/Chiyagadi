@@ -26,7 +26,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSuppliers();
+    // PERF: Let the screen render first.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSuppliers());
   }
 
   Future<void> _loadSuppliers() async {

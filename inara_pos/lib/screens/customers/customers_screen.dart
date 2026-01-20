@@ -22,11 +22,14 @@ class _CustomersScreenState extends State<CustomersScreen> {
   bool _isLoading = true;
   dynamic _selectedCustomerId;
   String _viewMode = 'list'; // 'list' or 'credits'
+  int _customersLimit = 200;
+  bool _canLoadMoreCustomers = false;
 
   @override
   void initState() {
     super.initState();
-    _loadCustomers();
+    // PERF: Let the screen render first.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadCustomers());
   }
 
   Future<void> _loadCustomers() async {
@@ -35,8 +38,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
-      final maps = await dbProvider.query('customers', orderBy: 'name ASC');
+      final maps = await dbProvider.query(
+        'customers',
+        orderBy: 'name ASC',
+        limit: _customersLimit,
+      );
       _customers = maps.map((map) => Customer.fromMap(map)).toList();
+      _canLoadMoreCustomers = maps.length >= _customersLimit;
     } catch (e) {
       debugPrint('Error loading customers: $e');
     } finally {
@@ -143,8 +151,22 @@ class _CustomersScreenState extends State<CustomersScreen> {
           )
         : ListView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: _customers.length,
+            itemCount: _customers.length + (_canLoadMoreCustomers ? 1 : 0),
             itemBuilder: (context, index) {
+              if (_canLoadMoreCustomers && index == _customers.length) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8, bottom: 24),
+                  child: OutlinedButton(
+                    onPressed: () {
+                      setState(() {
+                        _customersLimit += 200;
+                      });
+                      _loadCustomers();
+                    },
+                    child: const Text('Load more'),
+                  ),
+                );
+              }
               final customer = _customers[index];
               final hasCredit = customer.creditBalance > 0;
               final brand = AppTheme.logoPrimary;

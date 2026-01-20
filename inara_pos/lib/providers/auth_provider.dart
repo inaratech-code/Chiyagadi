@@ -14,14 +14,43 @@ class AuthProvider with ChangeNotifier {
   String? _currentUsername;
   Timer? _inactivityTimer;
   BuildContext? _context;
+  String _lockMode = 'timeout'; // NEW: 'always' | 'timeout'
 
   bool get isAuthenticated => _isAuthenticated;
   String? get currentUserId => _currentUserId;
   String? get currentUserRole => _currentUserRole;
   String? get currentUsername => _currentUsername;
+  String get lockMode => _lockMode; // NEW
 
   // Auto-lock after 5 minutes of inactivity
   static const int _inactivityTimeoutMinutes = 5;
+
+  /// NEW: Load login lock behavior (best-effort; SharedPreferences works on web + mobile).
+  Future<void> loadLockMode() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('lock_mode');
+      if (saved == 'always' || saved == 'timeout') {
+        _lockMode = saved!;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('AuthProvider: Error loading lock mode: $e');
+    }
+  }
+
+  /// NEW: Persist login lock behavior.
+  Future<void> setLockMode(String mode) async {
+    if (mode != 'always' && mode != 'timeout') return;
+    _lockMode = mode;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('lock_mode', mode);
+    } catch (e) {
+      debugPrint('AuthProvider: Error saving lock mode: $e');
+    }
+  }
 
   // Set context for accessing DatabaseProvider from Provider
   void setContext(BuildContext context) {
@@ -45,24 +74,25 @@ class AuthProvider with ChangeNotifier {
 
   Future<bool> checkPinExists() async {
     final prefs = await SharedPreferences.getInstance();
-    final hasPinInPrefs = prefs.containsKey('admin_pin');
+    // PERF: Keep startup fast. Determining "first time" should not require DB init.
+    // If DB/user is missing, the login flow already provides recovery options.
+    return prefs.containsKey('admin_pin');
+  }
 
-    // Also check if admin user exists in database
+  /// NEW: Verify admin PIN for sensitive actions (delete orders, inventory, etc.)
+  ///
+  /// SECURITY: We store only a hash in SharedPreferences (`admin_pin`).
+  /// This works offline on Android and on Web/PWA (best-effort).
+  Future<bool> verifyAdminPin(String pin) async {
+    if (pin.length < 4 || pin.length > 6) return false;
     try {
-      final dbProvider = _getDatabaseProvider();
-      await dbProvider.init();
-      final adminUsers = await dbProvider.query(
-        'users',
-        where: 'username = ? AND role = ?',
-        whereArgs: ['admin', 'admin'],
-      );
-
-      // Return true only if both PIN in prefs AND user in database exist
-      return hasPinInPrefs && adminUsers.isNotEmpty;
+      final prefs = await SharedPreferences.getInstance();
+      final storedHash = prefs.getString('admin_pin');
+      if (storedHash == null || storedHash.isEmpty) return false;
+      return _hashPin(pin) == storedHash;
     } catch (e) {
-      debugPrint('checkPinExists: Error checking database: $e');
-      // Fallback to SharedPreferences only
-      return hasPinInPrefs;
+      debugPrint('verifyAdminPin: Error: $e');
+      return false;
     }
   }
 
@@ -263,7 +293,13 @@ class AuthProvider with ChangeNotifier {
 
         debugPrint(
             'Login: Success! User authenticated - ID: $_currentUserId, Role: $_currentUserRole');
-        _resetInactivityTimer();
+        // UPDATED: Apply lock mode behavior.
+        if (_lockMode == 'timeout') {
+          _resetInactivityTimer();
+        } else {
+          _inactivityTimer?.cancel();
+          _inactivityTimer = null;
+        }
         notifyListeners();
         return true;
       }
@@ -307,7 +343,10 @@ class AuthProvider with ChangeNotifier {
   }
 
   void updateActivity() {
-    _resetInactivityTimer();
+    // UPDATED: Only apply inactivity timer in timeout mode.
+    if (_lockMode == 'timeout') {
+      _resetInactivityTimer();
+    }
   }
 
   void _resetInactivityTimer() {

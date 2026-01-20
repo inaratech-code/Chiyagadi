@@ -51,31 +51,28 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         // Continue without persistence settings - Firestore will still work
       }
 
-      // Test Firestore connection with a simple query
-      debugPrint('FirestoreDatabase: Testing Firestore connection...');
-      try {
-        await _firestore!.collection('_test').limit(1).get();
-        debugPrint('FirestoreDatabase: Firestore connection test successful');
-      } catch (testError) {
-        debugPrint('FirestoreDatabase: Connection test failed: $testError');
-        // Check if it's a permissions error (database not enabled)
-        if (testError.toString().contains('permission') ||
-            testError.toString().contains('PERMISSION_DENIED') ||
-            testError
-                .toString()
-                .contains('Missing or insufficient permissions')) {
-          throw Exception(
-              'Firestore database is not enabled or permissions are not set. Please enable Firestore Database in Firebase Console and configure security rules.');
-        }
-        // Re-throw other errors
-        rethrow;
-      }
-
       _isInitialized = true;
       debugPrint('FirestoreDatabase: Firestore initialized successfully');
 
-      // Initialize default data if needed
-      await _initializeDefaultData();
+      // PERF: Do not block app startup on network checks / seeding.
+      // We'll validate connectivity and seed defaults in the background.
+      unawaited(() async {
+        // Best-effort connection check
+        try {
+          debugPrint('FirestoreDatabase: Background connection test...');
+          await _firestore!.collection('_test').limit(1).get();
+          debugPrint('FirestoreDatabase: Background connection test ok');
+        } catch (e) {
+          debugPrint('FirestoreDatabase: Background connection test failed: $e');
+        }
+
+        // Best-effort default data init
+        try {
+          await _initializeDefaultData();
+        } catch (e) {
+          debugPrint('FirestoreDatabase: Background seed failed: $e');
+        }
+      }());
     } catch (e) {
       debugPrint('FirestoreDatabase: Initialization failed: $e');
       _isInitialized = false;

@@ -88,6 +88,11 @@ class _POSScreenState extends State<POSScreen> {
         orderId: orderId,
         product: product,
         quantity: 1,
+        createdBy: authProvider.currentUserId != null
+            ? (kIsWeb
+                ? authProvider.currentUserId!
+                : int.tryParse(authProvider.currentUserId!))
+            : null,
       );
 
       // Reload order (totals + updatedAt) so cart refreshes

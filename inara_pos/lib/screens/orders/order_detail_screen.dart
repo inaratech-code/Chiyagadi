@@ -40,7 +40,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    // PERF: Let the screen render first.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
   }
 
   Future<void> _loadData() async {
@@ -1099,12 +1100,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       try {
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+        final createdBy = auth.currentUserId != null
+            ? (kIsWeb ? auth.currentUserId! : int.tryParse(auth.currentUserId!))
+            : null;
         await _orderService.addItemToOrder(
           dbProvider: dbProvider,
           context: context,
           orderId: widget.orderId,
           product: selectedProduct!,
           quantity: quantity,
+          createdBy: createdBy,
         );
         await _loadData(); // Await to ensure data is loaded
         if (mounted) {
@@ -1252,6 +1258,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
       if (confirmed != true) return;
 
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final createdBy = auth.currentUserId != null
+          ? (kIsWeb ? auth.currentUserId! : int.tryParse(auth.currentUserId!))
+          : null;
+
       for (final entry in qty.entries) {
         if (entry.value <= 0) continue;
         final product = _products.firstWhere((p) {
@@ -1265,6 +1276,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           orderId: widget.orderId,
           product: product,
           quantity: entry.value,
+          createdBy: createdBy,
         );
       }
 
@@ -1305,7 +1317,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       try {
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-        await _orderService.removeItemFromOrder(dbProvider, itemId);
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+        final createdBy = auth.currentUserId != null
+            ? (kIsWeb ? auth.currentUserId! : int.tryParse(auth.currentUserId!))
+            : null;
+        await _orderService.removeItemFromOrder(
+          dbProvider: dbProvider,
+          context: context,
+          orderItemId: itemId,
+          createdBy: createdBy,
+        );
         await _loadData(); // Await to ensure data is loaded
       } catch (e) {
         if (mounted) {
@@ -1421,6 +1442,63 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _deleteOrder() async {
+    // NEW: Role-based + password-protected deletion
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final pinController = TextEditingController();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Order (Admin PIN required)'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+                'Deleting an order is a sensitive action and requires Admin PIN confirmation.'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: pinController,
+              keyboardType: TextInputType.number,
+              obscureText: true,
+              maxLength: 6,
+              decoration: const InputDecoration(
+                labelText: 'Admin PIN',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final pin = pinController.text.trim();
+              final valid = await auth.verifyAdminPin(pin);
+              if (!valid) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Invalid Admin PIN'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+                return;
+              }
+              if (context.mounted) Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(

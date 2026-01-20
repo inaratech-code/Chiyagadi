@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/order.dart';
 import '../../models/order_item.dart';
 import '../../providers/unified_database_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/order_service.dart';
 import '../../utils/number_formatter.dart';
 import '../../utils/theme.dart';
@@ -234,12 +235,16 @@ class _POSCartWidgetState extends State<POSCartWidget> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // UPDATED: Bill format matching image - Subtotal, Discount (%), VAT (%), Total
                 _buildTotalRow('Subtotal', widget.order!.subtotal),
-                if (widget.order!.discountAmount > 0)
-                  _buildTotalRow('Discount', -widget.order!.discountAmount),
                 _buildTotalRow(
-                    'VAT (${widget.order!.taxPercent.toStringAsFixed(0)}%)',
-                    widget.order!.taxAmount),
+                  'Discount (${widget.order!.discountPercent.toStringAsFixed(1)}%)',
+                  -widget.order!.discountAmount,
+                ),
+                _buildTotalRow(
+                  'VAT (${widget.order!.taxPercent.toStringAsFixed(1)}%)',
+                  widget.order!.taxAmount,
+                ),
                 const SizedBox(height: 8),
                 Container(
                   height: 1,
@@ -448,7 +453,17 @@ class _POSCartWidgetState extends State<POSCartWidget> {
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      await _orderService.updateItemQuantity(dbProvider, itemId, newQuantity);
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final createdBy = auth.currentUserId != null
+          ? (kIsWeb ? auth.currentUserId! : int.tryParse(auth.currentUserId!))
+          : null;
+      await _orderService.updateItemQuantity(
+        dbProvider: dbProvider,
+        context: context,
+        orderItemId: itemId,
+        quantity: newQuantity,
+        createdBy: createdBy,
+      );
       await _loadOrderItems();
       // Reload order to update totals
       final orderId = _currentOrderId();
@@ -470,7 +485,16 @@ class _POSCartWidgetState extends State<POSCartWidget> {
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      await _orderService.removeItemFromOrder(dbProvider, itemId);
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final createdBy = auth.currentUserId != null
+          ? (kIsWeb ? auth.currentUserId! : int.tryParse(auth.currentUserId!))
+          : null;
+      await _orderService.removeItemFromOrder(
+        dbProvider: dbProvider,
+        context: context,
+        orderItemId: itemId,
+        createdBy: createdBy,
+      );
       await _loadOrderItems();
       // Reload order to update totals
       final orderId = _currentOrderId();

@@ -318,7 +318,8 @@ class _OrderPaymentDialogState extends State<OrderPaymentDialog> {
 
     Future<void> reloadCustomers(
         {void Function(void Function())? setDialogState}) async {
-      final all = await dbProvider.query('customers');
+      // PERF: Keep the payment dialog snappy on large customer lists.
+      final all = await dbProvider.query('customers', limit: 500);
       final list = all.map((m) => Customer.fromMap(m)).toList();
       list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       customers = list;

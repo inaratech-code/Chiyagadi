@@ -42,7 +42,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _loadDashboardData();
+    // PERF: Let the page render first, then load data.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadDashboardData());
   }
 
   Future<void> _loadDashboardData() async {
@@ -84,8 +85,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         // 2: today's credit transactions
         dbProvider.query(
           'credit_transactions',
-          where: 'created_at >= ? AND created_at <= ? AND transaction_type = ?',
-          whereArgs: [startOfDay, endOfDay, 'credit'],
+          // Web/Firestore: (created_at range + transaction_type) often requires a composite index.
+          // Fetch by date range only and filter in-memory to avoid index requirement.
+          where: 'created_at >= ? AND created_at <= ?',
+          whereArgs: [startOfDay, endOfDay],
         ),
         // 3: purchasable products for low stock
         kIsWeb
@@ -110,7 +113,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       final settingsRows = results[0];
       final todayOrdersRaw = results[1];
-      final todayCreditTransactions = results[2];
+      final todayCreditTransactionsRaw = results[2];
       final products = results[3];
       final recentOrders = results[4];
       final recentExpenses = results[5];
@@ -135,6 +138,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         (sum, order) =>
             sum + ((order['total_amount'] as num?)?.toDouble() ?? 0.0),
       );
+
+      final todayCreditTransactions = todayCreditTransactionsRaw
+          .where((t) => (t['transaction_type'] ?? '').toString() == 'credit')
+          .toList();
 
       nextTodayCredit = todayCreditTransactions.fold<double>(
         0.0,
@@ -318,7 +325,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Welcome, $_shopName',
+                        // UPDATED: Requested home header text
+                        'Welcome to Chiyagadi',
                         style: const TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.w600,
@@ -328,7 +336,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Powered by Inara Tech',
+                        // UPDATED: Keep shop name visible
+                        _shopName,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w400,

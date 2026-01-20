@@ -9,7 +9,8 @@ import '../utils/chiyagaadi_menu_seed.dart';
 class DatabaseProvider with ChangeNotifier {
   static Database? _database;
   static const String _databaseName = 'inara_pos.db';
-  static const int _databaseVersion = 1;
+  // Bump DB version so expensive migrations run once (onUpgrade) instead of every launch.
+  static const int _databaseVersion = 2;
 
   DatabaseProvider();
 
@@ -29,23 +30,41 @@ class DatabaseProvider with ChangeNotifier {
 
     // Try to open existing database or create new one
     try {
+      var didUpgrade = false;
       final db = await openDatabase(
         path,
         version: _databaseVersion,
         onCreate: _onCreate,
-        onUpgrade: _onUpgrade,
+        onUpgrade: (db, oldVersion, newVersion) async {
+          didUpgrade = true;
+          await _onUpgrade(db, oldVersion, newVersion);
+        },
       );
 
-      // Add missing columns to existing tables (migration)
-      await _addMissingColumns(db);
-
-      // Validate that all required tables exist
-      try {
-        final isValid = await _validateSchema(db);
-        if (!isValid) {
-          debugPrint(
-              'Database: Schema validation failed, resetting database...');
-          await db.close();
+      // Validate only immediately after an upgrade (one-time cost).
+      if (didUpgrade) {
+        try {
+          final isValid = await _validateSchema(db);
+          if (!isValid) {
+            debugPrint(
+                'Database: Schema validation failed after upgrade, resetting database...');
+            await db.close();
+            await deleteDatabase(path);
+            // Recreate database
+            return await openDatabase(
+              path,
+              version: _databaseVersion,
+              onCreate: _onCreate,
+              onUpgrade: _onUpgrade,
+            );
+          }
+        } catch (validationError) {
+          // If validation itself fails, database is corrupted
+          debugPrint('Database: Schema validation error: $validationError');
+          debugPrint('Database: Database appears corrupted, resetting...');
+          try {
+            await db.close();
+          } catch (_) {}
           await deleteDatabase(path);
           // Recreate database
           return await openDatabase(
@@ -55,21 +74,6 @@ class DatabaseProvider with ChangeNotifier {
             onUpgrade: _onUpgrade,
           );
         }
-      } catch (validationError) {
-        // If validation itself fails, database is corrupted
-        debugPrint('Database: Schema validation error: $validationError');
-        debugPrint('Database: Database appears corrupted, resetting...');
-        try {
-          await db.close();
-        } catch (_) {}
-        await deleteDatabase(path);
-        // Recreate database
-        return await openDatabase(
-          path,
-          version: _databaseVersion,
-          onCreate: _onCreate,
-          onUpgrade: _onUpgrade,
-        );
       }
 
       return db;

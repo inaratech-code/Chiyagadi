@@ -25,6 +25,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _selectedMaxDiscount;
   bool _discountEnabled = true;
   bool _isLoading = true;
+  // NEW: Login behavior (security-sensitive)
+  String _lockMode = 'timeout'; // 'always' | 'timeout'
 
   // Discount options (0% to 100%)
   final List<String> _discountOptions = List.generate(101, (i) => i.toString());
@@ -32,7 +34,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSettings();
+    // PERF: Let the screen render first.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSettings());
     if (widget.showUserManagement) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         // Backwards-compatible: if caller asks for user management, open the full screen.
@@ -48,6 +51,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await dbProvider.init();
       final settings = await dbProvider.query('settings');
 
@@ -86,6 +90,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
       if (_selectedDefaultDiscount == null) _selectedDefaultDiscount = '0';
       if (_selectedMaxDiscount == null) _selectedMaxDiscount = '50';
+
+      // NEW: Load lock mode from AuthProvider (stored in SharedPreferences)
+      _lockMode = authProvider.lockMode;
     } catch (e) {
       debugPrint('Error loading settings: $e');
     } finally {
@@ -176,6 +183,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // NEW: Security / Login behavior
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Security',
+                              style: Theme.of(context).textTheme.titleLarge),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            value: _lockMode,
+                            decoration: const InputDecoration(
+                              labelText: 'Login behavior',
+                              border: OutlineInputBorder(),
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'always',
+                                child: Text('Ask password every time'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'timeout',
+                                child: Text('Ask after long inactivity'),
+                              ),
+                            ],
+                            onChanged: authProvider.isAdmin
+                                ? (v) async {
+                                    if (v == null) return;
+                                    setState(() => _lockMode = v);
+                                    await authProvider.setLockMode(v);
+                                  }
+                                : null,
+                          ),
+                          if (!authProvider.isAdmin)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 8),
+                              child: Text(
+                                'Admin only',
+                                style: TextStyle(
+                                    color: Colors.grey, fontSize: 12),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   // Café Information
                   Card(
                     child: Padding(

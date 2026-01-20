@@ -4,11 +4,13 @@ import '../providers/unified_database_provider.dart';
 import '../models/order.dart';
 import '../models/order_item.dart';
 import '../models/product.dart';
+import '../models/inventory_ledger_model.dart';
+import '../services/inventory_ledger_service.dart';
 
 /// Order Service
 ///
-/// Inventory is separate from Menu/Orders.
-/// Orders do not check/deduct inventory; inventory is managed via Purchases.
+/// UPDATED: When items are added to orders, inventory is automatically deducted
+/// if the product has inventory tracking enabled.
 class OrderService {
   // Generate unique order number (ORD yymmdd/000 format)
   Future<String> generateOrderNumber(UnifiedDatabaseProvider dbProvider) async {
@@ -91,7 +93,7 @@ class OrderService {
     return orderId;
   }
 
-  // Add item to order (with stock check using ledger)
+  // Add item to order (with automatic inventory deduction)
   Future<void> addItemToOrder({
     required UnifiedDatabaseProvider dbProvider,
     required BuildContext context,
@@ -99,6 +101,7 @@ class OrderService {
     required Product product,
     required int quantity,
     String? notes,
+    dynamic createdBy, // User ID who added the item
   }) async {
     await dbProvider.init();
 
@@ -116,6 +119,54 @@ class OrderService {
 
     final unitPrice = product.price;
     final totalPrice = unitPrice * quantity;
+
+    // UPDATED: Check if product has inventory and deduct stock automatically
+    final inventoryLedgerService = InventoryLedgerService();
+    try {
+      final currentStock = await inventoryLedgerService.getCurrentStock(
+        context: context,
+        productId: productId,
+      );
+
+      // If product has inventory (stock > 0 or has ledger entries), deduct stock
+      if (currentStock > 0 || await _hasInventoryHistory(dbProvider, productId)) {
+        // Check if sufficient stock is available
+        if (currentStock < quantity) {
+          throw Exception(
+              'Insufficient stock. Available: ${currentStock.toStringAsFixed(2)}, Required: $quantity');
+        }
+
+        // Create ledger entry to decrease stock
+        final ledgerEntry = InventoryLedger(
+          productId: productId,
+          productName: product.name,
+          quantityIn: 0.0,
+          quantityOut: quantity.toDouble(),
+          unitPrice: unitPrice,
+          transactionType: 'sale',
+          referenceType: 'order',
+          referenceId: orderId,
+          notes: notes ?? 'Order item: ${product.name}',
+          createdBy: createdBy,
+          createdAt: DateTime.now().millisecondsSinceEpoch,
+        );
+
+        await inventoryLedgerService.addLedgerEntry(
+          context: context,
+          ledgerEntry: ledgerEntry,
+        );
+
+        debugPrint(
+            'OrderService: Deducted $quantity ${product.name} from inventory. New stock: ${currentStock - quantity}');
+      }
+    } catch (e) {
+      // If it's a stock-related error, rethrow it
+      if (e.toString().contains('Insufficient stock')) {
+        rethrow;
+      }
+      // For other errors (e.g., product has no inventory), continue without deducting
+      debugPrint('OrderService: No inventory deduction needed for ${product.name}: $e');
+    }
 
     // Check if item already exists in order
     final existingItems = await dbProvider.query(
@@ -163,12 +214,32 @@ class OrderService {
     await _recalculateOrderTotals(dbProvider, orderId);
   }
 
-  // Remove item from order
+  // Helper method to check if product has inventory history
+  Future<bool> _hasInventoryHistory(
+      UnifiedDatabaseProvider dbProvider, dynamic productId) async {
+    try {
+      final ledgerEntries = await dbProvider.query(
+        'inventory_ledger',
+        where: 'product_id = ?',
+        whereArgs: [productId],
+        limit: 1,
+      );
+      return ledgerEntries.isNotEmpty;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Remove item from order (with inventory reversal)
   // FIXED: Handle both int (SQLite) and String (Firestore) order item IDs
-  Future<void> removeItemFromOrder(
-      UnifiedDatabaseProvider dbProvider, dynamic orderItemId) async {
+  Future<void> removeItemFromOrder({
+    required UnifiedDatabaseProvider dbProvider,
+    required BuildContext context,
+    required dynamic orderItemId,
+    dynamic createdBy,
+  }) async {
     await dbProvider.init();
-    // Get order_id before deleting
+    // Get order_id and item details before deleting
     final item = await dbProvider.query(
       'order_items',
       where: kIsWeb ? 'documentId = ?' : 'id = ?',
@@ -177,6 +248,47 @@ class OrderService {
 
     if (item.isNotEmpty) {
       final orderId = item.first['order_id'];
+      final productId = item.first['product_id'];
+      final quantity = (item.first['quantity'] as num?)?.toInt() ?? 0;
+      final unitPrice = (item.first['unit_price'] as num?)?.toDouble() ?? 0.0;
+      final productName = item.first['product_name'] as String? ?? '';
+
+      // UPDATED: Reverse inventory deduction if product has inventory
+      if (quantity > 0) {
+        try {
+          final inventoryLedgerService = InventoryLedgerService();
+          final hasInventory = await _hasInventoryHistory(dbProvider, productId);
+          
+          if (hasInventory) {
+            // Create reverse ledger entry to add stock back
+            final ledgerEntry = InventoryLedger(
+              productId: productId,
+              productName: productName,
+              quantityIn: quantity.toDouble(),
+              quantityOut: 0.0,
+              unitPrice: unitPrice,
+              transactionType: 'return',
+              referenceType: 'order',
+              referenceId: orderId,
+              notes: 'Order item removed: $productName',
+              createdBy: createdBy,
+              createdAt: DateTime.now().millisecondsSinceEpoch,
+            );
+
+            await inventoryLedgerService.addLedgerEntry(
+              context: context,
+              ledgerEntry: ledgerEntry,
+            );
+
+            debugPrint(
+                'OrderService: Reversed inventory deduction for $quantity $productName');
+          }
+        } catch (e) {
+          debugPrint('OrderService: Error reversing inventory: $e');
+          // Continue with deletion even if inventory reversal fails
+        }
+      }
+
       await dbProvider.delete(
         'order_items',
         where: kIsWeb ? 'documentId = ?' : 'id = ?',
@@ -186,12 +298,22 @@ class OrderService {
     }
   }
 
-  // Update item quantity
-  Future<void> updateItemQuantity(UnifiedDatabaseProvider dbProvider,
-      dynamic orderItemId, int quantity) async {
+  // Update item quantity (with inventory adjustment)
+  Future<void> updateItemQuantity({
+    required UnifiedDatabaseProvider dbProvider,
+    required BuildContext context,
+    required dynamic orderItemId,
+    required int quantity,
+    dynamic createdBy,
+  }) async {
     await dbProvider.init();
     if (quantity <= 0) {
-      await removeItemFromOrder(dbProvider, orderItemId);
+      await removeItemFromOrder(
+        dbProvider: dbProvider,
+        context: context,
+        orderItemId: orderItemId,
+        createdBy: createdBy,
+      );
       return;
     }
 
@@ -206,6 +328,82 @@ class OrderService {
       final unitPrice = (item.first['unit_price'] as num).toDouble();
       final totalPrice = unitPrice * quantity;
       final orderId = item.first['order_id'];
+      final productId = item.first['product_id'];
+      final oldQuantity = (item.first['quantity'] as num?)?.toInt() ?? 0;
+      final productName = item.first['product_name'] as String? ?? '';
+
+      // UPDATED: Adjust inventory if quantity changed
+      if (oldQuantity != quantity) {
+        try {
+          final inventoryLedgerService = InventoryLedgerService();
+          final hasInventory = await _hasInventoryHistory(dbProvider, productId);
+          
+          if (hasInventory) {
+            final quantityDiff = quantity - oldQuantity;
+            
+            if (quantityDiff > 0) {
+              // Quantity increased - deduct more stock
+              final currentStock = await inventoryLedgerService.getCurrentStock(
+                context: context,
+                productId: productId,
+              );
+
+              if (currentStock < quantityDiff) {
+                throw Exception(
+                    'Insufficient stock. Available: ${currentStock.toStringAsFixed(2)}, Required: $quantityDiff');
+              }
+
+              final ledgerEntry = InventoryLedger(
+                productId: productId,
+                productName: productName,
+                quantityIn: 0.0,
+                quantityOut: quantityDiff.toDouble(),
+                unitPrice: unitPrice,
+                transactionType: 'sale',
+                referenceType: 'order',
+                referenceId: orderId,
+                notes: 'Order item quantity increased: $productName',
+                createdBy: createdBy,
+                createdAt: DateTime.now().millisecondsSinceEpoch,
+              );
+
+              await inventoryLedgerService.addLedgerEntry(
+                context: context,
+                ledgerEntry: ledgerEntry,
+              );
+            } else {
+              // Quantity decreased - add stock back
+              final ledgerEntry = InventoryLedger(
+                productId: productId,
+                productName: productName,
+                quantityIn: (-quantityDiff).toDouble(),
+                quantityOut: 0.0,
+                unitPrice: unitPrice,
+                transactionType: 'return',
+                referenceType: 'order',
+                referenceId: orderId,
+                notes: 'Order item quantity decreased: $productName',
+                createdBy: createdBy,
+                createdAt: DateTime.now().millisecondsSinceEpoch,
+              );
+
+              await inventoryLedgerService.addLedgerEntry(
+                context: context,
+                ledgerEntry: ledgerEntry,
+              );
+            }
+
+            debugPrint(
+                'OrderService: Adjusted inventory for $productName: ${oldQuantity} -> $quantity');
+          }
+        } catch (e) {
+          if (e.toString().contains('Insufficient stock')) {
+            rethrow;
+          }
+          debugPrint('OrderService: Error adjusting inventory: $e');
+          // Continue with update even if inventory adjustment fails
+        }
+      }
 
       await dbProvider.update(
         'order_items',
@@ -383,12 +581,19 @@ class OrderService {
   Future<List<Map<String, dynamic>>> getOrderItems(
       UnifiedDatabaseProvider dbProvider, dynamic orderId) async {
     await dbProvider.init();
+    // UPDATED: Query by order_id only, sort in-memory to avoid Firestore composite index
     final items = await dbProvider.query(
       'order_items',
       where: 'order_id = ?',
       whereArgs: [orderId],
-      orderBy: 'created_at ASC',
     );
+
+    // Sort by created_at in-memory
+    items.sort((a, b) {
+      final aTime = (a['created_at'] as num?)?.toInt() ?? 0;
+      final bTime = (b['created_at'] as num?)?.toInt() ?? 0;
+      return aTime.compareTo(bTime);
+    });
 
     // Return items with product_name for ledger entries
     // The order_items table should have product_name denormalized

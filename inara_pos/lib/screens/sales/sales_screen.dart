@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import '../../providers/unified_database_provider.dart';
 import '../../screens/orders/order_detail_screen.dart';
@@ -17,6 +16,8 @@ class _SalesScreenState extends State<SalesScreen> {
   List<Map<String, dynamic>> _sales = [];
   bool _isLoading = true;
   DateTime _selectedDate = DateTime.now();
+  int _salesLimit = 50;
+  bool _canLoadMore = false;
 
   bool _isPaidOrPartial(dynamic paymentStatus) {
     final s = (paymentStatus ?? '').toString();
@@ -26,7 +27,8 @@ class _SalesScreenState extends State<SalesScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSales();
+    // PERF: Let the screen render first.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSales());
   }
 
   Future<void> _loadSales() async {
@@ -40,27 +42,16 @@ class _SalesScreenState extends State<SalesScreen> {
               .millisecondsSinceEpoch;
       final endOfDay = startOfDay + (24 * 60 * 60 * 1000) - 1;
 
-      // Firestore query wrapper doesn't support SQL-style `IN (?, ?)`.
-      // So on web, we filter payment_status in-memory.
-      if (kIsWeb) {
-        final rows = await dbProvider.query(
-          'orders',
-          where: 'created_at >= ? AND created_at <= ?',
-          whereArgs: [startOfDay, endOfDay],
-          orderBy: 'created_at DESC',
-        );
-        _sales =
-            rows.where((o) => _isPaidOrPartial(o['payment_status'])).toList();
-      } else {
-        // Include paid and partial payments (exclude unpaid)
-        _sales = await dbProvider.query(
-          'orders',
-          where:
-              'created_at >= ? AND created_at <= ? AND payment_status IN (?, ?)',
-          whereArgs: [startOfDay, endOfDay, 'paid', 'partial'],
-          orderBy: 'created_at DESC',
-        );
-      }
+      // PERF: Single query + in-memory filter (also avoids Firestore IN limitations).
+      final rows = await dbProvider.query(
+        'orders',
+        where: 'created_at >= ? AND created_at <= ?',
+        whereArgs: [startOfDay, endOfDay],
+        orderBy: 'created_at DESC',
+        limit: _salesLimit,
+      );
+      _sales = rows.where((o) => _isPaidOrPartial(o['payment_status'])).toList();
+      _canLoadMore = rows.length >= _salesLimit;
 
       // PERF: Batch load all order_items for these orders (avoids N+1 queries).
       final orderIds =
@@ -137,7 +128,11 @@ class _SalesScreenState extends State<SalesScreen> {
                       lastDate: DateTime.now(),
                     );
                     if (date != null) {
-                      setState(() => _selectedDate = date);
+                      setState(() {
+                        _selectedDate = date;
+                        _salesLimit = 50;
+                        _canLoadMore = false;
+                      });
                       _loadSales();
                     }
                   },
@@ -215,8 +210,23 @@ class _SalesScreenState extends State<SalesScreen> {
                           onRefresh: _loadSales,
                           child: ListView.builder(
                             padding: const EdgeInsets.all(16),
-                            itemCount: _sales.length,
+                            itemCount: _sales.length + (_canLoadMore ? 1 : 0),
                             itemBuilder: (context, index) {
+                              if (_canLoadMore && index == _sales.length) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(
+                                      top: 8, bottom: 24),
+                                  child: OutlinedButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        _salesLimit += 50;
+                                      });
+                                      _loadSales();
+                                    },
+                                    child: const Text('Load more'),
+                                  ),
+                                );
+                              }
                               final sale = _sales[index];
                               return _buildSaleCard(sale);
                             },

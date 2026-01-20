@@ -150,6 +150,26 @@ CREATE TABLE IF NOT EXISTS stock_transactions (
   FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
+-- Inventory Ledger Table (ledger-based stock; used by InventoryLedgerService)
+CREATE TABLE IF NOT EXISTS inventory_ledger (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id INTEGER NOT NULL,
+  product_name TEXT,
+  unit TEXT NOT NULL DEFAULT 'pcs',
+  quantity_in REAL NOT NULL DEFAULT 0,
+  quantity_out REAL NOT NULL DEFAULT 0,
+  unit_price REAL DEFAULT 0,
+  transaction_type TEXT,
+  reference_type TEXT,
+  reference_id INTEGER,
+  notes TEXT,
+  created_by INTEGER,
+  created_at INTEGER NOT NULL,
+  synced INTEGER NOT NULL DEFAULT 0 CHECK(synced IN (0, 1)),
+  FOREIGN KEY (product_id) REFERENCES products(id),
+  FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
 -- Suppliers Table (vendors / parties)
 CREATE TABLE IF NOT EXISTS suppliers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -318,6 +338,8 @@ CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id);
 CREATE INDEX IF NOT EXISTS idx_payments_synced ON payments(synced);
 CREATE INDEX IF NOT EXISTS idx_stock_transactions_product_id ON stock_transactions(product_id);
 CREATE INDEX IF NOT EXISTS idx_stock_transactions_synced ON stock_transactions(synced);
+CREATE INDEX IF NOT EXISTS idx_inventory_ledger_product_id ON inventory_ledger(product_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_ledger_synced ON inventory_ledger(synced);
 CREATE INDEX IF NOT EXISTS idx_purchases_synced ON purchases(synced);
 CREATE INDEX IF NOT EXISTS idx_day_sessions_session_date ON day_sessions(session_date);
 CREATE INDEX IF NOT EXISTS idx_sync_queue_synced ON sync_queue(synced);

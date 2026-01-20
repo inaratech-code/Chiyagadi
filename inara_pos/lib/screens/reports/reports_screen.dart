@@ -30,7 +30,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadReport();
+    // PERF: Let the screen render first.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadReport());
   }
 
   Future<void> _loadReport() async {
@@ -54,17 +55,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
       );
 
       // Total Sales (include paid and partial payments)
-      // Firestore query wrapper doesn't support SQL-style `IN (?, ?)`, so filter in-memory.
-      final orders = kIsWeb
-          ? allOrdersInRange
-              .where((o) => _isPaidOrPartial(o['payment_status']))
-              .toList()
-          : await dbProvider.query(
-              'orders',
-              where:
-                  'created_at >= ? AND created_at <= ? AND payment_status IN (?, ?)',
-              whereArgs: [start, end, 'paid', 'partial'],
-            );
+      // PERF: Always filter in-memory so we don't run a second DB query.
+      final orders = allOrdersInRange
+          .where((o) => _isPaidOrPartial(o['payment_status']))
+          .toList();
 
       final totalSales = orders.fold<double>(
         0.0,
@@ -89,11 +83,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
           0.0, (sum, o) => sum + (o['credit_amount'] as num? ?? 0).toDouble());
 
       // Credit Collected (from credit transactions of type 'payment')
-      final creditTransactions = await dbProvider.query(
+      // Web/Firestore: (created_at range + transaction_type) often requires a composite index.
+      // Fetch by date range only and filter in-memory to avoid index requirement.
+      final creditTransactionsRaw = await dbProvider.query(
         'credit_transactions',
-        where: 'created_at >= ? AND created_at <= ? AND transaction_type = ?',
-        whereArgs: [start, end, 'payment'],
+        where: 'created_at >= ? AND created_at <= ?',
+        whereArgs: [start, end],
       );
+      final creditTransactions = creditTransactionsRaw
+          .where(
+              (t) => (t['transaction_type'] ?? '').toString() == 'payment')
+          .toList();
       final creditCollected = creditTransactions.fold(
           0.0, (sum, t) => sum + (t['amount'] as num? ?? 0).toDouble());
 

@@ -28,7 +28,8 @@ class _POSProductGridState extends State<POSProductGrid> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    // PERF: Let the widget render first.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
   }
 
   Future<void> _loadData() async {
@@ -48,12 +49,11 @@ class _POSProductGridState extends State<POSProductGrid> {
       );
       _categories = categoryMaps.map((map) => Category.fromMap(map)).toList();
 
-      await _loadProducts();
-
+      // Default to the first category for a faster initial load.
       if (_categories.isNotEmpty && _selectedCategoryId == null) {
         _selectedCategoryId = _categories.first.id;
-        await _loadProducts();
       }
+      await _loadProducts();
     } catch (e) {
       debugPrint('Error loading data: $e');
     } finally {

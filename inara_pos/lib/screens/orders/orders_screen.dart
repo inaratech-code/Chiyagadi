@@ -26,11 +26,118 @@ class _OrdersScreenState extends State<OrdersScreen> {
   List<Map<String, dynamic>> _orders = [];
   bool _isLoading = true;
   String _filterStatus = 'all'; // 'all', 'pending', 'completed', 'cancelled'
+  int _ordersLimit = 50;
+  bool _canLoadMore = false;
+
+  // NEW: Sensitive action confirmation (admin PIN)
+  Future<bool> _confirmAdminPin() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final pinController = TextEditingController();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Admin PIN required'),
+        content: TextField(
+          controller: pinController,
+          keyboardType: TextInputType.number,
+          obscureText: true,
+          maxLength: 6,
+          decoration: const InputDecoration(
+            labelText: 'Admin PIN',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final valid = await auth.verifyAdminPin(pinController.text.trim());
+              if (!valid) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Invalid Admin PIN'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+                return;
+              }
+              if (context.mounted) Navigator.pop(context, true);
+            },
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
+  Future<void> _deleteOrderWithConfirmation({
+    required dynamic orderId,
+    required String orderNumber,
+  }) async {
+    // NEW: Role-based access + password-protected deletion
+    final okPin = await _confirmAdminPin();
+    if (!okPin) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Order?'),
+        content: Text(
+            'Delete $orderNumber permanently? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    try {
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      await _orderService.deleteOrder(
+        dbProvider: dbProvider,
+        context: context,
+        orderId: orderId,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Order deleted'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      await _loadOrders();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Delete failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _loadOrders();
+    // PERF: Let the screen render first.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadOrders());
   }
 
   Future<void> _loadOrders() async {
@@ -41,22 +148,26 @@ class _OrdersScreenState extends State<OrdersScreen> {
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
-      String? whereClause;
-      List<dynamic>? whereArgs;
-
-      if (_filterStatus != 'all') {
-        whereClause = 'status = ?';
-        whereArgs = [_filterStatus];
-      }
-
-      final orders = await dbProvider.query(
+      // UPDATED: Query by order_type only, filter status in-memory to avoid Firestore composite index
+      final allOrders = await dbProvider.query(
         'orders',
-        where: whereClause,
-        whereArgs: whereArgs,
+        where: 'order_type = ?',
+        whereArgs: ['dine_in'],
         orderBy: 'created_at DESC',
+        limit: _ordersLimit * 2, // Get more to account for filtering
       );
+
+      // Filter by status in-memory
+      final orders = _filterStatus == 'all'
+          ? allOrders
+          : allOrders.where((o) => o['status'] == _filterStatus).toList();
+
+      // Limit after filtering
+      final limitedOrders = orders.take(_ordersLimit).toList();
+
       if (!mounted) return;
-      _orders = orders;
+      _orders = limitedOrders;
+      _canLoadMore = orders.length >= _ordersLimit;
     } catch (e) {
       debugPrint('Error loading orders: $e');
     } finally {
@@ -233,8 +344,25 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 onRefresh: _loadOrders,
                                 child: ListView.builder(
                                   padding: const EdgeInsets.all(16),
-                                  itemCount: _filteredOrders.length,
+                                  itemCount: _filteredOrders.length +
+                                      (_canLoadMore ? 1 : 0),
                                   itemBuilder: (context, index) {
+                                    if (_canLoadMore &&
+                                        index == _filteredOrders.length) {
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                            top: 8, bottom: 24),
+                                        child: OutlinedButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              _ordersLimit += 50;
+                                            });
+                                            _loadOrders();
+                                          },
+                                          child: const Text('Load more'),
+                                        ),
+                                      );
+                                    }
                                     final order = _filteredOrders[index];
                                     return _buildOrderCard(order);
                                   },
@@ -268,8 +396,25 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             onRefresh: _loadOrders,
                             child: ListView.builder(
                               padding: const EdgeInsets.all(16),
-                              itemCount: _filteredOrders.length,
+                              itemCount: _filteredOrders.length +
+                                  (_canLoadMore ? 1 : 0),
                               itemBuilder: (context, index) {
+                                if (_canLoadMore &&
+                                    index == _filteredOrders.length) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(
+                                        top: 8, bottom: 24),
+                                    child: OutlinedButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _ordersLimit += 50;
+                                        });
+                                        _loadOrders();
+                                      },
+                                      child: const Text('Load more'),
+                                    ),
+                                  );
+                                }
                                 final order = _filteredOrders[index];
                                 return _buildOrderCard(order);
                               },
@@ -289,6 +434,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
       onSelected: (selected) {
         setState(() {
           _filterStatus = status;
+          _ordersLimit = 50;
+          _canLoadMore = false;
         });
         _loadOrders();
       },
@@ -411,6 +558,33 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // UPDATED: Edit button - opens order detail screen for editing
+                  IconButton(
+                    icon: const Icon(Icons.edit, color: Colors.blue),
+                    tooltip: 'Edit order',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => OrderDetailScreen(
+                            orderId: orderId,
+                            orderNumber: order['order_number'] as String? ?? 'Order',
+                          ),
+                        ),
+                      ).then((_) => _loadOrders());
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  // NEW: Delete button (password-protected)
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    tooltip: 'Delete order',
+                    onPressed: () => _deleteOrderWithConfirmation(
+                      orderId: orderId,
+                      orderNumber: order['order_number'] as String? ?? 'Order',
                     ),
                   ),
                 ],
@@ -927,6 +1101,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
             orderId: orderId,
             product: product,
             quantity: entry.value,
+            createdBy: authProvider.currentUserId != null
+                ? (kIsWeb
+                    ? authProvider.currentUserId!
+                    : int.tryParse(authProvider.currentUserId!))
+                : null,
           );
         }
 

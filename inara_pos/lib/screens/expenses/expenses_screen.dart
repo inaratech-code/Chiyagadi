@@ -16,20 +16,29 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   final ExpenseService _expenseService = ExpenseService();
   bool _isLoading = true;
   List<Expense> _expenses = [];
+  int _expensesLimit = 50;
+  bool _canLoadMore = false;
 
   @override
   void initState() {
     super.initState();
-    _loadExpenses();
+    // PERF: Let the screen render first.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadExpenses());
   }
 
   Future<void> _loadExpenses() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final expenses = await _expenseService.getExpenses(context: context);
+      final expenses = await _expenseService.getExpenses(
+        context: context,
+        limit: _expensesLimit,
+      );
       if (!mounted) return;
-      setState(() => _expenses = expenses);
+      setState(() {
+        _expenses = expenses;
+        _canLoadMore = expenses.length >= _expensesLimit;
+      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -246,8 +255,23 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       : ListView.builder(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 8),
-                          itemCount: _expenses.length,
+                          itemCount: _expenses.length + (_canLoadMore ? 1 : 0),
                           itemBuilder: (context, index) {
+                            if (_canLoadMore && index == _expenses.length) {
+                              return Padding(
+                                padding: const EdgeInsets.only(
+                                    top: 8, bottom: 24),
+                                child: OutlinedButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _expensesLimit += 50;
+                                    });
+                                    _loadExpenses();
+                                  },
+                                  child: const Text('Load more'),
+                                ),
+                              );
+                            }
                             final e = _expenses[index];
                             final date = DateTime.fromMillisecondsSinceEpoch(
                                 e.createdAt);

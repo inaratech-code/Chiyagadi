@@ -110,7 +110,26 @@ class _LoginScreenState extends State<LoginScreen>
             await dbProvider.query('users', limit: 1);
             dbInitialized = true;
           } catch (queryError) {
-            debugPrint('Database query test failed: $queryError');
+            final msg = queryError.toString();
+            debugPrint('Database query test failed: $msg');
+
+            // Fail fast on common Firestore configuration errors (web)
+            if (msg.contains('permission') ||
+                msg.contains('PERMISSION_DENIED') ||
+                msg.contains('Missing or insufficient permissions') ||
+                msg.contains('not enabled') ||
+                msg.contains('Firestore')) {
+              setState(() {
+                _errorMessage =
+                    'Database access error:\n\n$msg\n\n'
+                    'If you are using web:\n'
+                    '- Ensure Firestore Database is enabled\n'
+                    '- Ensure Firestore rules allow read/write (or publish your rules)\n';
+                _isLoading = false;
+              });
+              return;
+            }
+
             if (retryCount < maxRetries - 1) {
               // Try to reset and reinitialize
               try {
