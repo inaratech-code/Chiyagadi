@@ -37,13 +37,17 @@ class InventoryLedgerService {
       double totalOut = 0.0;
 
       for (final entry in ledgerEntries) {
-        totalIn += (entry['quantity_in'] as num?)?.toDouble() ?? 0.0;
-        totalOut += (entry['quantity_out'] as num?)?.toDouble() ?? 0.0;
+        final qtyIn = (entry['quantity_in'] as num?)?.toDouble() ?? 0.0;
+        final qtyOut = (entry['quantity_out'] as num?)?.toDouble() ?? 0.0;
+        totalIn += qtyIn;
+        totalOut += qtyOut;
       }
 
-      return totalIn - totalOut;
+      final stock = totalIn - totalOut;
+      debugPrint('InventoryLedgerService: Stock for product $productId - In: $totalIn, Out: $totalOut, Stock: $stock');
+      return stock;
     } catch (e) {
-      debugPrint('Error calculating current stock: $e');
+      debugPrint('Error calculating current stock for product $productId: $e');
       return 0.0;
     }
   }

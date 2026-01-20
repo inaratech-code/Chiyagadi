@@ -123,17 +123,37 @@ class OrderService {
     // UPDATED: Check if product has inventory and deduct stock automatically
     final inventoryLedgerService = InventoryLedgerService();
     try {
-      final currentStock = await inventoryLedgerService.getCurrentStock(
-        context: context,
-        productId: productId,
-      );
+      // UPDATED: Only check inventory if product has inventory history (has been purchased)
+      final hasInventory = await _hasInventoryHistory(dbProvider, productId);
+      
+      debugPrint('OrderService: Adding ${product.name} (ID: $productId) - hasInventory: $hasInventory');
+      
+      if (hasInventory) {
+        // Product has inventory tracking - check stock and deduct
+        final currentStock = await inventoryLedgerService.getCurrentStock(
+          context: context,
+          productId: productId,
+        );
 
-      // If product has inventory (stock > 0 or has ledger entries), deduct stock
-      if (currentStock > 0 || await _hasInventoryHistory(dbProvider, productId)) {
+        debugPrint('OrderService: Current stock for ${product.name}: $currentStock, Required: $quantity');
+
         // Check if sufficient stock is available
         if (currentStock < quantity) {
           throw Exception(
-              'Insufficient stock. Available: ${currentStock.toStringAsFixed(2)}, Required: $quantity');
+              'Insufficient stock for ${product.name}. Available: ${currentStock.toStringAsFixed(2)}, Required: $quantity');
+        }
+
+        // Convert createdBy to int? for InventoryLedger
+        // createdBy can be String (Firestore) or int (SQLite), but InventoryLedger expects int?
+        int? createdByInt;
+        if (createdBy != null) {
+          if (createdBy is int) {
+            createdByInt = createdBy;
+          } else if (createdBy is String) {
+            createdByInt = int.tryParse(createdBy);
+          } else if (createdBy is num) {
+            createdByInt = createdBy.toInt();
+          }
         }
 
         // Create ledger entry to decrease stock
@@ -147,7 +167,7 @@ class OrderService {
           referenceType: 'order',
           referenceId: orderId,
           notes: notes ?? 'Order item: ${product.name}',
-          createdBy: createdBy,
+          createdBy: createdByInt,
           createdAt: DateTime.now().millisecondsSinceEpoch,
         );
 
@@ -158,14 +178,17 @@ class OrderService {
 
         debugPrint(
             'OrderService: Deducted $quantity ${product.name} from inventory. New stock: ${currentStock - quantity}');
+      } else {
+        // Product has no inventory tracking - skip stock deduction
+        debugPrint('OrderService: Product ${product.name} has no inventory tracking, skipping stock deduction');
       }
     } catch (e) {
       // If it's a stock-related error, rethrow it
       if (e.toString().contains('Insufficient stock')) {
         rethrow;
       }
-      // For other errors (e.g., product has no inventory), continue without deducting
-      debugPrint('OrderService: No inventory deduction needed for ${product.name}: $e');
+      // For other errors, continue without deducting
+      debugPrint('OrderService: Error checking inventory for ${product.name}: $e');
     }
 
     // Check if item already exists in order
@@ -260,6 +283,18 @@ class OrderService {
           final hasInventory = await _hasInventoryHistory(dbProvider, productId);
           
           if (hasInventory) {
+            // Convert createdBy to int? for InventoryLedger
+            int? createdByInt;
+            if (createdBy != null) {
+              if (createdBy is int) {
+                createdByInt = createdBy;
+              } else if (createdBy is String) {
+                createdByInt = int.tryParse(createdBy);
+              } else if (createdBy is num) {
+                createdByInt = createdBy.toInt();
+              }
+            }
+            
             // Create reverse ledger entry to add stock back
             final ledgerEntry = InventoryLedger(
               productId: productId,
@@ -271,7 +306,7 @@ class OrderService {
               referenceType: 'order',
               referenceId: orderId,
               notes: 'Order item removed: $productName',
-              createdBy: createdBy,
+              createdBy: createdByInt,
               createdAt: DateTime.now().millisecondsSinceEpoch,
             );
 
@@ -339,6 +374,18 @@ class OrderService {
           final hasInventory = await _hasInventoryHistory(dbProvider, productId);
           
           if (hasInventory) {
+            // Convert createdBy to int? for InventoryLedger
+            int? createdByInt;
+            if (createdBy != null) {
+              if (createdBy is int) {
+                createdByInt = createdBy;
+              } else if (createdBy is String) {
+                createdByInt = int.tryParse(createdBy);
+              } else if (createdBy is num) {
+                createdByInt = createdBy.toInt();
+              }
+            }
+            
             final quantityDiff = quantity - oldQuantity;
             
             if (quantityDiff > 0) {
@@ -363,7 +410,7 @@ class OrderService {
                 referenceType: 'order',
                 referenceId: orderId,
                 notes: 'Order item quantity increased: $productName',
-                createdBy: createdBy,
+                createdBy: createdByInt,
                 createdAt: DateTime.now().millisecondsSinceEpoch,
               );
 
@@ -383,7 +430,7 @@ class OrderService {
                 referenceType: 'order',
                 referenceId: orderId,
                 notes: 'Order item quantity decreased: $productName',
-                createdBy: createdBy,
+                createdBy: createdByInt,
                 createdAt: DateTime.now().millisecondsSinceEpoch,
               );
 

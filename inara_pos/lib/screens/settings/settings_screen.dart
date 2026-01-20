@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/unified_database_provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/theme_provider.dart';
 import '../../utils/theme.dart';
 import '../../utils/app_messenger.dart';
 import 'users_management_screen.dart';
@@ -25,7 +24,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _selectedMaxDiscount;
   bool _discountEnabled = true;
   bool _isLoading = true;
-  // NEW: Login behavior (security-sensitive)
   String _lockMode = 'timeout'; // 'always' | 'timeout'
 
   // Discount options (0% to 100%)
@@ -268,73 +266,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // Theme Settings
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.dark_mode,
-                                  color: Color(0xFFFFC107)),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Appearance',
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Consumer<ThemeProvider>(
-                            builder: (context, themeProvider, _) {
-                              return Column(
-                                children: [
-                                  RadioListTile<ThemeMode>(
-                                    title: const Text('System Default'),
-                                    subtitle: const Text('Follow device theme'),
-                                    value: ThemeMode.system,
-                                    groupValue: themeProvider.themeMode,
-                                    onChanged: (value) {
-                                      if (value != null) {
-                                        themeProvider.setThemeMode(value);
-                                      }
-                                    },
-                                  ),
-                                  RadioListTile<ThemeMode>(
-                                    title: const Text('Light Mode'),
-                                    subtitle:
-                                        const Text('Always use light theme'),
-                                    value: ThemeMode.light,
-                                    groupValue: themeProvider.themeMode,
-                                    onChanged: (value) {
-                                      if (value != null) {
-                                        themeProvider.setThemeMode(value);
-                                      }
-                                    },
-                                  ),
-                                  RadioListTile<ThemeMode>(
-                                    title: const Text('Dark Mode'),
-                                    subtitle:
-                                        const Text('Always use dark theme'),
-                                    value: ThemeMode.dark,
-                                    groupValue: themeProvider.themeMode,
-                                    onChanged: (value) {
-                                      if (value != null) {
-                                        themeProvider.setThemeMode(value);
-                                      }
-                                    },
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                   // VAT Settings (Visible to All, Editable by Admin Only)
                   Card(
                     color: AppTheme.logoPrimary.withOpacity(0.1),
@@ -492,39 +423,132 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: const Text('Save Settings'),
                     ),
                   ),
-                  // Password Change (All Users)
-                  const SizedBox(height: 16),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.lock, color: Color(0xFFFFC107)),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Change Password',
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          ListTile(
-                            leading: const Icon(Icons.password),
-                            title: const Text('Change My Password'),
-                            subtitle: Text(
-                                'Current user: ${authProvider.currentUsername ?? 'Unknown'}'),
-                            trailing:
-                                const Icon(Icons.arrow_forward_ios, size: 16),
-                            onTap: () => _showChangePasswordDialog(),
-                          ),
-                        ],
+                  if (authProvider.isAdmin) ...[
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    // Quick Clear Data Button (Admin Only)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _showResetDialog,
+                        icon: const Icon(Icons.delete_sweep),
+                        label: const Text('Clear All Business Data'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          backgroundColor: AppTheme.errorColor,
+                          foregroundColor: Colors.white,
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Warning: This will permanently delete all orders, products, inventory, purchases, customers, and expenses. Users and settings will be kept.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                   if (authProvider.isAdmin) ...[
+                    // Password Change (Admin Only)
+                    const SizedBox(height: 16),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.lock, color: Color(0xFFFFC107)),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Change Password',
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Admin only: Change your password',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            ListTile(
+                              leading: const Icon(Icons.password),
+                              title: const Text('Change My Password'),
+                              subtitle: Text(
+                                  'Current user: ${authProvider.currentUsername ?? 'Unknown'}'),
+                              trailing:
+                                  const Icon(Icons.arrow_forward_ios, size: 16),
+                              onTap: () => _showChangePasswordDialog(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // User Management (Admin Only)
+                    Card(
+                      color: AppTheme.logoPrimary.withOpacity(0.1),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.manage_accounts,
+                                    color: AppTheme.logoPrimary),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'User Management',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleLarge
+                                      ?.copyWith(
+                                        color: AppTheme.logoPrimary,
+                                      ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Create users, reset PINs, and manage roles (Admin/Cashier)',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                        builder: (_) =>
+                                            const UsersManagementScreen()),
+                                  );
+                                },
+                                icon: const Icon(Icons.people),
+                                label: const Text('Manage Users'),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  backgroundColor: AppTheme.logoPrimary,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     // Admin Only Settings
                     Card(
@@ -544,23 +568,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ),
                             ),
                             const SizedBox(height: 16),
-                            ListTile(
-                              leading: const Icon(Icons.manage_accounts,
-                                  color: AppTheme.logoPrimary),
-                              title: const Text('User Management'),
-                              subtitle: const Text(
-                                  'Create users, reset PINs, roles (Admin/Cashier)'),
-                              trailing:
-                                  const Icon(Icons.arrow_forward_ios, size: 16),
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                      builder: (_) =>
-                                          const UsersManagementScreen()),
-                                );
-                              },
-                            ),
-                            const Divider(),
                             ListTile(
                               leading: const Icon(Icons.delete_forever,
                                   color: AppTheme.errorColor),

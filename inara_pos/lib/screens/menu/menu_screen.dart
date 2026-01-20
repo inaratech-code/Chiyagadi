@@ -8,6 +8,8 @@ import '../../models/category.dart';
 import '../../models/product.dart';
 import '../../services/order_service.dart';
 import '../../widgets/order_overlay_widget.dart';
+import '../../models/inventory_ledger_model.dart';
+import '../../services/inventory_ledger_service.dart';
 import '../../utils/theme.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io' as io;
@@ -1020,6 +1022,23 @@ class _MenuScreenState extends State<MenuScreen> {
         ],
       ),
     );
+  }
+
+  // Helper method to get current stock for a product
+  Future<double> _getProductStock(Product product) async {
+    try {
+      final productId = kIsWeb ? product.documentId : product.id;
+      if (productId == null) return 0.0;
+      
+      final ledgerService = InventoryLedgerService();
+      return await ledgerService.getCurrentStock(
+        context: context,
+        productId: productId,
+      );
+    } catch (e) {
+      debugPrint('Error getting product stock: $e');
+      return 0.0;
+    }
   }
 
   Future<bool?> _showAddCategoryDialog() async {
@@ -2053,6 +2072,227 @@ class _MenuScreenState extends State<MenuScreen> {
                         ),
                       ),
                     ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Inventory Management Section
+                  FutureBuilder<double>(
+                    future: _getProductStock(product),
+                    builder: (context, snapshot) {
+                      final currentStock = snapshot.data ?? 0.0;
+                      final stockController = TextEditingController();
+                      
+                      return StatefulBuilder(
+                        builder: (context, setState) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Divider(),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  const Icon(Icons.inventory_2, size: 20, color: Colors.blue),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Inventory Management',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey[800],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.grey[300]!),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Current Stock',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey[600],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          currentStock.toStringAsFixed(2),
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: currentStock > 0 
+                                                ? Colors.green[700] 
+                                                : Colors.red[700],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (currentStock > 0)
+                                      Icon(
+                                        Icons.check_circle,
+                                        color: Colors.green[700],
+                                        size: 24,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: stockController,
+                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      decoration: InputDecoration(
+                                        labelText: 'Quantity to Add',
+                                        hintText: 'Enter quantity',
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        contentPadding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: () async {
+                                      final quantityText = stockController.text.trim();
+                                      if (quantityText.isEmpty) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Please enter a quantity'),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      
+                                      final quantity = double.tryParse(quantityText);
+                                      if (quantity == null || quantity <= 0) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Please enter a valid quantity'),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      
+                                      try {
+                                        final dbProvider = Provider.of<UnifiedDatabaseProvider>(
+                                          context,
+                                          listen: false,
+                                        );
+                                        await dbProvider.init();
+                                        
+                                        final productId = kIsWeb ? product.documentId : product.id;
+                                        if (productId == null) {
+                                          throw Exception('Product ID is required');
+                                        }
+                                        
+                                        // Ensure product is marked as purchasable
+                                        if (!product.isPurchasable) {
+                                          final now = DateTime.now().millisecondsSinceEpoch;
+                                          await dbProvider.update(
+                                            'products',
+                                            values: {
+                                              'is_purchasable': 1,
+                                              'updated_at': now,
+                                            },
+                                            where: kIsWeb ? 'documentId = ?' : 'id = ?',
+                                            whereArgs: [productId],
+                                          );
+                                        }
+                                        
+                                        // Create inventory ledger entry
+                                        final auth = Provider.of<AuthProvider>(context, listen: false);
+                                        // createdBy must be int? for InventoryLedger
+                                        // For Firestore (web), try to parse string user ID as int
+                                        int? createdBy;
+                                        if (auth.currentUserId != null) {
+                                          if (kIsWeb) {
+                                            // Firestore: try to parse string user ID as int
+                                            createdBy = int.tryParse(auth.currentUserId!);
+                                          } else {
+                                            // SQLite: parse string user ID as int
+                                            createdBy = int.tryParse(auth.currentUserId!);
+                                          }
+                                        }
+                                        
+                                        final ledgerEntry = InventoryLedger(
+                                          productId: productId,
+                                          productName: product.name,
+                                          quantityIn: quantity,
+                                          quantityOut: 0.0,
+                                          unitPrice: product.cost ?? 0.0,
+                                          transactionType: 'manual_adjustment',
+                                          referenceType: 'manual',
+                                          referenceId: null,
+                                          notes: 'Manual stock addition from menu',
+                                          createdBy: createdBy,
+                                          createdAt: DateTime.now().millisecondsSinceEpoch,
+                                        );
+                                        
+                                        final ledgerService = InventoryLedgerService();
+                                        await ledgerService.addLedgerEntry(
+                                          context: context,
+                                          ledgerEntry: ledgerEntry,
+                                        );
+                                        
+                                        // Refresh stock display
+                                        setState(() {
+                                          stockController.clear();
+                                        });
+                                        
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Added ${quantity.toStringAsFixed(2)} to stock',
+                                            ),
+                                            backgroundColor: Colors.green,
+                                          ),
+                                        );
+                                        
+                                        // Refresh the stock value
+                                        setState(() {});
+                                      } catch (e) {
+                                        debugPrint('Error adding stock: $e');
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Error: ${e.toString()}'),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    icon: const Icon(Icons.add, size: 18),
+                                    label: const Text('Add Stock'),
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
                   ),
 
                   const SizedBox(height: 16),

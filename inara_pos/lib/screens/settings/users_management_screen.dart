@@ -346,6 +346,174 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
     }
   }
 
+  Future<void> _showRolePermissionsDialog() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    
+    // Section names and indices
+    final sections = [
+      {'name': 'Dashboard', 'index': 0},
+      {'name': 'Orders', 'index': 1},
+      {'name': 'Tables', 'index': 2},
+      {'name': 'Menu', 'index': 3},
+      {'name': 'Sales', 'index': 4},
+      {'name': 'Reports', 'index': 5},
+      {'name': 'Inventory', 'index': 6},
+      {'name': 'Customers', 'index': 7},
+      {'name': 'Purchases', 'index': 8},
+      {'name': 'Expenses', 'index': 9},
+    ];
+
+    // Load current permissions
+    Set<int> adminPermissions = await auth.getRolePermissions('admin');
+    Set<int> cashierPermissions = await auth.getRolePermissions('cashier');
+    
+    // Ensure Dashboard (0) is always included
+    adminPermissions.add(0);
+    cashierPermissions.add(0);
+    
+    // Ensure at least 2 permissions (Dashboard + one other)
+    if (adminPermissions.length < 2 && !adminPermissions.contains(1)) {
+      adminPermissions.add(1); // Add Orders as default second option
+    }
+    if (cashierPermissions.length < 2 && !cashierPermissions.contains(1)) {
+      cashierPermissions.add(1); // Add Orders as default second option
+    }
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Role Permissions'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Admin Permissions
+                Text(
+                  'Admin Permissions',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.logoPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ...sections.map((section) {
+                  final index = section['index'] as int;
+                  final isSelected = adminPermissions.contains(index);
+                  final isDashboard = index == 0;
+                  return CheckboxListTile(
+                    title: Text(section['name'] as String),
+                    value: isSelected,
+                    onChanged: isDashboard
+                        ? null // Dashboard cannot be unchecked
+                        : (value) {
+                            setDialogState(() {
+                              if (value == true) {
+                                adminPermissions.add(index);
+                              } else {
+                                // Ensure at least Dashboard + one other section
+                                adminPermissions.remove(index);
+                                if (adminPermissions.length < 2) {
+                                  // Keep Dashboard and add Orders if not already there
+                                  adminPermissions.add(0);
+                                  if (!adminPermissions.contains(1)) {
+                                    adminPermissions.add(1);
+                                  }
+                                }
+                              }
+                            });
+                          },
+                    dense: true,
+                    subtitle: isDashboard
+                        ? const Text('Always enabled (required)', style: TextStyle(fontSize: 11))
+                        : null,
+                  );
+                }),
+                const Divider(height: 32),
+                // Cashier Permissions
+                Text(
+                  'Cashier Permissions',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF6C5CE7),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ...sections.map((section) {
+                  final index = section['index'] as int;
+                  final isSelected = cashierPermissions.contains(index);
+                  final isDashboard = index == 0;
+                  return CheckboxListTile(
+                    title: Text(section['name'] as String),
+                    value: isSelected,
+                    onChanged: isDashboard
+                        ? null // Dashboard cannot be unchecked
+                        : (value) {
+                            setDialogState(() {
+                              if (value == true) {
+                                cashierPermissions.add(index);
+                              } else {
+                                // Ensure at least Dashboard + one other section
+                                cashierPermissions.remove(index);
+                                if (cashierPermissions.length < 2) {
+                                  // Keep Dashboard and add Orders if not already there
+                                  cashierPermissions.add(0);
+                                  if (!cashierPermissions.contains(1)) {
+                                    cashierPermissions.add(1);
+                                  }
+                                }
+                              }
+                            });
+                          },
+                    dense: true,
+                    subtitle: isDashboard
+                        ? const Text('Always enabled (required)', style: TextStyle(fontSize: 11))
+                        : null,
+                  );
+                }),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result == true) {
+      // Save permissions
+      final adminOk = await auth.updateRolePermissions('admin', adminPermissions);
+      final cashierOk = await auth.updateRolePermissions('cashier', cashierPermissions);
+
+      if (mounted) {
+        if (adminOk && cashierOk) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Role permissions updated successfully'),
+              backgroundColor: AppTheme.successColor,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to update permissions'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _toggleActive(Map<String, dynamic> user) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final userId = user['id'];
@@ -429,12 +597,27 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddUserDialog,
-        backgroundColor: AppTheme.logoPrimary,
-        foregroundColor: AppTheme.logoAccent,
-        icon: const Icon(Icons.person_add),
-        label: const Text('Add User'),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton.extended(
+            onPressed: _showRolePermissionsDialog,
+            backgroundColor: AppTheme.logoSecondary,
+            foregroundColor: Colors.white,
+            icon: const Icon(Icons.security),
+            label: const Text('Role Permissions'),
+            heroTag: 'permissions',
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton.extended(
+            onPressed: _showAddUserDialog,
+            backgroundColor: AppTheme.logoPrimary,
+            foregroundColor: AppTheme.logoAccent,
+            icon: const Icon(Icons.person_add),
+            label: const Text('Add User'),
+            heroTag: 'add_user',
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

@@ -403,7 +403,7 @@ class _LoginScreenState extends State<LoginScreen>
                                     child: Transform.translate(
                                       offset: Offset(0, 10 * (1 - value)),
                                       child: Text(
-                                        'Chiya Gadhi',
+                                        'ChiyaGadi',
                                         style: Theme.of(context)
                                             .textTheme
                                             .titleMedium

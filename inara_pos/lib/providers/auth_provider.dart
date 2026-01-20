@@ -538,6 +538,113 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  // Role Permissions Management
+  // Default permissions: Admin has access to all, Cashier has access to most except Inventory and Purchases
+  static const Map<String, List<int>> _defaultPermissions = {
+    'admin': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], // All sections
+    'cashier': [0, 1, 2, 3, 4, 5, 7, 9], // All except Inventory (6) and Purchases (8)
+  };
+
+  /// Get permissions for a role
+  Future<Set<int>> getRolePermissions(String role) async {
+    try {
+      final dbProvider = _getDatabaseProvider();
+      await dbProvider.init();
+      
+      final settings = await dbProvider.query(
+        'settings',
+        where: 'key = ?',
+        whereArgs: ['role_permissions_$role'],
+      );
+
+      Set<int> permissions;
+      if (settings.isNotEmpty) {
+        final permissionsJson = settings.first['value'] as String? ?? '[]';
+        final List<dynamic> permissionsList = jsonDecode(permissionsJson);
+        permissions = permissionsList.map((e) => (e as num).toInt()).toSet();
+      } else {
+        // Return default permissions if not configured
+        permissions = _defaultPermissions[role]?.toSet() ?? <int>{};
+      }
+
+      // Always ensure Dashboard (0) is included - NavigationBar requires at least 2 destinations
+      if (!permissions.contains(0)) {
+        permissions.add(0);
+      }
+
+      return permissions;
+    } catch (e) {
+      debugPrint('AuthProvider: Error getting role permissions: $e');
+      final permissions = _defaultPermissions[role]?.toSet() ?? <int>{0};
+      // Always ensure Dashboard is included
+      permissions.add(0);
+      return permissions;
+    }
+  }
+
+  /// Update permissions for a role
+  Future<bool> updateRolePermissions(String role, Set<int> permissions) async {
+    try {
+      final dbProvider = _getDatabaseProvider();
+      await dbProvider.init();
+      
+      // Always ensure Dashboard (0) is included - NavigationBar requires at least 2 destinations
+      final effectivePermissions = Set<int>.from(permissions);
+      if (!effectivePermissions.contains(0)) {
+        effectivePermissions.add(0);
+      }
+      
+      // Ensure at least 2 permissions (Dashboard + one other)
+      if (effectivePermissions.length < 2) {
+        // Add Orders (1) as a safe default second option
+        effectivePermissions.add(1);
+      }
+      
+      final permissionsJson = jsonEncode(effectivePermissions.toList());
+      final now = DateTime.now().millisecondsSinceEpoch;
+
+      final existing = await dbProvider.query(
+        'settings',
+        where: 'key = ?',
+        whereArgs: ['role_permissions_$role'],
+      );
+
+      if (existing.isNotEmpty) {
+        await dbProvider.update(
+          'settings',
+          values: {
+            'value': permissionsJson,
+            'updated_at': now,
+          },
+          where: 'key = ?',
+          whereArgs: ['role_permissions_$role'],
+        );
+      } else {
+        await dbProvider.insert('settings', {
+          'key': 'role_permissions_$role',
+          'value': permissionsJson,
+          'created_at': now,
+          'updated_at': now,
+        });
+      }
+
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('AuthProvider: Error updating role permissions: $e');
+      return false;
+    }
+  }
+
+  /// Check if current user has access to a section
+  Future<bool> hasAccessToSection(int sectionIndex) async {
+    if (_currentUserRole == null) return false;
+    if (_currentUserRole == 'admin') return true; // Admin always has access
+    
+    final permissions = await getRolePermissions(_currentUserRole!);
+    return permissions.contains(sectionIndex);
+  }
+
   @override
   void dispose() {
     _inactivityTimer?.cancel();

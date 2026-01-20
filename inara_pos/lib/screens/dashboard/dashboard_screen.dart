@@ -334,16 +334,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           letterSpacing: -0.3,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        // UPDATED: Keep shop name visible
-                        _shopName,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                          color: Colors.grey[500],
-                          letterSpacing: 0.2,
-                        ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Text(
+                            'Powered by ',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[500],
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          Text(
+                            'Inara Tech',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF8B4513),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -414,6 +425,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       const SizedBox(height: 16),
       _buildRecentActivity(),
+      const SizedBox(height: 32),
+      // Powered by Inara Tech
+      Center(
+        child: Column(
+          children: [
+            Text(
+              'Powered by',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey[500],
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Inara Tech',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF8B4513),
+                letterSpacing: 1.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 16),
     ];
   }
 
@@ -533,66 +571,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildLowStockAlert() {
-    return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const InventoryScreen()),
-        );
-      },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppTheme.warningColor.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-              color: AppTheme.warningColor.withOpacity(0.3), width: 1),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.warningColor.withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.warning_amber_rounded,
-                color: Colors.orange,
-                size: 24,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      color: Colors.red[50],
+      child: Row(
+        children: [
+          Icon(Icons.warning, color: Colors.red[700]),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$_lowStockCount item(s) are low on stock!',
+              style: TextStyle(
+                color: Colors.red[900],
+                fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Low Stock Alert',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.warningColor,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '$_lowStockCount item${_lowStockCount == 1 ? '' : 's'} need restocking',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.warningColor,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.chevron_right,
-              color: AppTheme.warningColor,
-            ),
-          ],
-        ),
+          ),
+          TextButton(
+            onPressed: () {
+              if (widget.onNavigate != null) {
+                widget.onNavigate!(6); // Inventory screen index
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const InventoryScreen()),
+                );
+              }
+            },
+            child: const Text('View'),
+          ),
+        ],
       ),
     );
   }

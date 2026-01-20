@@ -8,6 +8,7 @@ import '../../models/inventory_ledger_model.dart';
 import '../../utils/theme.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../purchases/purchases_screen.dart';
 
 /// FIXED: Inventory Screen now uses ledger-based stock calculation
 /// Stock is NEVER stored directly - always calculated from inventory_ledger
@@ -126,6 +127,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
       final products = productMaps.map((map) => Product.fromMap(map)).toList();
 
+      // UPDATED: Load categories to get category names
+      final categoryMaps = await dbProvider.query('categories');
+      final categoryMap = <dynamic, String>{};
+      for (final cat in categoryMaps) {
+        final catId = kIsWeb ? cat['id'] : cat['id'];
+        final catName = cat['name'] as String? ?? 'Uncategorized';
+        if (catId != null) {
+          categoryMap[catId] = catName;
+        }
+      }
+
       // FIXED: Calculate stock from ledger for each product
       final List<Map<String, dynamic>> inventoryList = [];
       final List<Map<String, dynamic>> lowStockList = [];
@@ -152,6 +164,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
         final isLowStock = currentStock <= minStockLevel;
 
+        // UPDATED: Get category name from category map
+        final categoryName = categoryMap[product.categoryId] ?? 'Uncategorized';
+
         final inventoryItem = {
           'product_id': productId,
           'product_name': product.name,
@@ -161,7 +176,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
           'is_low_stock': isLowStock ? 1 : 0,
           'selling_price': product.price,
           'purchase_price': product.cost,
-          'category_name': null, // Can be added if needed
+          'category_name': categoryName, // UPDATED: Use actual category name
+          'unit': 'pcs', // UPDATED: Default unit (can be enhanced later)
         };
 
         inventoryList.add(inventoryItem);
@@ -216,6 +232,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 ),
               ],
             ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          // Navigate to purchases screen to add inventory items
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const PurchasesScreen(),
+            ),
+          );
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Add Inventory'),
+        tooltip: 'Add inventory items via purchase',
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -417,7 +446,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                            '${item['category_name']} • ${item['unit']}'),
+                                            '${item['category_name'] ?? 'Uncategorized'} • ${item['unit'] ?? 'pcs'}'),
                                         if (_viewMode == 'report' &&
                                             item['purchase_price'] != null)
                                           Text(

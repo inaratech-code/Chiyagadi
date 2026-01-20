@@ -389,6 +389,13 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
 
     final List<Product> products = [];
 
+    // Load all suppliers for autocomplete
+    final suppliers = await _supplierService.getAllSuppliers(
+      context: context,
+      activeOnly: true,
+    );
+    final supplierNames = suppliers.map((s) => s.name).toList();
+
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -398,11 +405,94 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                  controller: supplierController,
-                  decoration:
-                      const InputDecoration(labelText: 'Supplier Name *'),
-                  autofocus: true,
+                // UPDATED: Autocomplete for supplier name with dropdown
+                Autocomplete<String>(
+                  initialValue: preSelectedSupplier != null
+                      ? TextEditingValue(text: preSelectedSupplier)
+                      : null,
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    if (textEditingValue.text.isEmpty) {
+                      return supplierNames;
+                    }
+                    return supplierNames.where((String option) {
+                      return option
+                          .toLowerCase()
+                          .contains(textEditingValue.text.toLowerCase());
+                    });
+                  },
+                  onSelected: (String selection) {
+                    supplierController.text = selection;
+                  },
+                  fieldViewBuilder: (
+                    BuildContext context,
+                    TextEditingController textEditingController,
+                    FocusNode focusNode,
+                    VoidCallback onFieldSubmitted,
+                  ) {
+                    // Initialize with pre-selected supplier or existing controller value
+                    if (preSelectedSupplier != null &&
+                        textEditingController.text.isEmpty) {
+                      textEditingController.text = preSelectedSupplier;
+                      supplierController.text = preSelectedSupplier;
+                    }
+                    // Sync changes from autocomplete controller to main controller
+                    textEditingController.addListener(() {
+                      if (supplierController.text != textEditingController.text) {
+                        supplierController.text = textEditingController.text;
+                      }
+                    });
+                    return TextField(
+                      controller: textEditingController,
+                      focusNode: focusNode,
+                      decoration:
+                          const InputDecoration(labelText: 'Supplier Name *'),
+                      autofocus: true,
+                      onSubmitted: (String value) {
+                        onFieldSubmitted();
+                      },
+                    );
+                  },
+                  optionsViewBuilder: (
+                    BuildContext context,
+                    AutocompleteOnSelected<String> onSelected,
+                    Iterable<String> options,
+                  ) {
+                    return Align(
+                      alignment: Alignment.topLeft,
+                      child: Material(
+                        elevation: 4.0,
+                        borderRadius: BorderRadius.circular(8),
+                        child: SizedBox(
+                          width: 250, // UPDATED: Fixed smaller width for dropdown
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(
+                              maxHeight: 200,
+                            ),
+                            child: ListView.builder(
+                              padding: EdgeInsets.zero,
+                              shrinkWrap: true,
+                              itemCount: options.length,
+                              itemBuilder: (BuildContext context, int index) {
+                                final String option = options.elementAt(index);
+                                return InkWell(
+                                  onTap: () {
+                                    onSelected(option);
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Text(
+                                      option,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -510,35 +600,92 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
           // For manual entries, try to find or create the product
           if (isManual && productId == null) {
             productName = item['product_name'] as String;
-            // Try to find existing product by name
-            final existingProducts = await dbProvider.query(
-              'products',
-              // IMPORTANT: Never link purchase items to Menu items.
-              // Only reuse products that are purchasable-only (is_purchasable=1 AND is_sellable=0).
-              where: 'name = ? AND is_purchasable = ? AND is_sellable = ?',
-              whereArgs: [productName, 1, 0],
-            );
-
-            if (existingProducts.isNotEmpty) {
-              final existing = Product.fromMap(existingProducts.first);
-              productId = kIsWeb ? existing.documentId : existing.id;
-              productName = existing.name;
+            // UPDATED: First try to find ANY existing product by name (case-insensitive)
+            // This ensures purchases add inventory to the same product used in orders
+            Product? matchedProduct;
+            
+            if (kIsWeb) {
+              // Firestore: Get all products and match in-memory (case-insensitive)
+              final allProducts = await dbProvider.query('products');
+              final normalizedName = productName.trim().toLowerCase();
+              for (final prodMap in allProducts) {
+                final prod = Product.fromMap(prodMap);
+                if (prod.name.trim().toLowerCase() == normalizedName) {
+                  matchedProduct = prod;
+                  break;
+                }
+              }
             } else {
-              // Create a new purchasable product on-the-fly
+              // SQLite: Try exact match first, then case-insensitive
+              var allProducts = await dbProvider.query(
+                'products',
+                where: 'name = ?',
+                whereArgs: [productName],
+              );
+              
+              if (allProducts.isEmpty) {
+                // Try case-insensitive match
+                allProducts = await dbProvider.query('products');
+                final normalizedName = productName.trim().toLowerCase();
+                for (final prodMap in allProducts) {
+                  final prod = Product.fromMap(prodMap);
+                  if (prod.name.trim().toLowerCase() == normalizedName) {
+                    allProducts = [prodMap];
+                    break;
+                  }
+                }
+              }
+              
+              if (allProducts.isNotEmpty) {
+                matchedProduct = Product.fromMap(allProducts.first);
+              }
+            }
+
+            if (matchedProduct != null) {
+              // Use existing product (whether sellable or not) to ensure inventory matches
+              productId = kIsWeb ? matchedProduct.documentId : matchedProduct.id;
+              productName = matchedProduct.name;
+              
+              debugPrint('Purchase: Matched existing product "$productName" (ID: $productId) for purchase item');
+              
+              // UPDATED: If product exists but isn't purchasable, mark it as purchasable
+              if (!matchedProduct.isPurchasable) {
+                final now = DateTime.now().millisecondsSinceEpoch;
+                await dbProvider.update(
+                  'products',
+                  values: {
+                    'is_purchasable': 1,
+                    'cost': (item['unit_price'] as num).toDouble(),
+                    'updated_at': now,
+                  },
+                  where: kIsWeb ? 'documentId = ?' : 'id = ?',
+                  whereArgs: [productId],
+                );
+                debugPrint('Purchase: Updated product "$productName" to be purchasable');
+              }
+            } else {
+              debugPrint('Purchase: No existing product found for "$productName", creating new product');
+              // Create a new product that can be both purchased and sold
+              // UPDATED: Check if this might be a menu item by looking for similar names
               final now = DateTime.now().millisecondsSinceEpoch;
+              
+              // Try to find a category (default to first category or 0)
+              final categories = await dbProvider.query('categories', limit: 1);
+              final categoryId = categories.isNotEmpty 
+                  ? (kIsWeb ? categories.first['id'] : categories.first['id'])
+                  : 0;
+              
               productId = await dbProvider.insert('products', {
-                // Use a safe "uncategorized" value so SQLite NOT NULL doesn't break.
-                // This product is purchasable-only, so it will not show in Menu anyway.
-                'category_id': 0,
+                'category_id': categoryId,
                 'name': productName,
                 'description': 'Purchase item',
-                'price': 0, // No selling price
+                'price': 0, // Will be set when sold
                 'cost': (item['unit_price'] as num).toDouble(),
                 'image_url': null,
                 'is_veg': 1,
                 'is_active': 1,
-                'is_purchasable': 1, // Mark as purchasable
-                'is_sellable': 0, // Not sellable (raw material)
+                'is_purchasable': 1, // Can be purchased
+                'is_sellable': 1, // UPDATED: Can also be sold (inventory items like drinks)
                 'created_at': now,
                 'updated_at': now,
               });

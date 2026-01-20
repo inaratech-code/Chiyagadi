@@ -22,10 +22,9 @@ dependencies:
   path: ^1.8.3
   sqflite_common_ffi: ^2.3.3
 
-  # Firebase (Storage removed - not needed for POS, can add later if needed)
+  # Firebase
   firebase_core: ^2.24.2
   cloud_firestore: ^4.13.6
-  # firebase_storage: ^11.5.6  # Removed - causes web compatibility issues
 
   # State Management
   provider: ^6.1.1

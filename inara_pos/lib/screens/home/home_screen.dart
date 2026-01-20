@@ -60,15 +60,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _navigateToScreen(int index) => _selectIndex(index);
 
-  void _selectIndex(int index) {
-    // NEW: Role-based access control (cashier restrictions)
+  void _selectIndex(int index) async {
+    // Role-based access control using permissions
     final auth = context.read<AuthProvider>();
-    final isRestrictedForCashier =
-        !auth.isAdmin && (index == 6 || index == 8); // Inventory, Purchases
-    if (isRestrictedForCashier) {
+    final hasAccess = await auth.hasAccessToSection(index);
+    
+    if (!hasAccess) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Access denied: Admin only'),
+          content: Text('Access denied: You do not have permission to access this section'),
           backgroundColor: Colors.red,
         ),
       );
@@ -227,80 +227,96 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildDrawer(BuildContext context, AuthProvider authProvider) {
     return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          DrawerHeader(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppTheme.logoPrimary,
-                  AppTheme.logoSecondary,
-                ],
+      child: FutureBuilder<Set<int>>(
+        future: authProvider.getRolePermissions(authProvider.currentUserRole ?? 'cashier'),
+        builder: (context, snapshot) {
+          final permissions = snapshot.data ?? <int>{0, 1, 2, 3, 4, 5, 7, 9};
+          
+          return ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              DrawerHeader(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppTheme.logoPrimary,
+                      AppTheme.logoSecondary,
+                    ],
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'चिया गढी',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      authProvider.currentUsername ?? 'User',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      authProvider.isAdmin ? 'Admin' : 'Cashier',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'चिया गढी',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  authProvider.currentUsername ?? 'User',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  authProvider.isAdmin ? 'Admin' : 'Cashier',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _buildDrawerTile(Icons.dashboard, 'Dashboard', 0),
-          _buildDrawerTile(Icons.receipt_long, 'Orders', 1),
-          _buildDrawerTile(Icons.table_restaurant, 'Tables', 2),
-          _buildDrawerTile(Icons.restaurant_menu, 'Menu', 3),
-          _buildDrawerTile(Icons.shopping_cart, 'Sales', 4),
-          _buildDrawerTile(Icons.analytics, 'Reports', 5),
-          // UPDATED: Cashier cannot access Inventory
-          if (authProvider.isAdmin)
-            _buildDrawerTile(Icons.inventory_2, 'Inventory', 6),
-          _buildDrawerTile(Icons.people, 'Customers', 7),
-          // UPDATED: Cashier cannot access Purchases
-          if (authProvider.isAdmin)
-            _buildDrawerTile(Icons.shopping_bag, 'Purchases', 8),
-          _buildDrawerTile(Icons.payments, 'Expenses', 9),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.settings),
-            title: const Text('Settings'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.pushNamed(context, '/settings');
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text('Logout', style: TextStyle(color: Colors.red)),
-            onTap: () {
-              Navigator.pop(context);
-              _showLogoutDialog(context, authProvider);
-            },
-          ),
-        ],
+              if (permissions.contains(0))
+                _buildDrawerTile(Icons.dashboard, 'Dashboard', 0),
+              if (permissions.contains(1))
+                _buildDrawerTile(Icons.receipt_long, 'Orders', 1),
+              if (permissions.contains(2))
+                _buildDrawerTile(Icons.table_restaurant, 'Tables', 2),
+              if (permissions.contains(3))
+                _buildDrawerTile(Icons.restaurant_menu, 'Menu', 3),
+              if (permissions.contains(4))
+                _buildDrawerTile(Icons.shopping_cart, 'Sales', 4),
+              if (permissions.contains(5))
+                _buildDrawerTile(Icons.analytics, 'Reports', 5),
+              if (permissions.contains(6))
+                _buildDrawerTile(Icons.inventory_2, 'Inventory', 6),
+              if (permissions.contains(7))
+                _buildDrawerTile(Icons.people, 'Customers', 7),
+              if (permissions.contains(8))
+                _buildDrawerTile(Icons.shopping_bag, 'Purchases', 8),
+              if (permissions.contains(9))
+                _buildDrawerTile(Icons.payments, 'Expenses', 9),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.settings),
+                title: const Text('Settings'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.logout, color: Colors.red),
+                title: const Text('Logout', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showLogoutDialog(context, authProvider);
+                },
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -325,72 +341,103 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMobileBottomNav(AuthProvider authProvider) {
-    // Mobile: Show only 4 most important items
+    // Mobile: Show only 4 most important items based on permissions
     // In our screen list: 0=Dashboard, 1=Orders, 2=Tables, 3=Menu, 4+=More screens.
-    // But mobile bottom nav shows: Home, Orders, Menu, More.
-    final isMoreSelected = _selectedIndex == 2 || _selectedIndex > 3;
-
-    int mobileIndexFromSelectedIndex(int selectedIndex) {
-      switch (selectedIndex) {
-        case 0:
-          return 0; // Home
-        case 1:
-          return 1; // Orders
-        case 3:
-          return 2; // Menu
-        default:
-          return 3; // More
-      }
-    }
-
-    int selectedIndexFromMobileIndex(int mobileIndex) {
-      switch (mobileIndex) {
-        case 0:
-          return 0; // Home
-        case 1:
-          return 1; // Orders
-        case 2:
-          return 3; // Menu (NOT tables)
-        default:
-          return _selectedIndex;
-      }
-    }
-
-    return NavigationBar(
-      selectedIndex:
-          isMoreSelected ? 3 : mobileIndexFromSelectedIndex(_selectedIndex),
-      onDestinationSelected: (index) {
-        if (index == 3) {
-          // Show "More" bottom sheet
-          _showMoreOptionsSheet(context, authProvider);
-        } else {
-          _selectIndex(selectedIndexFromMobileIndex(index));
+    // Mobile bottom nav shows: Home, Orders (if permitted), Menu (if permitted), More.
+    return FutureBuilder<Set<int>>(
+      future: authProvider.getRolePermissions(authProvider.currentUserRole ?? 'cashier'),
+      builder: (context, snapshot) {
+        final permissions = snapshot.data ?? <int>{0, 1, 3}; // Default: Home, Orders, Menu
+        
+        // Ensure Dashboard (0) is always accessible
+        final effectivePermissions = Set<int>.from(permissions);
+        if (!effectivePermissions.contains(0)) {
+          effectivePermissions.add(0);
         }
-      },
-      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-      height: 70,
-      destinations: const [
-        NavigationDestination(
+        
+        // Determine if current selection is in "More" category
+        final isMoreSelected = !effectivePermissions.contains(_selectedIndex) || 
+                               (_selectedIndex == 2) || 
+                               (_selectedIndex > 3);
+
+        // Build destinations based on permissions
+        final destinations = <NavigationDestination>[];
+        final indexMap = <int, int>{}; // Map navigation index to section index
+        int navIndex = 0;
+        
+        // Always add Home (Dashboard) - index 0
+        destinations.add(const NavigationDestination(
           icon: Icon(Icons.dashboard),
           selectedIcon: Icon(Icons.dashboard),
           label: 'Home',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.receipt_long),
-          selectedIcon: Icon(Icons.receipt_long),
-          label: 'Orders',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.restaurant_menu),
-          selectedIcon: Icon(Icons.restaurant_menu),
-          label: 'Menu',
-        ),
-        NavigationDestination(
+        ));
+        indexMap[navIndex] = 0;
+        navIndex++;
+        
+        // Add Orders if permitted - index 1
+        if (effectivePermissions.contains(1)) {
+          destinations.add(const NavigationDestination(
+            icon: Icon(Icons.receipt_long),
+            selectedIcon: Icon(Icons.receipt_long),
+            label: 'Orders',
+          ));
+          indexMap[navIndex] = 1;
+          navIndex++;
+        }
+        
+        // Add Menu if permitted - index 3
+        if (effectivePermissions.contains(3)) {
+          destinations.add(const NavigationDestination(
+            icon: Icon(Icons.restaurant_menu),
+            selectedIcon: Icon(Icons.restaurant_menu),
+            label: 'Menu',
+          ));
+          indexMap[navIndex] = 3;
+          navIndex++;
+        }
+        
+        // Always add More button (NavigationBar requires at least 2, and we have Home + More minimum)
+        destinations.add(const NavigationDestination(
           icon: Icon(Icons.more_horiz),
           selectedIcon: Icon(Icons.more_horiz),
           label: 'More',
-        ),
-      ],
+        ));
+        final moreIndex = navIndex;
+
+        // Calculate selected navigation index
+        int selectedNavIndex = moreIndex; // Default to More
+        if (!isMoreSelected) {
+          // Find which navigation index corresponds to current section
+          for (int i = 0; i < indexMap.length; i++) {
+            if (indexMap[i] == _selectedIndex) {
+              selectedNavIndex = i;
+              break;
+            }
+          }
+        }
+        
+        // Ensure selected index is valid
+        selectedNavIndex = selectedNavIndex.clamp(0, destinations.length - 1);
+
+        return NavigationBar(
+          selectedIndex: selectedNavIndex,
+          onDestinationSelected: (index) {
+            if (index == moreIndex) {
+              // Show "More" bottom sheet
+              _showMoreOptionsSheet(context, authProvider);
+            } else {
+              // Navigate to the section mapped to this navigation index
+              final sectionIndex = indexMap[index];
+              if (sectionIndex != null) {
+                _selectIndex(sectionIndex);
+              }
+            }
+          },
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          height: 70,
+          destinations: destinations,
+        );
+      },
     );
   }
 
@@ -400,35 +447,45 @@ class _HomeScreenState extends State<HomeScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 8),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
+      builder: (context) => FutureBuilder<Set<int>>(
+        future: authProvider.getRolePermissions(authProvider.currentUserRole ?? 'cashier'),
+        builder: (context, snapshot) {
+          final permissions = snapshot.data ?? <int>{};
+          
+          return SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                if (permissions.contains(2))
+                  _buildMoreOptionTile(context, Icons.table_restaurant, 'Tables', 2),
+                if (permissions.contains(4))
+                  _buildMoreOptionTile(context, Icons.shopping_cart, 'Sales', 4),
+                if (permissions.contains(5))
+                  _buildMoreOptionTile(context, Icons.analytics, 'Reports', 5),
+                if (permissions.contains(6))
+                  _buildMoreOptionTile(context, Icons.inventory_2, 'Inventory', 6),
+                if (permissions.contains(7))
+                  _buildMoreOptionTile(context, Icons.people, 'Customers', 7),
+                if (permissions.contains(8))
+                  _buildMoreOptionTile(context, Icons.shopping_bag, 'Purchases', 8),
+                if (permissions.contains(9))
+                  _buildMoreOptionTile(context, Icons.payments, 'Expenses', 9),
+                _buildMoreOptionTile(context, Icons.settings, 'Settings', -1,
+                    isSettings: true),
+                const SizedBox(height: 8),
+              ],
             ),
-            _buildMoreOptionTile(context, Icons.table_restaurant, 'Tables', 2),
-            _buildMoreOptionTile(context, Icons.shopping_cart, 'Sales', 4),
-            _buildMoreOptionTile(context, Icons.analytics, 'Reports', 5),
-            // UPDATED: Cashier cannot access Inventory
-            if (authProvider.isAdmin)
-              _buildMoreOptionTile(context, Icons.inventory_2, 'Inventory', 6),
-            _buildMoreOptionTile(context, Icons.people, 'Customers', 7),
-            // UPDATED: Cashier cannot access Purchases
-            if (authProvider.isAdmin)
-              _buildMoreOptionTile(context, Icons.shopping_bag, 'Purchases', 8),
-            _buildMoreOptionTile(context, Icons.payments, 'Expenses', 9),
-            _buildMoreOptionTile(context, Icons.settings, 'Settings', -1,
-                isSettings: true),
-            const SizedBox(height: 8),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -457,56 +514,109 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildWebBottomNav(AuthProvider authProvider) {
-    // Web: Show all items
-    return NavigationBar(
-      selectedIndex: _selectedIndex,
-      onDestinationSelected: (index) {
-        _selectIndex(index);
+    // Web: Show items based on permissions
+    return FutureBuilder<Set<int>>(
+      future: authProvider.getRolePermissions(authProvider.currentUserRole ?? 'cashier'),
+      builder: (context, snapshot) {
+        final permissions = snapshot.data ?? <int>{};
+        
+        // Ensure Dashboard (0) is always accessible
+        final effectivePermissions = permissions.isEmpty 
+            ? {0, 1, 2, 3, 4, 5, 7, 9} // Default cashier permissions
+            : permissions;
+        if (!effectivePermissions.contains(0)) {
+          effectivePermissions.add(0); // Always include Dashboard
+        }
+        
+        // Build destinations based on permissions
+        final destinations = <NavigationDestination>[];
+        final sectionData = [
+          {'icon': Icons.dashboard, 'label': 'Home', 'index': 0},
+          {'icon': Icons.receipt_long, 'label': 'Orders', 'index': 1},
+          {'icon': Icons.table_restaurant, 'label': 'Tables', 'index': 2},
+          {'icon': Icons.restaurant_menu, 'label': 'Menu', 'index': 3},
+          {'icon': Icons.shopping_cart, 'label': 'Sales', 'index': 4},
+          {'icon': Icons.analytics, 'label': 'Reports', 'index': 5},
+          {'icon': Icons.inventory_2, 'label': 'Inventory', 'index': 6},
+          {'icon': Icons.people, 'label': 'Customers', 'index': 7},
+          {'icon': Icons.shopping_bag, 'label': 'Purchases', 'index': 8},
+          {'icon': Icons.payments, 'label': 'Expenses', 'index': 9},
+        ];
+        
+        // Map original index to filtered index
+        final indexMap = <int, int>{};
+        int filteredIndex = 0;
+        
+        for (final section in sectionData) {
+          final index = section['index'] as int;
+          if (effectivePermissions.contains(index)) {
+            destinations.add(NavigationDestination(
+              icon: Icon(section['icon'] as IconData),
+              label: section['label'] as String,
+            ));
+            indexMap[filteredIndex] = index;
+            filteredIndex++;
+          }
+        }
+        
+        // NavigationBar requires at least 2 destinations
+        // If we have fewer, ensure Dashboard and at least one other
+        if (destinations.length < 2) {
+          // Reset and add Dashboard + Orders as minimum
+          destinations.clear();
+          indexMap.clear();
+          destinations.add(const NavigationDestination(
+            icon: Icon(Icons.dashboard),
+            label: 'Home',
+          ));
+          indexMap[0] = 0;
+          
+          // Add Orders if available, otherwise add Menu
+          final fallbackIndex = effectivePermissions.contains(1) ? 1 : 3;
+          if (fallbackIndex == 1) {
+            destinations.add(const NavigationDestination(
+              icon: Icon(Icons.receipt_long),
+              label: 'Orders',
+            ));
+            indexMap[1] = 1;
+          } else if (effectivePermissions.contains(3)) {
+            destinations.add(const NavigationDestination(
+              icon: Icon(Icons.restaurant_menu),
+              label: 'Menu',
+            ));
+            indexMap[1] = 3;
+          } else {
+            // Last resort: add Orders anyway (admin can fix permissions)
+            destinations.add(const NavigationDestination(
+              icon: Icon(Icons.receipt_long),
+              label: 'Orders',
+            ));
+            indexMap[1] = 1;
+          }
+        }
+        
+        // Find the selected index in the filtered list
+        int selectedFilteredIndex = 0;
+        for (int i = 0; i < destinations.length; i++) {
+          if (indexMap[i] == _selectedIndex) {
+            selectedFilteredIndex = i;
+            break;
+          }
+        }
+        
+        return NavigationBar(
+          selectedIndex: selectedFilteredIndex.clamp(0, destinations.length - 1),
+          onDestinationSelected: (index) {
+            final actualIndex = indexMap[index];
+            if (actualIndex != null) {
+              _selectIndex(actualIndex);
+            }
+          },
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          height: 70,
+          destinations: destinations,
+        );
       },
-      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-      height: 70,
-      destinations: [
-        const NavigationDestination(
-          icon: Icon(Icons.dashboard),
-          label: 'Home',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.receipt_long),
-          label: 'Orders',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.table_restaurant),
-          label: 'Tables',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.restaurant_menu),
-          label: 'Menu',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.shopping_cart),
-          label: 'Sales',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.analytics),
-          label: 'Reports',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.inventory_2),
-          label: 'Inventory',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.people),
-          label: 'Customers',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.shopping_bag),
-          label: 'Purchases',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.payments),
-          label: 'Expenses',
-        ),
-      ],
     );
   }
 

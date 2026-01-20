@@ -97,6 +97,20 @@ class InventoryLedger {
       }
     }
 
+    // Handle created_by (can be int for SQLite or String for Firestore)
+    final createdByData = map['created_by'];
+    int? createdBy;
+    if (createdByData != null) {
+      if (createdByData is int) {
+        createdBy = createdByData;
+      } else if (createdByData is String) {
+        // Firestore: String user ID - try to parse as int, otherwise keep as null
+        createdBy = int.tryParse(createdByData);
+      } else if (createdByData is num) {
+        createdBy = createdByData.toInt();
+      }
+    }
+
     return InventoryLedger(
       id: idValue,
       documentId: docId,
@@ -109,7 +123,7 @@ class InventoryLedger {
       referenceType: map['reference_type'] as String?,
       referenceId: referenceId,
       notes: map['notes'] as String?,
-      createdBy: (map['created_by'] as num?)?.toInt(),
+      createdBy: createdBy,
       createdAt: (map['created_at'] as num?)?.toInt() ?? 0,
     );
   }
