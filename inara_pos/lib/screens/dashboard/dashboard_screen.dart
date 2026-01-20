@@ -361,15 +361,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Welcome, Chiyagadi',
+                        'Welcome,\nChiyagadi',
                         style: TextStyle(
-                          fontSize: kIsWeb ? 26 : 16,
+                          fontSize: kIsWeb ? 26 : 14,
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFF1A1A1A),
                           letterSpacing: -0.2,
+                          height: 1.2,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
+                        overflow: TextOverflow.visible,
                       ),
                       const SizedBox(height: 6),
                       Row(

@@ -679,13 +679,13 @@ class _MenuScreenState extends State<MenuScreen> {
                                                       horizontal: 10,
                                                       vertical: 5),
                                               decoration: BoxDecoration(
-                                                color: AppTheme.logoPrimary
-                                                    .withOpacity(0.1),
+                                                color: _categoryColorForName(category.name)
+                                                    .withOpacity(0.15),
                                                 borderRadius:
                                                     BorderRadius.circular(8),
                                                 border: Border.all(
-                                                  color: AppTheme.logoPrimary,
-                                                  width: 1,
+                                                  color: _categoryColorForName(category.name),
+                                                  width: 1.5,
                                                 ),
                                               ),
                                               child: Text(
@@ -693,7 +693,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                                 style: TextStyle(
                                                   fontSize: 13,
                                                   fontWeight: FontWeight.w700,
-                                                  color: AppTheme.logoPrimary,
+                                                  color: _categoryColorForName(category.name),
                                                   letterSpacing: 0.5,
                                                 ),
                                               ),
@@ -938,54 +938,49 @@ class _MenuScreenState extends State<MenuScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // UPDATED: Responsive image aspect ratio - square on mobile, wider on web
+                // UPDATED: Responsive image aspect ratio - smaller on mobile to leave room for text
                 AspectRatio(
-                  aspectRatio: MediaQuery.of(context).size.width < 600 ? 1.0 : 1.2,
+                  aspectRatio: MediaQuery.of(context).size.width < 600 ? 0.85 : 1.2,
                   child: DecoratedBox(
                     decoration: BoxDecoration(color: Colors.grey[200]),
                     child: _buildProductImage(product.imageUrl, product.name),
                   ),
                 ),
 
-                // UPDATED: Content area - name and price only (centered)
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // UPDATED: Item name (centered, bigger and bolder font)
-                        Flexible(
-                          child: Center(
-                            child: Text(
-                              product.name,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.black87,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
+                // UPDATED: Content area - name and price (always visible, not expanded)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // UPDATED: Item name (centered, visible font)
+                      Text(
+                        product.name,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: MediaQuery.of(context).size.width < 600 ? 14 : 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black87,
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
 
-                        const SizedBox(height: 8),
+                      const SizedBox(height: 6),
 
-                        // UPDATED: Price (centered, bigger and bolder font)
-                        Text(
-                          'रू${product.price.toStringAsFixed(0)}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.black87,
-                          ),
+                      // UPDATED: Price (centered, visible font)
+                      Text(
+                        'रू${product.price.toStringAsFixed(0)}',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: MediaQuery.of(context).size.width < 600 ? 14 : 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black87,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ],
