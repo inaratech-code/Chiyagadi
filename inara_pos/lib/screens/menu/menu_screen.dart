@@ -672,10 +672,14 @@ class _MenuScreenState extends State<MenuScreen> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      // Category Heading
+                                      // Category Heading (with top margin to prevent overlap)
                                       Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 8, vertical: 10),
+                                        padding: EdgeInsets.only(
+                                          left: 8,
+                                          right: 8,
+                                          top: categoryIndex == 0 ? 10 : 20, // Extra top margin for non-first categories
+                                          bottom: 10,
+                                        ),
                                         child: Row(
                                           children: [
                                             Container(
@@ -733,12 +737,12 @@ class _MenuScreenState extends State<MenuScreen> {
                                             if (width < 1200) return 5; // Desktop: 5 columns
                                             return 6; // Large desktop: 6 columns
                                           }(),
-                                          // UPDATED: Aspect ratio optimized for 3-column layout with action bar - increased to prevent overlap
+                                          // UPDATED: Aspect ratio optimized for 3-column layout - adjusted for better spacing
                                           childAspectRatio: () {
                                             final width = MediaQuery.of(context).size.width;
-                                            if (!kIsWeb && width < 900) return 0.72; // Mobile (Android/iOS): slightly taller to prevent overlap
-                                            if (width < 600) return 0.72; // Mobile web: slightly taller to prevent overlap
-                                            return 0.80; // Web/Tablet: taller cards
+                                            if (!kIsWeb && width < 900) return 0.68; // Mobile (Android/iOS): taller to accommodate all elements
+                                            if (width < 600) return 0.68; // Mobile web: taller to accommodate all elements
+                                            return 0.75; // Web/Tablet: taller cards
                                           }(),
                                           crossAxisSpacing: 8,
                                           mainAxisSpacing: 8,
@@ -751,7 +755,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                         },
                                       ),
                                       // Increased spacing between categories to prevent overlap
-                                      SizedBox(height: !kIsWeb ? 24 : 16),
+                                      SizedBox(height: !kIsWeb ? 32 : 20),
                                     ],
                                   );
                                 },
@@ -851,7 +855,7 @@ class _MenuScreenState extends State<MenuScreen> {
             ),
         ],
       ),
-      floatingActionButton: Consumer<AuthProvider>(
+      floatingActionButton: _showOrderOverlay ? null : Consumer<AuthProvider>(
         builder: (context, auth, _) {
           // UPDATED: Show "View Order" button when there's an active order (for all users)
           // Cashiers can also create new orders, admins can view existing orders
@@ -981,58 +985,63 @@ class _MenuScreenState extends State<MenuScreen> {
                   ),
                 ),
 
-                // UPDATED: Content area - name and price (compact for 3-column layout)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Item name (single line, clear and visible)
-                      Text(
-                        product.name,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: () {
-                            final width = MediaQuery.of(context).size.width;
-                            if (!kIsWeb && width < 900) return 12.0; // Mobile (Android/iOS): compact for 3 columns
-                            if (width < 600) return 12.0; // Mobile web: compact
-                            return 14.0; // Web: slightly larger
-                          }(),
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                          height: 1.2,
+                // UPDATED: Content area - name and price (improved spacing to prevent overlap)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Item name (single line, clear and visible)
+                        Text(
+                          product.name,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: () {
+                              final width = MediaQuery.of(context).size.width;
+                              if (!kIsWeb && width < 900) return 12.0; // Mobile (Android/iOS): compact for 3 columns
+                              if (width < 600) return 12.0; // Mobile web: compact
+                              return 14.0; // Web: slightly larger
+                            }(),
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                            height: 1.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
 
-                      const SizedBox(height: 4),
+                        const SizedBox(height: 6),
 
-                      // Price (prominent, single line)
-                      Text(
-                        'रू${product.price.toStringAsFixed(0)}',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: () {
-                            final width = MediaQuery.of(context).size.width;
-                            if (!kIsWeb && width < 900) return 13.0; // Mobile (Android/iOS): compact but visible
-                            if (width < 600) return 13.0; // Mobile web: compact
-                            return 15.0; // Web: standard size
-                          }(),
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black87,
+                        // Price (prominent, single line) - with bottom margin to separate from action bar
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text(
+                            'रू${product.price.toStringAsFixed(0)}',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: () {
+                                final width = MediaQuery.of(context).size.width;
+                                if (!kIsWeb && width < 900) return 13.0; // Mobile (Android/iOS): compact but visible
+                                if (width < 600) return 13.0; // Mobile web: compact
+                                return 15.0; // Web: standard size
+                              }(),
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black87,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
 
-                // NEW: Action bar at bottom using app's primary color (inspired by design reference)
+                // NEW: Action bar at bottom using app's primary color (with clear separation)
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
                   decoration: BoxDecoration(
                     color: AppTheme.logoPrimary, // Using app's golden yellow color
                     borderRadius: const BorderRadius.only(
