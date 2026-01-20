@@ -322,8 +322,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 // Logo
                 Container(
-                  width: 80,
-                  height: 80,
+                  width: kIsWeb ? 80 : 70,
+                  height: kIsWeb ? 80 : 70,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
@@ -354,20 +354,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: kIsWeb ? 16 : 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        // UPDATED: Requested home header text
                         'Welcome to Chiyagadi',
-                        style: const TextStyle(
-                          fontSize: 26,
+                        style: TextStyle(
+                          fontSize: kIsWeb ? 26 : 20,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF1A1A1A),
+                          color: const Color(0xFF1A1A1A),
                           letterSpacing: -0.3,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 6),
                       Row(
@@ -700,8 +702,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required Gradient gradient,
     required IconData icon,
   }) {
+    final isMobile = !kIsWeb;
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isMobile ? 24 : 20),
+      height: isMobile ? 140 : 120, // Make boxes bigger on mobile
       decoration: BoxDecoration(
         gradient: gradient,
         borderRadius: BorderRadius.circular(16),
@@ -719,26 +723,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87, // Dark/black text
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: kIsWeb ? 14 : 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87, // Dark/black text
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               Icon(
                 icon,
-                size: 20,
+                size: kIsWeb ? 20 : 22,
                 color: Colors.black87, // Dark/black icon
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: kIsWeb ? 12 : 16),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 24,
+            style: TextStyle(
+              fontSize: kIsWeb ? 24 : 26,
               fontWeight: FontWeight.bold,
               color: Colors.black87, // Dark/black text
             ),
