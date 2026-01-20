@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -133,18 +133,26 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   }
 
   Future<void> _checkAuth() async {
-    final prefs = await SharedPreferences.getInstance();
-    // Check if admin PIN exists (for future use)
-    prefs.containsKey('admin_pin');
-
-    // NEW: Load lock mode preference
-    if (mounted) {
-      await context.read<AuthProvider>().loadLockMode();
-    }
-
+    // PERF: Show UI immediately, load preferences in background
     setState(() {
       _isLoading = false;
     });
+
+    // Load preferences asynchronously after UI is shown
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // Check if admin PIN exists (for future use)
+      prefs.containsKey('admin_pin');
+
+      // NEW: Load lock mode preference (non-blocking)
+      if (mounted) {
+        context.read<AuthProvider>().loadLockMode().catchError((e) {
+          debugPrint('Error loading lock mode: $e');
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading preferences: $e');
+    }
   }
 
   @override

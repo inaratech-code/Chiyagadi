@@ -26,13 +26,16 @@ class AuthProvider with ChangeNotifier {
   static const int _inactivityTimeoutMinutes = 5;
 
   /// NEW: Load login lock behavior (best-effort; SharedPreferences works on web + mobile).
+  /// PERF: Only notify listeners if value actually changed.
   Future<void> loadLockMode() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final saved = prefs.getString('lock_mode');
       if (saved == 'always' || saved == 'timeout') {
-        _lockMode = saved!;
-        notifyListeners();
+        if (_lockMode != saved) {
+          _lockMode = saved!;
+          notifyListeners();
+        }
       }
     } catch (e) {
       debugPrint('AuthProvider: Error loading lock mode: $e');
