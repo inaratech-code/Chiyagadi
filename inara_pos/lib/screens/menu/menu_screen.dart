@@ -650,12 +650,17 @@ class _MenuScreenState extends State<MenuScreen> {
                           ],
                         ),
                       )
-                    : RefreshIndicator(
+                            : RefreshIndicator(
                         onRefresh: _loadData,
                         child: _productsByCategory.isEmpty
                             ? const SizedBox.shrink()
                             : ListView.builder(
-                                padding: const EdgeInsets.all(8),
+                                padding: EdgeInsets.only(
+                                  left: 8,
+                                  right: 8,
+                                  top: 8,
+                                  bottom: kIsWeb ? 8 : 100, // Extra bottom padding on mobile to prevent FAB overlap
+                                ),
                                 itemCount: _productsByCategory.length,
                                 itemBuilder: (context, categoryIndex) {
                                   final category = _productsByCategory.keys
@@ -719,18 +724,22 @@ class _MenuScreenState extends State<MenuScreen> {
                                             horizontal: 8),
                                         gridDelegate:
                                             SliverGridDelegateWithFixedCrossAxisCount(
-                                          // UPDATED: Responsive columns - 3 for mobile, more for web/tablet
+                                          // UPDATED: 3 columns for mobile (Android/iOS) as per design reference
                                           crossAxisCount: () {
                                             final width = MediaQuery.of(context).size.width;
-                                            if (width < 600) return 3; // Mobile: 3 columns
+                                            if (!kIsWeb && width < 900) return 3; // Mobile (Android/iOS): 3 columns
+                                            if (width < 600) return 3; // Mobile web: 3 columns
                                             if (width < 900) return 4; // Tablet: 4 columns
                                             if (width < 1200) return 5; // Desktop: 5 columns
                                             return 6; // Large desktop: 6 columns
                                           }(),
-                                          // UPDATED: Responsive aspect ratio - taller on web
-                                          childAspectRatio: MediaQuery.of(context).size.width < 600
-                                              ? 0.85 // Mobile: slightly taller
-                                              : 0.75, // Web: taller cards
+                                          // UPDATED: Aspect ratio optimized for 3-column layout with blue action bar
+                                          childAspectRatio: () {
+                                            final width = MediaQuery.of(context).size.width;
+                                            if (!kIsWeb && width < 900) return 0.75; // Mobile (Android/iOS): optimized for 3 columns
+                                            if (width < 600) return 0.75; // Mobile web: optimized for 3 columns
+                                            return 0.80; // Web/Tablet: taller cards
+                                          }(),
                                           crossAxisSpacing: 8,
                                           mainAxisSpacing: 8,
                                         ),
@@ -846,69 +855,79 @@ class _MenuScreenState extends State<MenuScreen> {
           // UPDATED: Show "View Order" button when there's an active order (for all users)
           // Cashiers can also create new orders, admins can view existing orders
           if (_activeOrderId != null || _isOrderMode(auth)) {
-            return FloatingActionButton.extended(
-              onPressed: _isAddingToOrder
-                  ? null
-                  : () async {
-                      // If no active order and user is cashier, create one first
-                      if (_activeOrderId == null && _isOrderMode(auth)) {
-                        try {
-                          final dbProvider =
-                              Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-                          final authProvider = Provider.of<AuthProvider>(context, listen: false);
-                          await dbProvider.init();
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: !kIsWeb ? 16 : 0, // Extra bottom padding on mobile to avoid overlap
+              ),
+              child: FloatingActionButton.extended(
+                onPressed: _isAddingToOrder
+                    ? null
+                    : () async {
+                        // If no active order and user is cashier, create one first
+                        if (_activeOrderId == null && _isOrderMode(auth)) {
+                          try {
+                            final dbProvider =
+                                Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+                            final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                            await dbProvider.init();
 
-                          final createdBy = authProvider.currentUserId != null
-                              ? (kIsWeb
-                                  ? authProvider.currentUserId!
-                                  : int.tryParse(authProvider.currentUserId!))
-                              : null;
+                            final createdBy = authProvider.currentUserId != null
+                                ? (kIsWeb
+                                    ? authProvider.currentUserId!
+                                    : int.tryParse(authProvider.currentUserId!))
+                                : null;
 
-                          _activeOrderId = await _orderService.createOrder(
-                            dbProvider: dbProvider,
-                            orderType: 'dine_in',
-                            createdBy: createdBy,
-                          );
-
-                          final order = await _orderService.getOrderById(dbProvider, _activeOrderId);
-                          _activeOrderNumber = order?.orderNumber ?? 'Order';
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error creating order: $e')),
+                            _activeOrderId = await _orderService.createOrder(
+                              dbProvider: dbProvider,
+                              orderType: 'dine_in',
+                              createdBy: createdBy,
                             );
-                          }
-                          return;
-                        }
-                      }
 
-                      // UPDATED: Load active order before showing overlay to ensure correct order ID
-                      if (_activeOrderId == null) {
-                        await _loadActiveOrder();
-                      }
-                      
-                      // Show overlay if we have an active order
-                      if (mounted && _activeOrderId != null) {
-                        setState(() {
-                          _showOrderOverlay = true;
-                          _overlayRefreshKey++; // Force overlay to reload with latest data
-                        });
-                      }
-                    },
-              backgroundColor: AppTheme.logoPrimary,
-              icon: const Icon(Icons.receipt_long),
-              label: Text(_isAddingToOrder
-                  ? 'Please wait…'
-                  : (_activeOrderId == null ? 'New Order' : 'View Order')),
+                            final order = await _orderService.getOrderById(dbProvider, _activeOrderId);
+                            _activeOrderNumber = order?.orderNumber ?? 'Order';
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error creating order: $e')),
+                              );
+                            }
+                            return;
+                          }
+                        }
+
+                        // UPDATED: Load active order before showing overlay to ensure correct order ID
+                        if (_activeOrderId == null) {
+                          await _loadActiveOrder();
+                        }
+                        
+                        // Show overlay if we have an active order
+                        if (mounted && _activeOrderId != null) {
+                          setState(() {
+                            _showOrderOverlay = true;
+                            _overlayRefreshKey++; // Force overlay to reload with latest data
+                          });
+                        }
+                      },
+                backgroundColor: AppTheme.logoPrimary,
+                icon: const Icon(Icons.receipt_long),
+                label: Text(_isAddingToOrder
+                    ? 'Please wait…'
+                    : (_activeOrderId == null ? 'New Order' : 'View Order')),
+              ),
             );
           }
 
           // Admin: keep existing menu management
-          return FloatingActionButton.extended(
-            onPressed: () => _showAddProductDialog(),
-            backgroundColor: Theme.of(context).primaryColor,
-            icon: const Icon(Icons.add),
-            label: const Text('Add Item'),
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: !kIsWeb ? 16 : 0, // Extra bottom padding on mobile to avoid overlap
+            ),
+            child: FloatingActionButton.extended(
+              onPressed: () => _showAddProductDialog(),
+              backgroundColor: Theme.of(context).primaryColor,
+              icon: const Icon(Icons.add),
+              label: const Text('Add Item'),
+            ),
           );
         },
       ),
@@ -938,49 +957,99 @@ class _MenuScreenState extends State<MenuScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // UPDATED: Responsive image aspect ratio - smaller on mobile to leave room for text
+                // UPDATED: Square/near-square product image (inspired by design reference)
                 AspectRatio(
-                  aspectRatio: MediaQuery.of(context).size.width < 600 ? 0.85 : 1.2,
+                  aspectRatio: 1.0, // Square image for consistent 3-column layout
                   child: DecoratedBox(
-                    decoration: BoxDecoration(color: Colors.grey[200]),
-                    child: _buildProductImage(product.imageUrl, product.name),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(8),
+                        topRight: Radius.circular(8),
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(8),
+                        topRight: Radius.circular(8),
+                      ),
+                      child: _buildProductImage(product.imageUrl, product.name),
+                    ),
                   ),
                 ),
 
-                // UPDATED: Content area - name and price (always visible, not expanded)
+                // UPDATED: Content area - name and price (compact for 3-column layout)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      // UPDATED: Item name (centered, visible font)
+                      // Item name (single line, clear and visible)
                       Text(
                         product.name,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: MediaQuery.of(context).size.width < 600 ? 14 : 16,
-                          fontWeight: FontWeight.w700,
+                          fontSize: () {
+                            final width = MediaQuery.of(context).size.width;
+                            if (!kIsWeb && width < 900) return 12; // Mobile (Android/iOS): compact for 3 columns
+                            if (width < 600) return 12; // Mobile web: compact
+                            return 14; // Web: slightly larger
+                          }(),
+                          fontWeight: FontWeight.w600,
                           color: Colors.black87,
+                          height: 1.2,
                         ),
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
 
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
 
-                      // UPDATED: Price (centered, visible font)
+                      // Price (prominent, single line)
                       Text(
                         'रू${product.price.toStringAsFixed(0)}',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: MediaQuery.of(context).size.width < 600 ? 14 : 16,
+                          fontSize: () {
+                            final width = MediaQuery.of(context).size.width;
+                            if (!kIsWeb && width < 900) return 13; // Mobile (Android/iOS): compact but visible
+                            if (width < 600) return 13; // Mobile web: compact
+                            return 15; // Web: standard size
+                          }(),
                           fontWeight: FontWeight.w700,
                           color: Colors.black87,
                         ),
                       ),
                     ],
+                  ),
+                ),
+
+                // NEW: Blue action bar at bottom (inspired by design reference)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[600],
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(8),
+                      bottomRight: Radius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    '< रू${product.price.toStringAsFixed(0)} >',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: () {
+                        final width = MediaQuery.of(context).size.width;
+                        if (!kIsWeb && width < 900) return 12; // Mobile (Android/iOS): compact
+                        if (width < 600) return 12; // Mobile web: compact
+                        return 14; // Web: standard size
+                      }(),
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ],
