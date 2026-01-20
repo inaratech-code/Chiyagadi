@@ -993,9 +993,9 @@ class _MenuScreenState extends State<MenuScreen> {
                         style: TextStyle(
                           fontSize: () {
                             final width = MediaQuery.of(context).size.width;
-                            if (!kIsWeb && width < 900) return 12; // Mobile (Android/iOS): compact for 3 columns
-                            if (width < 600) return 12; // Mobile web: compact
-                            return 14; // Web: slightly larger
+                            if (!kIsWeb && width < 900) return 12.0; // Mobile (Android/iOS): compact for 3 columns
+                            if (width < 600) return 12.0; // Mobile web: compact
+                            return 14.0; // Web: slightly larger
                           }(),
                           fontWeight: FontWeight.w600,
                           color: Colors.black87,
@@ -1014,9 +1014,9 @@ class _MenuScreenState extends State<MenuScreen> {
                         style: TextStyle(
                           fontSize: () {
                             final width = MediaQuery.of(context).size.width;
-                            if (!kIsWeb && width < 900) return 13; // Mobile (Android/iOS): compact but visible
-                            if (width < 600) return 13; // Mobile web: compact
-                            return 15; // Web: standard size
+                            if (!kIsWeb && width < 900) return 13.0; // Mobile (Android/iOS): compact but visible
+                            if (width < 600) return 13.0; // Mobile web: compact
+                            return 15.0; // Web: standard size
                           }(),
                           fontWeight: FontWeight.w700,
                           color: Colors.black87,
@@ -1043,9 +1043,9 @@ class _MenuScreenState extends State<MenuScreen> {
                     style: TextStyle(
                       fontSize: () {
                         final width = MediaQuery.of(context).size.width;
-                        if (!kIsWeb && width < 900) return 12; // Mobile (Android/iOS): compact
-                        if (width < 600) return 12; // Mobile web: compact
-                        return 14; // Web: standard size
+                        if (!kIsWeb && width < 900) return 12.0; // Mobile (Android/iOS): compact
+                        if (width < 600) return 12.0; // Mobile web: compact
+                        return 14.0; // Web: standard size
                       }(),
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
