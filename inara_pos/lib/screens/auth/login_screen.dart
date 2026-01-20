@@ -76,6 +76,15 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _handleLogin() async {
+    // Validate username
+    if (_usernameController.text.trim().isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter a username';
+      });
+      return;
+    }
+
+    // Validate PIN
     if (_pinController.text.length < 4 || _pinController.text.length > 6) {
       setState(() {
         _errorMessage = 'PIN must be 4-6 digits';
@@ -207,18 +216,16 @@ class _LoginScreenState extends State<LoginScreen>
         return;
       }
 
-      final username = _usernameController.text.trim().isEmpty
-          ? 'admin'
-          : _usernameController.text.trim();
+      final username = _usernameController.text.trim();
 
       if (_isFirstTime) {
-        // Setup admin PIN
+        // Setup admin PIN with username
         try {
           final success = await authProvider.setupAdminPin(_pinController.text);
           if (success) {
-            // Login after setup
+            // Login after setup using the provided username
             final loginSuccess =
-                await authProvider.login('admin', _pinController.text);
+                await authProvider.login(username, _pinController.text);
             if (loginSuccess && mounted) {
               Navigator.of(context).pushReplacementNamed('/home');
             } else {
@@ -475,58 +482,56 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                               const SizedBox(height: 32),
 
-                              // Username field (only for non-first-time)
-                              if (!_isFirstTime) ...[
-                                TweenAnimationBuilder<double>(
-                                  tween: Tween(begin: 0.0, end: 1.0),
-                                  duration: const Duration(milliseconds: 1100),
-                                  curve: const Interval(0.55, 1.0,
-                                      curve: Curves.easeOut),
-                                  builder: (context, value, child) {
-                                    return Opacity(
-                                      opacity: value,
-                                      child: Transform.translate(
-                                        offset: Offset(0, 20 * (1 - value)),
-                                        child: TextField(
-                                          controller: _usernameController,
-                                          decoration: InputDecoration(
-                                            labelText: 'Username',
-                                            prefixIcon: const Icon(
-                                                Icons.person_outline,
-                                                color: Color(0xFFFFC107)),
-                                            border: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                              borderSide: BorderSide(
-                                                  color: Colors.grey[300]!),
-                                            ),
-                                            enabledBorder: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                              borderSide: BorderSide(
-                                                  color: Colors.grey[300]!),
-                                            ),
-                                            focusedBorder: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                              borderSide: const BorderSide(
-                                                  color: Color(0xFFFFC107),
-                                                  width: 2),
-                                            ),
-                                            filled: true,
-                                            fillColor: Colors.grey[50],
-                                            contentPadding:
-                                                const EdgeInsets.symmetric(
-                                                    horizontal: 16,
-                                                    vertical: 16),
+                              // Username field (always required)
+                              TweenAnimationBuilder<double>(
+                                tween: Tween(begin: 0.0, end: 1.0),
+                                duration: const Duration(milliseconds: 1100),
+                                curve: const Interval(0.55, 1.0,
+                                    curve: Curves.easeOut),
+                                builder: (context, value, child) {
+                                  return Opacity(
+                                    opacity: value,
+                                    child: Transform.translate(
+                                      offset: Offset(0, 20 * (1 - value)),
+                                      child: TextField(
+                                        controller: _usernameController,
+                                        decoration: InputDecoration(
+                                          labelText: 'Username',
+                                          prefixIcon: const Icon(
+                                              Icons.person_outline,
+                                              color: Color(0xFFFFC107)),
+                                          border: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            borderSide: BorderSide(
+                                                color: Colors.grey[300]!),
                                           ),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            borderSide: BorderSide(
+                                                color: Colors.grey[300]!),
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            borderSide: const BorderSide(
+                                                color: Color(0xFFFFC107),
+                                                width: 2),
+                                          ),
+                                          filled: true,
+                                          fillColor: Colors.grey[50],
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                  horizontal: 16,
+                                                  vertical: 16),
                                         ),
                                       ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 20),
-                              ],
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 20),
 
                               // PIN field
                               TweenAnimationBuilder<double>(
