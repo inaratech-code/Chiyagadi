@@ -31,6 +31,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _lowStockCount = 0;
   String _shopName = 'Shop';
   List<_ActivityItem> _recentActivity = const [];
+  bool _isLoading = true; // Add loading state
   // FIXED: Use ledger service instead of direct inventory service
   final InventoryLedgerService _ledgerService = InventoryLedgerService();
 
@@ -42,14 +43,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // PERF: Let the page render first, then load data.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadDashboardData());
+    // PERF: Show UI immediately, then load data asynchronously
+    // This ensures the page appears instantly on Android/iOS
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Small delay to ensure UI is fully rendered
+      Future.delayed(const Duration(milliseconds: 50), () {
+        if (mounted) {
+          _loadDashboardData();
+        }
+      });
+    });
   }
 
   Future<void> _loadDashboardData() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      // Initialize database (should be fast if already initialized)
       await dbProvider.init();
 
       String nextShopName = _shopName;
@@ -102,13 +115,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 where: 'is_purchasable = ?',
                 whereArgs: [1],
               ),
-        // 4: recent orders
-        dbProvider.query('orders', orderBy: 'created_at DESC', limit: 5),
-        // 5: recent expenses
-        dbProvider.query('expenses', orderBy: 'created_at DESC', limit: 5),
-        // 6: recent credits
+        // 4: recent orders (limit to 3 for faster loading)
+        dbProvider.query('orders', orderBy: 'created_at DESC', limit: 3),
+        // 5: recent expenses (limit to 3 for faster loading)
+        dbProvider.query('expenses', orderBy: 'created_at DESC', limit: 3),
+        // 6: recent credits (limit to 3 for faster loading)
         dbProvider.query('credit_transactions',
-            orderBy: 'created_at DESC', limit: 5),
+            orderBy: 'created_at DESC', limit: 3),
       ]);
 
       final settingsRows = results[0];
@@ -149,24 +162,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
             sum + ((transaction['amount'] as num?)?.toDouble() ?? 0.0),
       );
 
-      if (!mounted) return;
-      final productIds = products
-          .map((p) => p['id'])
-          .where((id) => id != null)
-          .toList()
-          .cast<dynamic>();
-      final stockMap = await _ledgerService.getCurrentStockBatch(
-        context: context,
-        productIds: productIds,
-      );
-
-      int lowStockCount = 0;
-      for (final pid in productIds) {
-        final currentStock = stockMap[pid] ?? 0.0;
-        if (currentStock <= 0) lowStockCount++;
+      // Load stock data asynchronously after main data is shown
+      if (mounted && products.isNotEmpty) {
+        final productIds = products
+            .map((p) => p['id'])
+            .where((id) => id != null)
+            .toList()
+            .cast<dynamic>();
+        
+        // Load stock in background to not block UI
+        _ledgerService.getCurrentStockBatch(
+          context: context,
+          productIds: productIds,
+        ).then((stockMap) {
+          if (!mounted) return;
+          int lowStockCount = 0;
+          for (final pid in productIds) {
+            final currentStock = stockMap[pid] ?? 0.0;
+            if (currentStock <= 0) lowStockCount++;
+          }
+          if (mounted) {
+            setState(() => _lowStockCount = lowStockCount);
+          }
+        }).catchError((e) {
+          debugPrint('Error loading stock: $e');
+        });
       }
-
-      nextLowStockCount = lowStockCount;
+      
+      nextLowStockCount = 0; // Will be updated async
 
       for (final o in recentOrders) {
         final createdAt = (o['created_at'] as num?)?.toInt() ?? 0;
@@ -222,7 +245,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
 
       nextRecent.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      if (nextRecent.length > 8) nextRecent = nextRecent.take(8).toList();
+      if (nextRecent.length > 6) nextRecent = nextRecent.take(6).toList();
 
       if (!mounted) return;
       setState(() {
@@ -231,9 +254,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _todayCredit = nextTodayCredit;
         _lowStockCount = nextLowStockCount;
         _recentActivity = nextRecent;
+        _isLoading = false;
       });
     } catch (e) {
       debugPrint('Error loading dashboard data: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -246,6 +273,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
+        top: true,
+        bottom: true,
+        left: true,
+        right: true,
         child: RefreshIndicator(
           onRefresh: _loadDashboardData,
           child: kIsWeb
@@ -275,6 +306,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   List<Widget> _buildContent(BuildContext context, AuthProvider authProvider) {
+    if (_isLoading) {
+      return _buildLoadingContent();
+    }
+    
     return [
       // Welcome Section with Logo and Settings Button
       const SizedBox(height: 8),
@@ -452,6 +487,149 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ),
       const SizedBox(height: 16),
+    ];
+  }
+
+  List<Widget> _buildLoadingContent() {
+    return [
+      // Welcome Section Skeleton
+      const SizedBox(height: 8),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(40),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 200,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 120,
+                    height: 14,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              shape: BoxShape.circle,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 24),
+      // Summary Cards Skeleton
+      Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Container(
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 24),
+      // Quick Access Skeleton
+      Container(
+        width: 120,
+        height: 20,
+        decoration: BoxDecoration(
+          color: Colors.grey[300],
+          borderRadius: BorderRadius.circular(4),
+        ),
+      ),
+      const SizedBox(height: 16),
+      GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.0,
+        ),
+        itemCount: 8,
+        itemBuilder: (context, index) => Container(
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+      const SizedBox(height: 32),
+      // Recent Activity Skeleton
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Container(
+            width: 140,
+            height: 20,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          Container(
+            width: 80,
+            height: 20,
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 16),
+      ...List.generate(3, (index) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Container(
+              height: 60,
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          )),
     ];
   }
 
@@ -692,9 +870,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Treat web-on-phone like mobile so tiles don't overlap.
     final isCompact = width < 700;
 
-    // Responsive grid: compact phones = 3 columns, tablets = 3, desktop = 4
-    final crossAxisCount =
-        isCompact ? 3 : (kIsWeb ? (width > 1200 ? 4 : 3) : 2);
+    // Responsive grid: mobile (Android/iOS) = 3 columns, tablets = 3, desktop = 4
+    final crossAxisCount = kIsWeb
+        ? (width > 1200 ? 4 : 3) // Web: 4 columns on large screens, 3 on smaller
+        : (width < 600 ? 3 : 3); // Mobile: Always 3 columns for consistency
 
     return GridView.builder(
       shrinkWrap: true,
