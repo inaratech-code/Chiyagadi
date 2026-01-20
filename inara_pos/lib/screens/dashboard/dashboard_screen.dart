@@ -354,19 +354,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                 ),
-                SizedBox(width: kIsWeb ? 16 : 12),
+                SizedBox(width: kIsWeb ? 16 : 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Welcome to Chiyagadi',
+                        'Welcome, Chiyagadi',
                         style: TextStyle(
-                          fontSize: kIsWeb ? 26 : 20,
+                          fontSize: kIsWeb ? 26 : 16,
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFF1A1A1A),
-                          letterSpacing: -0.3,
+                          letterSpacing: -0.2,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
