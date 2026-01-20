@@ -890,10 +890,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        // Compact screens need taller tiles so the icon + label never overlap.
-        childAspectRatio: isCompact ? 0.95 : 1.5,
+        crossAxisSpacing: 16, // Increased spacing
+        mainAxisSpacing: 16, // Increased spacing
+        // Larger tiles - adjusted aspect ratio for bigger buttons
+        childAspectRatio: isCompact ? 0.85 : 1.3,
       ),
       itemCount: tiles.length,
       itemBuilder: (context, index) {
@@ -934,14 +934,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
           padding: EdgeInsets.symmetric(
-            vertical: isCompact ? 10 : 8,
-            horizontal: 6,
+            vertical: isCompact ? 16 : 14, // Increased vertical padding
+            horizontal: 8, // Increased horizontal padding
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                padding: EdgeInsets.all(isCompact ? 10 : 12),
+                padding: EdgeInsets.all(isCompact ? 14 : 16), // Larger icon container
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.1),
                   shape: BoxShape.circle,
@@ -949,14 +949,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Icon(
                   icon,
                   color: color,
-                  size: isCompact ? 34 : 48,
+                  size: isCompact ? 42 : 56, // Larger icons
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8), // Increased spacing
               Text(
                 label,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontSize: isCompact ? 11 : 12,
+                      fontSize: isCompact ? 13 : 14, // Larger font size
                       fontWeight: FontWeight.w600,
                       color: Colors.grey[800],
                     ),
