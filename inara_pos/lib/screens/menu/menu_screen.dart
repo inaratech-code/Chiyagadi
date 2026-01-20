@@ -1026,12 +1026,12 @@ class _MenuScreenState extends State<MenuScreen> {
                   ),
                 ),
 
-                // NEW: Blue action bar at bottom (inspired by design reference)
+                // NEW: Action bar at bottom using app's primary color (inspired by design reference)
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.blue[600],
+                    color: AppTheme.logoPrimary, // Using app's golden yellow color
                     borderRadius: const BorderRadius.only(
                       bottomLeft: Radius.circular(8),
                       bottomRight: Radius.circular(8),
