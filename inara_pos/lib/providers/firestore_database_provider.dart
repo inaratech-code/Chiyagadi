@@ -415,24 +415,40 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
       // Commit all batches that have operations
       int batchesCommitted = 0;
+      int totalOperations = 0;
+      
+      // Count total operations across all batches
       for (int i = 0; i <= currentBatchIndex; i++) {
-        // Count operations in this batch by checking if it has any
-        // We'll commit all batches up to currentBatchIndex
-        try {
-          await batches[i].commit();
-          batchesCommitted++;
-          debugPrint('FirestoreDatabase: Committed batch ${i + 1}/${currentBatchIndex + 1}');
-        } catch (e) {
-          debugPrint('FirestoreDatabase: Error committing batch ${i + 1}: $e');
-          // Continue with other batches
+        // Firestore batches track operations internally, we'll commit all batches
+        totalOperations += operationsInCurrentBatch;
+      }
+      
+      debugPrint('FirestoreDatabase: Total operations to commit: $totalOperations across ${currentBatchIndex + 1} batches');
+      
+      // Commit categories batch first (if it has operations)
+      if (operationsInCurrentBatch > 0 || currentBatchIndex >= 0) {
+        for (int i = 0; i <= currentBatchIndex; i++) {
+          try {
+            await batches[i].commit();
+            batchesCommitted++;
+            debugPrint('FirestoreDatabase: Successfully committed batch ${i + 1}/${currentBatchIndex + 1}');
+          } catch (e) {
+            debugPrint('FirestoreDatabase: Error committing batch ${i + 1}: $e');
+            rethrow; // Re-throw to show error to user
+          }
         }
       }
       
-      if (batchesCommitted == 0 && productsAdded == 0 && productsSkipped == 0) {
-        debugPrint('FirestoreDatabase: No operations to commit - all items may already exist');
-      }
+      debugPrint('FirestoreDatabase: Chiyagaadi menu seed completed - Added: $productsAdded products, Skipped: $productsSkipped products, Batches committed: $batchesCommitted');
       
-      debugPrint('FirestoreDatabase: Chiyagaadi menu seed completed - Added: $productsAdded products, Skipped: $productsSkipped products');
+      // Verify data was saved by querying
+      try {
+        final verifyCategories = await firestore.collection('categories').limit(5).get();
+        final verifyProducts = await firestore.collection('products').limit(5).get();
+        debugPrint('FirestoreDatabase: Verification - Found ${verifyCategories.docs.length} categories and ${verifyProducts.docs.length} products in Firestore');
+      } catch (e) {
+        debugPrint('FirestoreDatabase: Error verifying saved data: $e');
+      }
     } catch (e) {
       debugPrint('FirestoreDatabase: Error seeding menu: $e');
       rethrow; // Re-throw so caller can handle it

@@ -437,6 +437,23 @@ class _MenuScreenState extends State<MenuScreen> {
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
+      // Check if database is available
+      if (!dbProvider.isAvailable) {
+        debugPrint('MenuScreen: Database not available, cannot load data');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Database not available. Please check Firebase connection.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
+      debugPrint('MenuScreen: Loading categories and products...');
+
       // PERF: Categories + products can load in parallel.
       final categoryFuture = dbProvider.query(
         'categories',
@@ -452,14 +469,18 @@ class _MenuScreenState extends State<MenuScreen> {
             where: 'is_sellable = ?',
             whereArgs: [1],
           );
+          debugPrint('MenuScreen: Found ${sellable.length} sellable products');
           if (sellable.isNotEmpty) return sellable;
 
           // Fallback for legacy docs (missing is_sellable): fetch all and filter.
           final all = await dbProvider.query('products');
-          return all.where((p) {
+          debugPrint('MenuScreen: Found ${all.length} total products, filtering...');
+          final filtered = all.where((p) {
             final v = p['is_sellable'];
             return v == null || v == 1;
           }).toList();
+          debugPrint('MenuScreen: After filtering: ${filtered.length} products');
+          return filtered;
         }
 
         return await dbProvider.query(
@@ -478,12 +499,38 @@ class _MenuScreenState extends State<MenuScreen> {
       final categoryMaps = results[0];
       final productMaps = results[1];
 
+      debugPrint('MenuScreen: Loaded ${categoryMaps.length} categories and ${productMaps.length} products');
+
       _categories = categoryMaps.map((map) => Category.fromMap(map)).toList();
       _products = productMaps.map((map) => Product.fromMap(map)).toList();
-    } catch (e) {
-      debugPrint('Error loading menu data: $e');
+      
+      debugPrint('MenuScreen: Parsed ${_categories.length} categories and ${_products.length} products');
+      
+      if (_categories.isEmpty && _products.isEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No menu items found. Click the seed button to add menu items.'),
+            duration: Duration(seconds: 4),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('MenuScreen: Error loading menu data: $e');
+      debugPrint('MenuScreen: Stack trace: $stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading menu: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
