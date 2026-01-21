@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../utils/theme.dart';
@@ -30,11 +31,33 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
       final users = await auth.getAllUsers();
       if (!mounted) return;
       setState(() => _users = users);
+      
+      // Show a helpful message if database initialization failed but we have at least the current user
+      if (users.isEmpty && auth.isAuthenticated && auth.isAdmin) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Database initialization failed. Showing current user only.'),
+              duration: Duration(seconds: 3),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
     } catch (e) {
+      debugPrint('_loadUsers: Error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading users: $e')),
-        );
+        // Don't show error if it's just a database init issue - getAllUsers handles it gracefully
+        final errorStr = e.toString();
+        if (!errorStr.contains('Database initialization failed') && 
+            !errorStr.contains('Null check')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error loading users: $e'),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

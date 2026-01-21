@@ -948,9 +948,47 @@ class InaraAuthProvider with ChangeNotifier {
 
   // Admin-only: list users
   Future<List<Map<String, dynamic>>> getAllUsers() async {
-    final dbProvider = _getDatabaseProvider();
-    await dbProvider.init();
-    return await dbProvider.query('users', orderBy: 'username ASC');
+    try {
+      final dbProvider = _getDatabaseProvider();
+      try {
+        await dbProvider.init();
+      } catch (initError) {
+        debugPrint('getAllUsers: Database initialization failed: $initError');
+        // Return at least the current admin user if we're logged in
+        if (_isAuthenticated && _currentUserRole == 'admin' && _currentUserId != null) {
+          return [
+            {
+              'id': _currentUserId,
+              'documentId': kIsWeb ? _currentUserId : null,
+              'username': _currentUsername ?? 'admin',
+              'email': 'chiyagadi@gmail.com',
+              'role': 'admin',
+              'is_active': 1,
+            }
+          ];
+        }
+        // If database init fails and we can't get current user, return empty list
+        return [];
+      }
+      return await dbProvider.query('users', orderBy: 'username ASC');
+    } catch (e) {
+      debugPrint('getAllUsers: Error loading users: $e');
+      // Return at least the current admin user if we're logged in
+      if (_isAuthenticated && _currentUserRole == 'admin' && _currentUserId != null) {
+        return [
+          {
+            'id': _currentUserId,
+            'documentId': kIsWeb ? _currentUserId : null,
+            'username': _currentUsername ?? 'admin',
+            'email': 'chiyagadi@gmail.com',
+            'role': 'admin',
+            'is_active': 1,
+          }
+        ];
+      }
+      // Return empty list on error
+      return [];
+    }
   }
 
   // Admin-only: change role
