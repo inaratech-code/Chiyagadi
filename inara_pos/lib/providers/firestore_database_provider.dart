@@ -348,6 +348,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
           currentBatchIndex++;
           batches.add(firestore.batch());
           operationsInCurrentBatch = 0;
+          debugPrint('FirestoreDatabase: Created new batch ${currentBatchIndex + 1}');
         }
 
         final docRef = firestore.collection('categories').doc();
@@ -361,8 +362,10 @@ class FirestoreDatabaseProvider with ChangeNotifier {
           'updated_at': now,
         });
         operationsInCurrentBatch++;
-        debugPrint('FirestoreDatabase: Will create category "${cat.name}"');
+        debugPrint('FirestoreDatabase: Will create category "${cat.name}" in batch ${currentBatchIndex + 1}');
       }
+      
+      debugPrint('FirestoreDatabase: Categories processed - ${categoryIdByNormName.length} categories ready');
 
       // Create products (menu items). Inventory is handled separately using
       // purchasable items + purchases, not menu sales.

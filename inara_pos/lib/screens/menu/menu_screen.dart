@@ -157,26 +157,47 @@ class _MenuScreenState extends State<MenuScreen> {
       }
 
       // Seed menu items
+      debugPrint('MenuScreen: Starting menu seed...');
       final success = await dbProvider.seedMenuItems();
       
       if (!mounted) return;
       
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Menu items seeded successfully!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        debugPrint('MenuScreen: Seed completed successfully, reloading data...');
+        
+        // Wait a moment for Firestore to propagate
+        await Future.delayed(const Duration(milliseconds: 500));
         
         // Reload menu data
         await _loadData();
+        
+        // Verify data was loaded
+        if (mounted) {
+          if (_categories.isEmpty && _products.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Seed completed but no data loaded. Please refresh manually.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 4),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Menu items seeded successfully! Loaded ${_categories.length} categories and ${_products.length} products.'),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        }
       } else {
+        debugPrint('MenuScreen: Seed failed');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Failed to seed menu items. Check console for details.'),
+            content: Text('Failed to seed menu items. Check console (F12) for details.'),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
           ),
         );
       }
