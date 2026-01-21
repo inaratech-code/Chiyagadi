@@ -278,7 +278,11 @@ class InaraAuthProvider with ChangeNotifier {
       final userCredential = await auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
-      );
+      ).catchError((error) {
+        debugPrint('Login: Firebase Auth error: $error');
+        // Re-throw to be caught by the outer catch block
+        throw error;
+      });
       
       if (userCredential.user == null) {
         debugPrint('Login: Firebase Auth returned null user');

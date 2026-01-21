@@ -135,7 +135,12 @@ class _LoginScreenState extends State<LoginScreen>
       String errorMsg = 'Login failed. ';
       switch (e.code) {
         case 'user-not-found':
-          errorMsg += 'No user found with this email.';
+          errorMsg = 'No user found with this email.\n\n'
+              'Please ensure the admin user exists in Firebase Console:\n'
+              '1. Go to Firebase Console → Authentication → Users\n'
+              '2. Add user with email: chiyagadi@gmail.com\n'
+              '3. Set password: Chiyagadi15@\n'
+              '4. Try logging in again';
           break;
         case 'wrong-password':
           errorMsg += 'Incorrect password.';
