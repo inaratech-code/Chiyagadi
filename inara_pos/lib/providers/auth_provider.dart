@@ -153,7 +153,7 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> setupAdminPin(String pin) async {
+  Future<bool> setupAdminPin(String pin, {String? email}) async {
     if (!_isValidPassword(pin)) {
       debugPrint('SetupAdminPin: Password invalid (must be 4-20 characters)');
       return false;
@@ -212,6 +212,8 @@ class AuthProvider with ChangeNotifier {
       }
 
       final now = DateTime.now().millisecondsSinceEpoch;
+      final normalizedEmail =
+          (email != null && email.trim().isNotEmpty) ? email.trim() : null;
 
       // Check if admin user already exists
       final existingUsers = await dbProvider.query(
@@ -226,6 +228,7 @@ class AuthProvider with ChangeNotifier {
         final userId = await dbProvider.insert('users', {
           'username': 'admin',
           'pin_hash': pinHash,
+          if (normalizedEmail != null) 'email': normalizedEmail,
           'role': 'admin',
           'is_active': 1,
           'created_at': now,
@@ -239,6 +242,7 @@ class AuthProvider with ChangeNotifier {
           values: {
             'pin_hash': pinHash,
             'is_active': 1,
+            if (normalizedEmail != null) 'email': normalizedEmail,
             'updated_at': now,
           },
           where: 'username = ?',

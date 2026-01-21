@@ -15,6 +15,7 @@ class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _pinController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   bool _isLoading = false;
   bool _isFirstTime = false;
   bool _obscurePin = true;
@@ -76,8 +77,12 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _handleLogin() async {
-    // Validate username
-    if (_usernameController.text.trim().isEmpty) {
+    final username = _usernameController.text.trim();
+    final email = _emailController.text.trim();
+    final identifier = email.isNotEmpty ? email : username;
+
+    // Validate username/email (at least one required)
+    if (identifier.isEmpty) {
       setState(() {
         _errorMessage = 'Please enter a username or email';
       });
@@ -222,11 +227,14 @@ class _LoginScreenState extends State<LoginScreen>
       if (_isFirstTime) {
         // Setup password with username
         try {
-          final success = await authProvider.setupAdminPin(_pinController.text);
+          final success = await authProvider.setupAdminPin(
+            _pinController.text,
+            email: email.isNotEmpty ? email : null,
+          );
           if (success) {
-            // Login after setup using the provided username
+            // Login after setup using username or email
             final loginSuccess =
-                await authProvider.login(username, _pinController.text);
+                await authProvider.login(identifier, _pinController.text);
             if (loginSuccess && mounted) {
               Navigator.of(context).pushReplacementNamed('/home');
             } else {
@@ -252,7 +260,8 @@ class _LoginScreenState extends State<LoginScreen>
         }
       } else {
         // Regular login
-        final success = await authProvider.login(username, _pinController.text);
+        final success =
+            await authProvider.login(identifier, _pinController.text);
         if (success && mounted) {
           Navigator.of(context).pushReplacementNamed('/home');
         } else {
@@ -497,10 +506,64 @@ class _LoginScreenState extends State<LoginScreen>
                                       child: TextField(
                                         controller: _usernameController,
                                         decoration: InputDecoration(
-                                          labelText: 'Username or Email',
+                                          labelText: 'Username',
                                           prefixIcon: const Icon(
                                               Icons.person_outline,
                                               color: Color(0xFFFFC107)),
+                                          border: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            borderSide: BorderSide(
+                                                color: Colors.grey[300]!),
+                                          ),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            borderSide: BorderSide(
+                                                color: Colors.grey[300]!),
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            borderSide: const BorderSide(
+                                                color: Color(0xFFFFC107),
+                                                width: 2),
+                                          ),
+                                          filled: true,
+                                          fillColor: Colors.grey[50],
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                  horizontal: 16,
+                                                  vertical: 16),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 20),
+
+                              // Email field (optional; can be used to login)
+                              TweenAnimationBuilder<double>(
+                                tween: Tween(begin: 0.0, end: 1.0),
+                                duration: const Duration(milliseconds: 1150),
+                                curve: const Interval(0.6, 1.0,
+                                    curve: Curves.easeOut),
+                                builder: (context, value, child) {
+                                  return Opacity(
+                                    opacity: value,
+                                    child: Transform.translate(
+                                      offset: Offset(0, 20 * (1 - value)),
+                                      child: TextField(
+                                        controller: _emailController,
+                                        keyboardType:
+                                            TextInputType.emailAddress,
+                                        decoration: InputDecoration(
+                                          labelText: 'Email',
+                                          prefixIcon: const Icon(
+                                            Icons.email_outlined,
+                                            color: Color(0xFFFFC107),
+                                          ),
                                           border: OutlineInputBorder(
                                             borderRadius:
                                                 BorderRadius.circular(12),
@@ -925,6 +988,7 @@ class _LoginScreenState extends State<LoginScreen>
     _animationController.dispose();
     _pinController.dispose();
     _usernameController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 }
