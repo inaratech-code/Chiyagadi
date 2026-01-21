@@ -277,20 +277,25 @@ class InaraAuthProvider with ChangeNotifier {
       
       // Sign in with Firebase Auth
       final auth = FirebaseAuth.instance;
-      final userCredential = await auth.signInWithEmailAndPassword(
-        email: trimmedEmail,
-        password: password, // Don't trim password - it may contain leading/trailing spaces intentionally
-      ).catchError((error) {
-        debugPrint('Login: Firebase Auth error: $error');
-        if (error is FirebaseAuthException) {
-          debugPrint('Login: Firebase Auth error code: ${error.code}');
-          debugPrint('Login: Firebase Auth error message: ${error.message}');
-        }
-        // Re-throw to be caught by the outer catch block
-        throw error;
-      });
+      FirebaseAuthException? authException;
+      UserCredential? userCredential;
       
-      if (userCredential.user == null) {
+      try {
+        userCredential = await auth.signInWithEmailAndPassword(
+          email: trimmedEmail.toLowerCase(), // Normalize email to lowercase
+          password: password, // Don't trim password - it may contain leading/trailing spaces intentionally
+        );
+      } on FirebaseAuthException catch (e) {
+        authException = e;
+        debugPrint('Login: Firebase Auth error code: ${e.code}');
+        debugPrint('Login: Firebase Auth error message: ${e.message}');
+        rethrow;
+      } catch (e) {
+        debugPrint('Login: Unexpected error during Firebase Auth: $e');
+        rethrow;
+      }
+      
+      if (userCredential == null || userCredential.user == null) {
         debugPrint('Login: Firebase Auth returned null user');
         return false;
       }
@@ -316,8 +321,8 @@ class InaraAuthProvider with ChangeNotifier {
           final adminUser = adminUsers.first;
           final adminEmail = adminUser['email'] as String?;
           
-          // Verify this is the admin user by email
-          if (adminEmail?.toLowerCase() == email.trim().toLowerCase()) {
+          // Verify this is the admin user by email (normalize both to lowercase)
+          if (adminEmail?.toLowerCase() == trimmedEmail.toLowerCase()) {
             final isActive = (adminUser['is_active'] as num?)?.toInt();
             if (isActive != null && isActive == 0) {
               debugPrint('Login: Admin user is disabled');
@@ -350,7 +355,7 @@ class InaraAuthProvider with ChangeNotifier {
         final users = await dbProvider.query(
           'users',
           where: 'email = ?',
-          whereArgs: [email.trim().toLowerCase()],
+          whereArgs: [trimmedEmail.toLowerCase()],
         );
         
         if (users.isNotEmpty) {

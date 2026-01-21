@@ -86,7 +86,8 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _handleLogin() async {
-    final email = _emailController.text.trim();
+    // Normalize email to lowercase for consistency
+    final email = _emailController.text.trim().toLowerCase();
     // Don't trim password - Firebase passwords are case-sensitive and may have spaces
     final password = _pinController.text;
 
