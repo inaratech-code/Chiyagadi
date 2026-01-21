@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT UNIQUE NOT NULL,
   pin_hash TEXT NOT NULL,
+  email TEXT,
   role TEXT NOT NULL CHECK(role IN ('admin', 'cashier')),
   is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
   created_at INTEGER NOT NULL,

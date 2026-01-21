@@ -417,6 +417,12 @@ class DatabaseProvider with ChangeNotifier {
               'ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1))');
           debugPrint('Database: Added is_active column to users');
         }
+        
+        // Add email column if it doesn't exist
+        if (!userColumnNames.contains('email')) {
+          await db.execute('ALTER TABLE users ADD COLUMN email TEXT');
+          debugPrint('Database: Added email column to users');
+        }
       }
 
       // FIXED: Ensure product flags exist to separate Purchase items from Menu items

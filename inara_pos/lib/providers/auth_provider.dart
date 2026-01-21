@@ -482,7 +482,7 @@ class AuthProvider with ChangeNotifier {
 
   /// Create a user with a specific document ID (for Firestore) or regular insert (SQLite)
   /// Useful for migrating users or setting up specific user IDs
-  Future<bool> createUserWithId(String userId, String username, String pin, String role) async {
+  Future<bool> createUserWithId(String userId, String username, String pin, String role, {String? email}) async {
     if (!_isValidPassword(pin)) {
       return false;
     }
@@ -524,6 +524,7 @@ class AuthProvider with ChangeNotifier {
       await dbProvider.insert('users', {
         'username': username,
         'pin_hash': pinHash,
+        if (email != null && email.isNotEmpty) 'email': email,
         'role': role,
         'is_active': 1,
         'created_at': now,
