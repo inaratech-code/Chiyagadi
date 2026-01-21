@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../providers/unified_database_provider.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart' show InaraInaraAuthProvider;
 import '../../models/category.dart';
 import '../../models/product.dart';
 import '../../services/order_service.dart';
@@ -42,7 +42,7 @@ class _MenuScreenState extends State<MenuScreen> {
   // We intentionally do NOT hard-delete products because historical orders may reference them.
   // Instead we mark the product inactive + not sellable, which removes it from the menu.
   Future<void> _deleteMenuItem(Product product) async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final auth = Provider.of<InaraAuthProvider>(context, listen: false);
     if (!auth.isAdmin) return;
 
     final ok = await showDialog<bool>(
@@ -194,7 +194,7 @@ class _MenuScreenState extends State<MenuScreen> {
     });
   }
 
-  bool _isOrderMode(AuthProvider auth) {
+  bool _isOrderMode(InaraAuthProvider auth) {
     // NEW: Cashier uses Menu as ordering surface (admin keeps menu management).
     return !auth.isAdmin;
   }
@@ -248,7 +248,7 @@ class _MenuScreenState extends State<MenuScreen> {
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final auth = Provider.of<InaraAuthProvider>(context, listen: false);
       await dbProvider.init();
 
       // UPDATED: Try to load active order first, but if query fails, we'll create a new one
@@ -855,7 +855,7 @@ class _MenuScreenState extends State<MenuScreen> {
             ),
         ],
       ),
-      floatingActionButton: _showOrderOverlay ? null : Consumer<AuthProvider>(
+      floatingActionButton: _showOrderOverlay ? null : Consumer<InaraAuthProvider>(
         builder: (context, auth, _) {
           // UPDATED: Show "View Order" button when there's an active order (for all users)
           // Cashiers can also create new orders, admins can view existing orders
@@ -874,7 +874,7 @@ class _MenuScreenState extends State<MenuScreen> {
                           try {
                             final dbProvider =
                                 Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-                            final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                            final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
                             await dbProvider.init();
 
                             final createdBy = authProvider.currentUserId != null
@@ -2293,7 +2293,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                         }
                                         
                                         // Create inventory ledger entry
-                                        final auth = Provider.of<AuthProvider>(context, listen: false);
+                                        final auth = Provider.of<InaraAuthProvider>(context, listen: false);
                                         // createdBy must be int? for InventoryLedger
                                         // For Firestore (web), try to parse string user ID as int
                                         int? createdBy;

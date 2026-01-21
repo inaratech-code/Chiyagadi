@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/unified_database_provider.dart';
-import '../providers/auth_provider.dart';
+import '../providers/auth_provider.dart' show InaraInaraAuthProvider;
 import '../models/purchase_model.dart';
 import '../models/purchase_item_model.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -100,7 +100,7 @@ class PurchaseService {
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
       await dbProvider.init();
 
       // Validate items

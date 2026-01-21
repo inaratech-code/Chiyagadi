@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../providers/unified_database_provider.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -67,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
       // Set context for AuthProvider to access UnifiedDatabaseProvider
       authProvider.setContext(context);
 
@@ -111,7 +111,7 @@ class _LoginScreenState extends State<LoginScreen>
     });
 
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
       
       // Ensure context is set for database access
       authProvider.setContext(context);

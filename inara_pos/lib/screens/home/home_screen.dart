@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../orders/orders_screen.dart';
 import '../menu/menu_screen.dart';
 import '../tables/tables_screen.dart';
@@ -62,7 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _selectIndex(int index) async {
     // Role-based access control using permissions
-    final auth = context.read<AuthProvider>();
+    final auth = context.read<InaraAuthProvider>();
     final hasAccess = await auth.hasAccessToSection(index);
     
     if (!hasAccess) {
@@ -144,7 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
+    final authProvider = Provider.of<InaraAuthProvider>(context);
     // Ensure at least the current screen is alive.
     if (_alive.isEmpty || !_alive.contains(_selectedIndex)) {
       _ensureAlive(_selectedIndex);
@@ -225,7 +225,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildDrawer(BuildContext context, AuthProvider authProvider) {
+  Widget _buildDrawer(BuildContext context, InaraAuthProvider authProvider) {
     return Drawer(
       child: FutureBuilder<Set<int>>(
         future: authProvider.getRolePermissions(authProvider.currentUserRole ?? 'cashier'),
@@ -340,7 +340,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildMobileBottomNav(AuthProvider authProvider) {
+  Widget _buildMobileBottomNav(InaraAuthProvider authProvider) {
     // Mobile: Show only 4 most important items based on permissions
     // In our screen list: 0=Dashboard, 1=Orders, 2=Tables, 3=Menu, 4+=More screens.
     // Mobile bottom nav shows: Home, Orders (if permitted), Menu (if permitted), More.
@@ -441,7 +441,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showMoreOptionsSheet(BuildContext context, AuthProvider authProvider) {
+  void _showMoreOptionsSheet(BuildContext context, InaraAuthProvider authProvider) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -513,7 +513,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildWebBottomNav(AuthProvider authProvider) {
+  Widget _buildWebBottomNav(InaraAuthProvider authProvider) {
     // Web: Show items based on permissions
     return FutureBuilder<Set<int>>(
       future: authProvider.getRolePermissions(authProvider.currentUserRole ?? 'cashier'),
@@ -621,7 +621,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _showLogoutDialog(
-      BuildContext context, AuthProvider authProvider) async {
+      BuildContext context, InaraAuthProvider authProvider) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(

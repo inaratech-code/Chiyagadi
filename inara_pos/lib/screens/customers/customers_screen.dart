@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/unified_database_provider.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart' show InaraInaraAuthProvider;
 import '../../models/customer.dart';
 import '../../utils/theme.dart';
 import '../orders/order_detail_screen.dart';
@@ -922,7 +922,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
       try {
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
         final customerId = customer.documentId ?? customer.id;
         if (customerId == null) return;
 
@@ -1195,7 +1195,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
       try {
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
         final customerId =
             kIsWeb ? (customer.documentId ?? customer.id) : customer.id;
         if (customerId == null) return;

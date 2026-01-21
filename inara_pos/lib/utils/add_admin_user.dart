@@ -1,12 +1,12 @@
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
-import '../providers/auth_provider.dart';
+import '../providers/auth_provider.dart' show InaraAuthProvider;
 import '../providers/unified_database_provider.dart';
 
 /// Utility function to add an admin user with a specific document ID
 /// Usage: Call this function from your app initialization or admin panel
 Future<bool> addAdminUserWithId(
   UnifiedDatabaseProvider dbProvider,
-  AuthProvider authProvider,
+  InaraAuthProvider authProvider,
   String documentId, {
   String username = 'admin',
   String pin = 'admin123', // Default password - user should change this

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import '../../providers/unified_database_provider.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../services/order_service.dart';
 import '../../services/inventory_ledger_service.dart';
 import '../../models/product.dart';
@@ -31,7 +31,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   // NEW: Sensitive action confirmation (password)
   Future<bool> _confirmAdminPin() async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final auth = Provider.of<InaraAuthProvider>(context, listen: false);
     final pinController = TextEditingController();
 
     final ok = await showDialog<bool>(
@@ -708,7 +708,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     final dbProvider =
         Provider.of<UnifiedDatabaseProvider>(context, listen: false);
     await dbProvider.init();
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
 
     // Dialog state
     String orderType = 'takeaway';

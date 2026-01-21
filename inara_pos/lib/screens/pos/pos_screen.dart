@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/order.dart';
 import '../../models/product.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart' show InaraInaraAuthProvider;
 import '../../providers/unified_database_provider.dart';
 import '../../services/order_service.dart';
 import '../../services/printer_service.dart';
@@ -46,7 +46,7 @@ class _POSScreenState extends State<POSScreen> {
 
     final dbProvider =
         Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
 
     try {
       await dbProvider.init();
@@ -143,7 +143,7 @@ class _POSScreenState extends State<POSScreen> {
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
       await dbProvider.init();
 
       // If an order is already open, delete it so we truly start fresh.

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../utils/theme.dart';
 
 class UsersManagementScreen extends StatefulWidget {
@@ -26,7 +26,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final auth = Provider.of<InaraAuthProvider>(context, listen: false);
       final users = await auth.getAllUsers();
       if (!mounted) return;
       setState(() => _users = users);
@@ -56,7 +56,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
       (u['is_active'] as num?)?.toInt() ?? 1;
 
   Future<void> _showAddUserDialog() async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final auth = Provider.of<InaraAuthProvider>(context, listen: false);
     final usernameController = TextEditingController();
     final emailController = TextEditingController();
     final pinController = TextEditingController();
@@ -227,7 +227,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
   }
 
   Future<void> _showResetPinDialog(Map<String, dynamic> user) async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final auth = Provider.of<InaraAuthProvider>(context, listen: false);
     final userId = user['id'];
     final username = user['username'] as String? ?? '';
     final pinController = TextEditingController();
@@ -328,7 +328,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
   }
 
   Future<void> _showChangeRoleDialog(Map<String, dynamic> user) async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final auth = Provider.of<InaraAuthProvider>(context, listen: false);
     final userId = user['id'];
     final username = user['username'] as String? ?? '';
     String role = user['role'] as String? ?? 'cashier';
@@ -380,7 +380,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
   }
 
   Future<void> _showRolePermissionsDialog() async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final auth = Provider.of<InaraAuthProvider>(context, listen: false);
     
     // Section names and indices
     final sections = [
@@ -548,7 +548,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
   }
 
   Future<void> _toggleActive(Map<String, dynamic> user) async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final auth = Provider.of<InaraAuthProvider>(context, listen: false);
     final userId = user['id'];
     final username = user['username'] as String? ?? '';
     final isActive = _isActive(user) == 1;
@@ -611,7 +611,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = Provider.of<AuthProvider>(context);
+    final auth = Provider.of<InaraAuthProvider>(context);
     if (!auth.isAdmin) {
       return const Scaffold(
         body: Center(child: Text('Admin access required')),

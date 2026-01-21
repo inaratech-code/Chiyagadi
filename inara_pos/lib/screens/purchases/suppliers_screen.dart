@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import '../../providers/unified_database_provider.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart' show InaraInaraAuthProvider;
 import '../../models/supplier_model.dart';
 import '../../services/supplier_service.dart';
 import '../../utils/theme.dart';
@@ -1035,7 +1035,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                       Builder(
                         builder: (dialogContext) {
                           final authProvider =
-                              Provider.of<AuthProvider>(context, listen: false);
+                              Provider.of<InaraAuthProvider>(context, listen: false);
                           final hasOutstanding = outstanding > 0;
                           return Row(
                             children: [
@@ -1170,7 +1170,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     required Supplier supplier,
     required List<Map<String, dynamic>> purchases,
   }) async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
     if (!authProvider.isAdmin) return false;
 
     // Only allow payments against a specific outstanding purchase (no ambiguity)

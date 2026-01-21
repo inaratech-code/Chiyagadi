@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/unified_database_provider.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart' show InaraInaraAuthProvider;
 import '../../services/purchase_service.dart';
 import '../../services/supplier_service.dart';
 import '../../models/product.dart';
@@ -82,7 +82,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
+    final authProvider = Provider.of<InaraAuthProvider>(context);
 
     return Scaffold(
       appBar: widget.hideAppBar
@@ -1016,7 +1016,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
               (totalAmount - paidAmount);
       final hasOutstanding = outstandingAmount > 0;
 
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
 
       await showDialog(
         context: context,
@@ -1370,7 +1370,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
       try {
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
         final purchaseId = kIsWeb
             ? (purchase['documentId'] ?? purchase['id'])
             : purchase['id'];

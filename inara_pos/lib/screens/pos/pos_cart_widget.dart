@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/order.dart';
 import '../../models/order_item.dart';
 import '../../providers/unified_database_provider.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart' show InaraInaraAuthProvider;
 import '../../services/order_service.dart';
 import '../../utils/number_formatter.dart';
 import '../../utils/theme.dart';
@@ -453,7 +453,7 @@ class _POSCartWidgetState extends State<POSCartWidget> {
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final auth = Provider.of<InaraAuthProvider>(context, listen: false);
       final createdBy = auth.currentUserId != null
           ? (kIsWeb ? auth.currentUserId! : int.tryParse(auth.currentUserId!))
           : null;
@@ -485,7 +485,7 @@ class _POSCartWidgetState extends State<POSCartWidget> {
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final auth = Provider.of<InaraAuthProvider>(context, listen: false);
       final createdBy = auth.currentUserId != null
           ? (kIsWeb ? auth.currentUserId! : int.tryParse(auth.currentUserId!))
           : null;

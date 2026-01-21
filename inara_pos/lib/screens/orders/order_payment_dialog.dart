@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart' show InaraInaraAuthProvider;
 import '../../providers/unified_database_provider.dart';
 import '../../services/order_service.dart';
 import '../../utils/number_formatter.dart';
@@ -250,7 +250,7 @@ class _OrderPaymentDialogState extends State<OrderPaymentDialog> {
     setState(() => _isProcessing = true);
 
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
 

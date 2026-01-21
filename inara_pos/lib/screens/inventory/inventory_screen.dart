@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/unified_database_provider.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart' show InaraInaraAuthProvider;
 import '../../services/inventory_ledger_service.dart';
 import '../../models/product.dart';
 import '../../models/inventory_ledger_model.dart';
@@ -601,7 +601,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         // FIXED: Use ledger service to create adjustment entry (not direct update)
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
         await dbProvider.init();
 
         final productId = item['product_id'];

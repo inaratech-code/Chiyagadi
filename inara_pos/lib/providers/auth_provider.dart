@@ -8,7 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'unified_database_provider.dart';
 
-class AuthProvider with ChangeNotifier {
+class InaraAuthProvider with ChangeNotifier {
   bool _isAuthenticated = false;
   String? _currentUserId;
   String? _currentUserRole;

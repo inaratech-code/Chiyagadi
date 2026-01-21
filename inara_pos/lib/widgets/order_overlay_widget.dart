@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:provider/provider.dart';
 import '../providers/unified_database_provider.dart';
-import '../providers/auth_provider.dart';
+import '../providers/auth_provider.dart' show InaraAuthProvider;
 import '../models/product.dart';
 import '../services/order_service.dart';
 import '../screens/orders/orders_screen.dart';
@@ -140,7 +140,7 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
         );
         if (item.isNotEmpty) {
           final itemId = item['id'] ?? item['documentId'];
-          final auth = Provider.of<AuthProvider>(context, listen: false);
+          final auth = Provider.of<InaraAuthProvider>(context, listen: false);
           final createdBy = auth.currentUserId != null
               ? (kIsWeb ? auth.currentUserId! : int.tryParse(auth.currentUserId!))
               : null;
@@ -158,7 +158,7 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
           orElse: () => {},
         );
         
-        final auth = Provider.of<AuthProvider>(context, listen: false);
+        final auth = Provider.of<InaraAuthProvider>(context, listen: false);
         final createdBy = auth.currentUserId != null
             ? (kIsWeb ? auth.currentUserId! : int.tryParse(auth.currentUserId!))
             : null;

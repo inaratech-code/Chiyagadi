@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'providers/auth_provider.dart';
+import 'providers/auth_provider.dart' show InaraAuthProvider;
 import 'providers/unified_database_provider.dart';
 import 'providers/sync_provider.dart';
 import 'providers/theme_provider.dart';
@@ -33,7 +33,7 @@ class InaraPOSApp extends StatelessWidget {
         ChangeNotifierProvider.value(value: databaseProvider),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(
-          create: (_) => AuthProvider(),
+          create: (_) => InaraAuthProvider(),
         ),
         ChangeNotifierProvider(
           create: (_) => SyncProvider(),
@@ -90,7 +90,7 @@ class _WarmStartState extends State<_WarmStart> {
         
         // Add admin user with specific document ID if on web
         if (kIsWeb) {
-          final authProvider = context.read<AuthProvider>();
+          final authProvider = context.read<InaraAuthProvider>();
           // Add admin user with document ID: cruFy4iy9kMP136d8H99DrBjBbG3
           await addAdminUserWithId(
             dbProvider,
@@ -145,7 +145,7 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
     // If lockMode == 'always', we lock the app when it goes to background.
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
-      final auth = context.read<AuthProvider>();
+      final auth = context.read<InaraAuthProvider>();
       if (auth.lockMode == 'always') {
         auth.logout();
       }
@@ -161,7 +161,7 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
     // Check Firebase Auth state
     try {
       final auth = FirebaseAuth.instance;
-      final authProvider = context.read<AuthProvider>();
+          final authProvider = context.read<InaraAuthProvider>();
       
       // Load lock mode preference (non-blocking)
       if (mounted) {
@@ -220,7 +220,7 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
       );
     }
 
-    return Consumer<AuthProvider>(
+    return Consumer<InaraAuthProvider>(
       builder: (context, authProvider, _) {
         // IMPORTANT: keep a stable, long-lived context in AuthProvider so it can safely
         // access other providers (UnifiedDatabaseProvider) even if LoginScreen is disposed.

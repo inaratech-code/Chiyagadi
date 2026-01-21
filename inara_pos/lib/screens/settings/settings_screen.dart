@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/unified_database_provider.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../utils/theme.dart';
 import '../../utils/app_messenger.dart';
 import 'users_management_screen.dart';
@@ -49,7 +49,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
       await dbProvider.init();
       final settings = await dbProvider.query('settings');
 
@@ -89,7 +89,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (_selectedDefaultDiscount == null) _selectedDefaultDiscount = '0';
       if (_selectedMaxDiscount == null) _selectedMaxDiscount = '50';
 
-      // NEW: Load lock mode from AuthProvider (stored in SharedPreferences)
+      // NEW: Load lock mode from InaraAuthProvider (stored in SharedPreferences)
       _lockMode = authProvider.lockMode;
     } catch (e) {
       debugPrint('Error loading settings: $e');
@@ -102,7 +102,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
       final now = DateTime.now().millisecondsSinceEpoch;
 
       // Validate VAT percent (admin only can modify, but we still validate on save)
@@ -168,7 +168,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
+    final authProvider = Provider.of<InaraAuthProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -824,7 +824,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
 
       try {
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
         final success = await authProvider.changePassword(oldPin, newPin);
 
         if (mounted) {

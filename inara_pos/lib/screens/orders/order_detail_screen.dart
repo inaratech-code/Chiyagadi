@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import '../../providers/unified_database_provider.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../models/product.dart';
 import '../../services/order_service.dart';
 import '../../services/inventory_ledger_service.dart';
@@ -1100,7 +1100,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       try {
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-        final auth = Provider.of<AuthProvider>(context, listen: false);
+        final auth = Provider.of<InaraAuthProvider>(context, listen: false);
         final createdBy = auth.currentUserId != null
             ? (kIsWeb ? auth.currentUserId! : int.tryParse(auth.currentUserId!))
             : null;
@@ -1258,7 +1258,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
       if (confirmed != true) return;
 
-      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final auth = Provider.of<InaraAuthProvider>(context, listen: false);
       final createdBy = auth.currentUserId != null
           ? (kIsWeb ? auth.currentUserId! : int.tryParse(auth.currentUserId!))
           : null;
@@ -1317,7 +1317,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       try {
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-        final auth = Provider.of<AuthProvider>(context, listen: false);
+        final auth = Provider.of<InaraAuthProvider>(context, listen: false);
         final createdBy = auth.currentUserId != null
             ? (kIsWeb ? auth.currentUserId! : int.tryParse(auth.currentUserId!))
             : null;
@@ -1443,7 +1443,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Future<void> _deleteOrder() async {
     // NEW: Role-based + password-protected deletion
-    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final auth = Provider.of<InaraAuthProvider>(context, listen: false);
     final pinController = TextEditingController();
 
     final ok = await showDialog<bool>(
@@ -1869,7 +1869,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     if (result == true) {
       try {
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
 
         // Calculate payment amounts
         double? partialAmount;
@@ -2020,7 +2020,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           throw Exception('Invalid amount');
         }
 
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         await _orderService.payCredit(
