@@ -141,18 +141,21 @@ class _MenuScreenState extends State<MenuScreen> {
     try {
       final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       
-      // Ensure database is initialized
-      await dbProvider.init();
+      // Force re-initialization to reset any previous failures
+      debugPrint('MenuScreen: Forcing database re-initialization for seed...');
+      await dbProvider.forceInit();
       
       if (!dbProvider.isAvailable) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Database not available. Please check Firebase connection.'),
+              content: Text('Database not available. Please check Firebase connection and try refreshing the page.'),
               backgroundColor: Colors.red,
+              duration: Duration(seconds: 5),
             ),
           );
         }
+        debugPrint('MenuScreen: Database still not available after forceInit()');
         return;
       }
 
