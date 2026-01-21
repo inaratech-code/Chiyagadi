@@ -134,35 +134,57 @@ class UnifiedDatabaseProvider with ChangeNotifier {
               throw StateError('Firebase options is null after all attempts');
             }
             
-            // Initialize Firebase with retries
+            // Initialize Firebase with retries and longer delays for null check errors
             bool initSuccess = false;
-            for (int attempt = 0; attempt < 3; attempt++) {
+            for (int attempt = 0; attempt < 5; attempt++) {
               try {
                 if (attempt > 0) {
-                  await Future.delayed(Duration(milliseconds: 300 * (attempt + 1)));
-                  debugPrint('UnifiedDatabase: Retrying Firebase initialization (attempt ${attempt + 1})...');
+                  // Longer delays for retries, especially for null check errors
+                  final delayMs = attempt == 1 ? 500 : (attempt == 2 ? 1000 : 2000);
+                  await Future.delayed(Duration(milliseconds: delayMs));
+                  debugPrint('UnifiedDatabase: Retrying Firebase initialization (attempt ${attempt + 1}/5)...');
                 }
                 
-                await Firebase.initializeApp(options: options);
-                debugPrint('UnifiedDatabase: Firebase App initialized successfully (web)');
-                initSuccess = true;
-                break;
+                // Wrap initializeApp in try-catch to catch null check errors
+                try {
+                  await Firebase.initializeApp(options: options);
+                  debugPrint('UnifiedDatabase: Firebase App initialized successfully (web)');
+                  initSuccess = true;
+                  break;
+                } catch (initError) {
+                  final initErrorMsg = initError.toString();
+                  
+                  // If it's a null check error, wait longer and retry
+                  if (initErrorMsg.contains('Null check operator') || 
+                      initErrorMsg.contains('null value')) {
+                    debugPrint('UnifiedDatabase: Null check error in Firebase.initializeApp: $initError');
+                    if (attempt < 4) {
+                      debugPrint('UnifiedDatabase: Waiting longer before retry...');
+                      // Wait progressively longer for null check errors
+                      await Future.delayed(Duration(milliseconds: 1000 * (attempt + 1)));
+                      continue;
+                    }
+                  }
+                  // Re-throw if not a null check error or last attempt
+                  rethrow;
+                }
               } catch (initError) {
                 final initErrorMsg = initError.toString();
                 debugPrint('UnifiedDatabase: Firebase init attempt ${attempt + 1} failed: $initError');
                 
-                // If it's a null check error, retry
-                if (initErrorMsg.contains('Null check operator') || 
-                    initErrorMsg.contains('null value')) {
-                  if (attempt < 2) {
-                    debugPrint('UnifiedDatabase: Null check error detected, will retry...');
-                    continue;
+                // If this is the last attempt, handle gracefully
+                if (attempt == 4) {
+                  // For null check errors on final attempt, mark as failed but don't throw
+                  if (initErrorMsg.contains('Null check operator') || 
+                      initErrorMsg.contains('null value')) {
+                    debugPrint('UnifiedDatabase: Null check error persists after all retries');
+                    debugPrint('UnifiedDatabase: This may be a browser compatibility issue');
+                    debugPrint('UnifiedDatabase: Try refreshing the page or using a different browser');
+                    _initFailed = true;
+                    _isInitialized = false;
+                    return; // Exit gracefully
                   }
-                }
-                
-                // If this is the last attempt, throw
-                if (attempt == 2) {
-                  throw StateError('Failed to initialize Firebase App after 3 attempts: $initError');
+                  throw StateError('Failed to initialize Firebase App after 5 attempts: $initError');
                 }
               }
             }
