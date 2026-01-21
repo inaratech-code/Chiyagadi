@@ -57,6 +57,9 @@
       _flutter.loader.loadEntrypoint({
         serviceWorker: {
           serviceWorkerVersion: serviceWorkerVersion,
+          // Increase timeout for service worker initialization
+          // This helps on slower networks or when Firebase is initializing
+          timeout: 10000, // 10 seconds instead of default 4 seconds
         },
         onEntrypointLoaded: function(engineInitializer) {
           engineInitializer.initializeEngine().then(function(appRunner) {
