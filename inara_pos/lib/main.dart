@@ -182,24 +182,33 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
             final dbProvider = context.read<UnifiedDatabaseProvider>();
             await dbProvider.init();
             
-            const adminDocumentId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
-            final adminUsers = await dbProvider.query(
-              'users',
-              where: 'documentId = ?',
-              whereArgs: [adminDocumentId],
-            );
+            // Support multiple admin document IDs
+            const adminDocumentIds = [
+              'dSc8mQzHPsftOpqb200d7xPhS7K2',
+              'GrH4UWRy6UhEBMOaXxx0hBTfUbJ3',
+            ];
             
-            if (adminUsers.isNotEmpty) {
-              final adminUser = adminUsers.first;
-              final adminEmail = adminUser['email'] as String?;
+            // Try to find admin by any of the document IDs
+            for (final adminDocumentId in adminDocumentIds) {
+              final adminUsers = await dbProvider.query(
+                'users',
+                where: 'documentId = ?',
+                whereArgs: [adminDocumentId],
+              );
               
-              if (adminEmail?.toLowerCase() == email.toLowerCase()) {
-                authProvider.setContext(context);
-                // Manually set authenticated state
-                // Note: This bypasses password check, but user is already authenticated via Firebase Auth
-                debugPrint('AuthWrapper: Restoring admin session for $email');
-                // We'll let the AuthProvider handle this through its login method
-                // For now, just ensure context is set
+              if (adminUsers.isNotEmpty) {
+                final adminUser = adminUsers.first;
+                final adminEmail = adminUser['email'] as String?;
+                
+                if (adminEmail?.toLowerCase() == email.toLowerCase()) {
+                  authProvider.setContext(context);
+                  // Manually set authenticated state
+                  // Note: This bypasses password check, but user is already authenticated via Firebase Auth
+                  debugPrint('AuthWrapper: Restoring admin session for $email');
+                  // We'll let the AuthProvider handle this through its login method
+                  // For now, just ensure context is set
+                  break; // Found the admin, no need to check other IDs
+                }
               }
             }
           } catch (e) {
