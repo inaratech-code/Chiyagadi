@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show ChangeNotifier, debugPrint;
+import 'package:flutter/foundation.dart'
+    show ChangeNotifier, debugPrint, defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/chiyagaadi_menu_seed.dart';
 
@@ -38,17 +39,42 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       // Get Firestore instance
       _firestore = FirebaseFirestore.instance;
 
-      // Try to enable offline persistence (may not be supported on all web platforms)
-      try {
-        _firestore!.settings = const Settings(
-          persistenceEnabled: true,
-          cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-        );
-        debugPrint('FirestoreDatabase: Offline persistence enabled');
-      } catch (settingsError) {
-        debugPrint(
-            'FirestoreDatabase: Could not set persistence settings (this is OK on some web platforms): $settingsError');
-        // Continue without persistence settings - Firestore will still work
+      // Web/iOS Safari often fails (or behaves inconsistently) with persistence enabled.
+      // This can surface as opaque "Null check operator used on a null value" errors on new devices.
+      //
+      // Strategy:
+      // - On web+iOS: force persistence OFF for reliability.
+      // - Elsewhere: best-effort enable persistence; if it fails, fall back to OFF.
+      final isWebIOS = kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+      if (isWebIOS) {
+        try {
+          _firestore!.settings = const Settings(
+            persistenceEnabled: false,
+          );
+          debugPrint(
+              'FirestoreDatabase: Web iOS detected, persistence disabled for stability');
+        } catch (e) {
+          debugPrint(
+              'FirestoreDatabase: Failed to apply iOS web settings (continuing): $e');
+        }
+      } else {
+        try {
+          _firestore!.settings = const Settings(
+            persistenceEnabled: true,
+            cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+          );
+          debugPrint('FirestoreDatabase: Offline persistence enabled');
+        } catch (settingsError) {
+          debugPrint(
+              'FirestoreDatabase: Could not enable persistence; falling back to disabled: $settingsError');
+          try {
+            _firestore!.settings = const Settings(
+              persistenceEnabled: false,
+            );
+          } catch (_) {
+            // Ignore: Firestore will still work with defaults.
+          }
+        }
       }
 
       _isInitialized = true;
