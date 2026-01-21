@@ -84,19 +84,11 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-    // Validate password (alphanumeric, 4-20 characters)
+    // Validate password (4-20 characters, allows special characters)
     final password = _pinController.text.trim();
     if (password.length < 4 || password.length > 20) {
       setState(() {
         _errorMessage = 'Password must be 4-20 characters';
-      });
-      return;
-    }
-    // Check if password contains only letters and numbers
-    final alphanumericRegex = RegExp(r'^[a-zA-Z0-9]+$');
-    if (!alphanumericRegex.hasMatch(password)) {
-      setState(() {
-        _errorMessage = 'Password can only contain letters and numbers';
       });
       return;
     }

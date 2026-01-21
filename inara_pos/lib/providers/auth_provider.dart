@@ -155,7 +155,7 @@ class AuthProvider with ChangeNotifier {
 
   Future<bool> setupAdminPin(String pin) async {
     if (!_isValidPassword(pin)) {
-      debugPrint('SetupAdminPin: Password invalid (must be 4-20 alphanumeric characters)');
+      debugPrint('SetupAdminPin: Password invalid (must be 4-20 characters)');
       return false;
     }
 

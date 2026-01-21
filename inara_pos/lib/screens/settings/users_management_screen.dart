@@ -104,7 +104,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                   decoration: InputDecoration(
                     labelText: 'Password',
                     border: const OutlineInputBorder(),
-                    helperText: '4-20 characters (letters and numbers)',
+                    helperText: '4-20 characters',
                     suffixIcon: IconButton(
                       icon: Icon(
                           obscurePin ? Icons.visibility : Icons.visibility_off),

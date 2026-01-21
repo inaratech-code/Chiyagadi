@@ -804,21 +804,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return;
       }
 
-      // Validate password: 4-20 alphanumeric characters
+      // Validate password: 4-20 characters (allows special characters)
       if (newPin.length < 4 || newPin.length > 20) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Password must be 4-20 characters')),
-          );
-        }
-        return;
-      }
-      // Check if password contains only letters and numbers
-      final alphanumericRegex = RegExp(r'^[a-zA-Z0-9]+$');
-      if (!alphanumericRegex.hasMatch(newPin)) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Password can only contain letters and numbers')),
           );
         }
         return;
