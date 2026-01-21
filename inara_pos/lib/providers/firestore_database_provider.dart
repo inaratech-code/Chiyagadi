@@ -223,6 +223,25 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         }
       }
 
+      // Test Firestore connectivity with a simple read operation
+      try {
+        debugPrint('FirestoreDatabase: Testing Firestore connectivity...');
+        final testQuery = await _firestore!.collection('_connectivity_test').limit(1).get();
+        debugPrint('FirestoreDatabase: Connectivity test successful - Firestore is accessible');
+      } catch (testError) {
+        final testErrorMsg = testError.toString();
+        debugPrint('FirestoreDatabase: Connectivity test failed: $testError');
+        
+        // If it's a permissions error, that's okay - Firestore is initialized
+        if (testErrorMsg.contains('permission') || 
+            testErrorMsg.contains('PERMISSION_DENIED') ||
+            testErrorMsg.contains('Missing or insufficient permissions')) {
+          debugPrint('FirestoreDatabase: Permission error (expected if rules require auth) - Firestore is initialized');
+        } else {
+          debugPrint('FirestoreDatabase: Warning - Connectivity test failed but continuing anyway');
+        }
+      }
+      
       _isInitialized = true;
       debugPrint('FirestoreDatabase: Firestore initialized successfully');
 
