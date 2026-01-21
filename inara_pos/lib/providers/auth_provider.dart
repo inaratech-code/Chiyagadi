@@ -393,7 +393,67 @@ class InaraAuthProvider with ChangeNotifier {
         debugPrint('Login: Error looking up user by email: $e');
       }
       
-      // If user document not found, still allow login but create a basic user record
+      // If user document not found, check if this is the admin email and create admin document
+      if (trimmedEmail.toLowerCase() == 'chiyagadi@gmail.com') {
+        debugPrint('Login: Admin email detected but Firestore document not found. Creating admin document...');
+        
+        // Try to create admin user with the first available document ID
+        const adminDocumentIds = [
+          'dSc8mQzHPsftOpqb200d7xPhS7K2',
+          'GrH4UWRy6UhEBMOaXxx0hBTfUbJ3',
+        ];
+        
+        String? createdAdminId;
+        for (final adminDocumentId in adminDocumentIds) {
+          try {
+            // Check if document already exists
+            final existing = await dbProvider.query(
+              'users',
+              where: 'documentId = ?',
+              whereArgs: [adminDocumentId],
+            );
+            
+            if (existing.isEmpty) {
+              // Create admin user document
+              final now = DateTime.now().millisecondsSinceEpoch;
+              await dbProvider.insert('users', {
+                'username': 'admin',
+                'email': trimmedEmail.toLowerCase(),
+                'role': 'admin',
+                'is_active': 1,
+                'created_at': now,
+                'updated_at': now,
+              }, documentId: kIsWeb ? adminDocumentId : null);
+              
+              createdAdminId = adminDocumentId;
+              debugPrint('Login: Created admin user document with ID: $adminDocumentId');
+              break;
+            }
+          } catch (e) {
+            debugPrint('Login: Error creating admin document $adminDocumentId: $e');
+            continue;
+          }
+        }
+        
+        if (createdAdminId != null) {
+          _isAuthenticated = true;
+          _currentUserId = createdAdminId;
+          _currentUserRole = 'admin';
+          _currentUsername = 'admin';
+          
+          debugPrint('Login: Success! Admin authenticated with newly created document ID: $_currentUserId');
+          if (_lockMode == 'timeout') {
+            _resetInactivityTimer();
+          } else {
+            _inactivityTimer?.cancel();
+            _inactivityTimer = null;
+          }
+          notifyListeners();
+          return true;
+        }
+      }
+      
+      // If user document not found and not admin, still allow login but create a basic user record
       debugPrint('Login: User document not found in Firestore, but Firebase Auth succeeded');
       _isAuthenticated = true;
       _currentUserId = userCredential.user!.uid;
@@ -412,8 +472,9 @@ class InaraAuthProvider with ChangeNotifier {
     } on FirebaseAuthException catch (e) {
       debugPrint('Login: Firebase Auth error: ${e.code} - ${e.message}');
       return false;
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('Login: Error during login: $e');
+      debugPrint('Login: Stack trace: $stackTrace');
       return false;
     }
   }
