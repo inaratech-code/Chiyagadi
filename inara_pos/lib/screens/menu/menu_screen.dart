@@ -240,9 +240,17 @@ class _MenuScreenState extends State<MenuScreen> {
 
   Color _categoryColorForName(String categoryName) {
     final key = _normalizeNameKey(categoryName);
-    if (key == _normalizeNameKey('Smokes')) return const Color(0xFF424242);
-    if (key == _normalizeNameKey('Drinks')) return const Color(0xFF1976D2);
-    // default accent for other categories
+    
+    // Define colors for all categories
+    if (key == _normalizeNameKey('Tuto Sip')) return const Color(0xFF4CAF50); // Green
+    if (key == _normalizeNameKey('Chill Sip')) return const Color(0xFF2196F3); // Blue
+    if (key == _normalizeNameKey('Snacks')) return const Color(0xFFFF9800); // Orange
+    if (key == _normalizeNameKey('Hookah')) return const Color(0xFF9C27B0); // Purple
+    if (key == _normalizeNameKey('Games & Vibes')) return const Color(0xFFE91E63); // Pink
+    if (key == _normalizeNameKey('Smokes')) return const Color(0xFF424242); // Dark Gray
+    if (key == _normalizeNameKey('Drinks')) return const Color(0xFF00BCD4); // Cyan
+    
+    // Default accent for any other categories
     return AppTheme.logoPrimary;
   }
 
