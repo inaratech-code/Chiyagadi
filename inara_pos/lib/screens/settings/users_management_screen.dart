@@ -260,19 +260,19 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
     );
     if (!mounted) return;
     if (ok) {
-      // For cashiers, show the generated email
+      // Show the generated email for all roles
+      await _loadUsers();
+      final createdUser = _users.firstWhere(
+        (u) => u['username'] == username,
+        orElse: () => {},
+      );
+      
       String message = 'User "$username" created';
-      if (selectedRole == 'cashier') {
-        // Get the generated email from the user list
-        await _loadUsers();
-        final createdUser = _users.firstWhere(
-          (u) => u['username'] == username,
-          orElse: () => {},
-        );
-        if (createdUser.isNotEmpty && createdUser['email'] != null) {
-          message = 'User "$username" created\nLogin email: ${createdUser['email']}';
-        }
+      if (createdUser.isNotEmpty && createdUser['email'] != null) {
+        final userEmail = createdUser['email'] as String;
+        message = 'User "$username" created\nLogin email: $userEmail';
       }
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text(message),
@@ -851,40 +851,73 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                                       ),
                                   ],
                                 ),
-                                subtitle: Row(
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: roleColor.withOpacity(0.12),
-                                        borderRadius:
-                                            BorderRadius.circular(999),
+                                    // Email display at the top
+                                    if (u['email'] != null && (u['email'] as String).isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(bottom: 4),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.email_outlined,
+                                              size: 14,
+                                              color: Colors.grey[600],
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Expanded(
+                                              child: Text(
+                                                u['email'] as String,
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[700],
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                      child: Text(
-                                        role.toUpperCase(),
-                                        style: TextStyle(
-                                            color: roleColor,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 12),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: statusColor.withOpacity(0.12),
-                                        borderRadius:
-                                            BorderRadius.circular(999),
-                                      ),
-                                      child: Text(
-                                        active ? 'ACTIVE' : 'DISABLED',
-                                        style: TextStyle(
-                                            color: statusColor,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 12),
-                                      ),
+                                    // Role and status badges
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: roleColor.withOpacity(0.12),
+                                            borderRadius:
+                                                BorderRadius.circular(999),
+                                          ),
+                                          child: Text(
+                                            role.toUpperCase(),
+                                            style: TextStyle(
+                                                color: roleColor,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 12),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: statusColor.withOpacity(0.12),
+                                            borderRadius:
+                                                BorderRadius.circular(999),
+                                          ),
+                                          child: Text(
+                                            active ? 'ACTIVE' : 'DISABLED',
+                                            style: TextStyle(
+                                                color: statusColor,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 12),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
