@@ -10,6 +10,7 @@ import '../firebase_options.dart';
 class UnifiedDatabaseProvider with ChangeNotifier {
   late final dynamic _provider;
   bool _isInitialized = false;
+  bool _initFailed = false; // Track if initialization failed
 
   UnifiedDatabaseProvider() {
     if (kIsWeb) {
@@ -23,6 +24,12 @@ class UnifiedDatabaseProvider with ChangeNotifier {
 
   Future<void> init() async {
     if (_isInitialized) {
+      return;
+    }
+    
+    // If init already failed, don't retry automatically (prevents infinite loops)
+    if (_initFailed) {
+      debugPrint('UnifiedDatabase: Init previously failed, skipping retry');
       return;
     }
 
@@ -155,30 +162,33 @@ class UnifiedDatabaseProvider with ChangeNotifier {
 
       await _provider.init();
       _isInitialized = true;
+      _initFailed = false; // Reset failure flag on success
       debugPrint('UnifiedDatabase: Initialized successfully');
     } catch (e) {
       debugPrint('UnifiedDatabase: Initialization failed: $e');
       final errorMsg = e.toString();
       
-      // Provide more helpful error message for null check errors
+      // Mark as failed but don't throw - allow app to continue
+      _initFailed = true;
+      _isInitialized = false;
+      
+      // Log helpful information
       if (errorMsg.contains('Null check operator') || errorMsg.contains('null value')) {
-        throw StateError(
-          'Database initialization failed: Null check error detected.\n\n'
-          'This is often caused by:\n'
-          '1. Firebase not fully initialized on iOS Safari\n'
-          '2. Firestore instance not available\n'
-          '3. Browser compatibility issue\n\n'
-          'Try:\n'
-          '1. Hard refresh the page (Cmd+Shift+R on Mac)\n'
-          '2. Clear browser cache\n'
-          '3. Check browser console (F12) for details\n\n'
-          'Original error: $e'
-        );
+        debugPrint('UnifiedDatabase: Null check error detected.');
+        debugPrint('UnifiedDatabase: This is often caused by:');
+        debugPrint('UnifiedDatabase: 1. Firebase not fully initialized on iOS Safari');
+        debugPrint('UnifiedDatabase: 2. Firestore instance not available');
+        debugPrint('UnifiedDatabase: 3. Browser compatibility issue');
+        debugPrint('UnifiedDatabase: App will continue but database operations may fail.');
       }
       
-      rethrow;
+      // Don't rethrow - allow app to continue even if database init fails
+      // Screens should handle empty results gracefully
     }
   }
+  
+  /// Check if database is available
+  bool get isAvailable => _isInitialized && !_initFailed;
 
   Future<List<Map<String, dynamic>>> query(
     String table, {
@@ -195,31 +205,54 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     if (!_isInitialized) {
       await init();
     }
-    return await _provider.query(
-      table,
-      distinct: distinct,
-      columns: columns,
-      where: where,
-      whereArgs: whereArgs,
-      groupBy: groupBy,
-      having: having,
-      orderBy: orderBy,
-      limit: limit,
-      offset: offset,
-    );
+    
+    // If init failed, return empty list instead of throwing
+    if (!isAvailable) {
+      debugPrint('UnifiedDatabase: Query skipped - database not available');
+      return [];
+    }
+    
+    try {
+      return await _provider.query(
+        table,
+        distinct: distinct,
+        columns: columns,
+        where: where,
+        whereArgs: whereArgs,
+        groupBy: groupBy,
+        having: having,
+        orderBy: orderBy,
+        limit: limit,
+        offset: offset,
+      );
+    } catch (e) {
+      debugPrint('UnifiedDatabase: Query error: $e');
+      return []; // Return empty list on error
+    }
   }
 
   Future<dynamic> insert(String table, Map<String, dynamic> values, {String? documentId}) async {
     if (!_isInitialized) {
       await init();
     }
+    
+    // If init failed, return null instead of throwing
+    if (!isAvailable) {
+      debugPrint('UnifiedDatabase: Insert skipped - database not available');
+      return null;
+    }
 
-    if (kIsWeb) {
-      // Firestore returns String (document ID)
-      return await _provider.insert(table, values, documentId: documentId);
-    } else {
-      // SQLite returns int (documentId parameter ignored on SQLite)
-      return await _provider.insert(table, values);
+    try {
+      if (kIsWeb) {
+        // Firestore returns String (document ID)
+        return await _provider.insert(table, values, documentId: documentId);
+      } else {
+        // SQLite returns int (documentId parameter ignored on SQLite)
+        return await _provider.insert(table, values);
+      }
+    } catch (e) {
+      debugPrint('UnifiedDatabase: Insert error: $e');
+      return null; // Return null on error
     }
   }
 
@@ -232,23 +265,35 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     if (!_isInitialized) {
       await init();
     }
-    if (kIsWeb) {
-      // FirestoreDatabaseProvider.update expects `data: ...`
+    
+    // If init failed, return 0 instead of throwing
+    if (!isAvailable) {
+      debugPrint('UnifiedDatabase: Update skipped - database not available');
+      return 0;
+    }
+    
+    try {
+      if (kIsWeb) {
+        // FirestoreDatabaseProvider.update expects `data: ...`
+        return await _provider.update(
+          table,
+          data: values,
+          where: where,
+          whereArgs: whereArgs,
+        );
+      }
+
+      // DatabaseProvider.update (SQLite) expects the values map as the 2nd positional argument.
       return await _provider.update(
         table,
-        data: values,
+        values,
         where: where,
         whereArgs: whereArgs,
       );
+    } catch (e) {
+      debugPrint('UnifiedDatabase: Update error: $e');
+      return 0; // Return 0 on error (no rows updated)
     }
-
-    // DatabaseProvider.update (SQLite) expects the values map as the 2nd positional argument.
-    return await _provider.update(
-      table,
-      values,
-      where: where,
-      whereArgs: whereArgs,
-    );
   }
 
   Future<int> delete(
@@ -259,11 +304,23 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     if (!_isInitialized) {
       await init();
     }
-    return await _provider.delete(
-      table,
-      where: where,
-      whereArgs: whereArgs,
-    );
+    
+    // If init failed, return 0 instead of throwing
+    if (!isAvailable) {
+      debugPrint('UnifiedDatabase: Delete skipped - database not available');
+      return 0;
+    }
+    
+    try {
+      return await _provider.delete(
+        table,
+        where: where,
+        whereArgs: whereArgs,
+      );
+    } catch (e) {
+      debugPrint('UnifiedDatabase: Delete error: $e');
+      return 0; // Return 0 on error (no rows deleted)
+    }
   }
 
   Future<T?> transaction<T>(Future<T> Function(dynamic txn) action) async {
