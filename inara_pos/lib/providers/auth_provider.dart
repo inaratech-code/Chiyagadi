@@ -283,12 +283,25 @@ class AuthProvider with ChangeNotifier {
             'Login: Found user - username: ${user['username']}, role: ${user['role']}');
       }
 
-      final users = await dbProvider.query(
+      // Try to find user by username first
+      var users = await dbProvider.query(
         'users',
         where: 'username = ? AND pin_hash = ?',
         whereArgs: [username, pinHash],
       );
-      debugPrint('Login: Query result - found ${users.length} matching users');
+      debugPrint('Login: Query by username result - found ${users.length} matching users');
+      
+      // If not found by username, try by email (for email-based login)
+      if (users.isEmpty) {
+        users = await dbProvider.query(
+          'users',
+          where: 'email = ? AND pin_hash = ?',
+          whereArgs: [username, pinHash],
+        );
+        debugPrint('Login: Query by email result - found ${users.length} matching users');
+      }
+      
+      debugPrint('Login: Final query result - found ${users.length} matching users');
 
       if (users.isNotEmpty) {
         final user = users.first;
