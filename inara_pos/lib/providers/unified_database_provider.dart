@@ -99,6 +99,8 @@ class UnifiedDatabaseProvider with ChangeNotifier {
           // This satisfies Firestore rules that require `request.auth != null`
           // Admin credentials: chiyagadi@gmail.com / Chiyagadi15@
           // NOTE: We wrap this in try-catch to avoid minified JS type errors
+          // If Firebase Auth fails completely, we'll skip it and try Firestore anyway
+          bool authSkipped = false;
           try {
             // Defensive access to FirebaseAuth - avoid type checking in minified JS
             dynamic authInstance;
@@ -106,22 +108,28 @@ class UnifiedDatabaseProvider with ChangeNotifier {
               authInstance = FirebaseAuth.instance;
             } catch (e) {
               debugPrint('UnifiedDatabase: Error getting FirebaseAuth.instance: $e');
-              // Continue without auth - Firestore may still work if rules are public
-              debugPrint('UnifiedDatabase: Continuing without Firebase Auth');
+              // If we can't even get the instance, skip auth entirely
+              authSkipped = true;
+              debugPrint('UnifiedDatabase: Skipping Firebase Auth - continuing with Firestore init');
             }
             
-            if (authInstance != null) {
+            if (!authSkipped && authInstance != null) {
               // Check if already signed in - use defensive access
               dynamic currentUser;
               try {
                 currentUser = authInstance.currentUser;
               } catch (e) {
                 debugPrint('UnifiedDatabase: Error checking Firebase Auth: $e');
-                // If checking currentUser fails, try to sign in anyway
-                currentUser = null;
+                // If checking currentUser fails with minified JS error, skip auth
+                if (e.toString().contains('minified') || e.toString().contains('TypeError')) {
+                  authSkipped = true;
+                  debugPrint('UnifiedDatabase: Minified JS error in Auth check - skipping Auth');
+                } else {
+                  currentUser = null;
+                }
               }
               
-              if (currentUser == null) {
+              if (!authSkipped && currentUser == null) {
                 // Sign in with admin Firebase Auth credentials
                 try {
                   await authInstance.signInWithEmailAndPassword(
@@ -131,19 +139,25 @@ class UnifiedDatabaseProvider with ChangeNotifier {
                   debugPrint('UnifiedDatabase: Firebase Auth email/password sign-in ok');
                 } catch (signInError) {
                   debugPrint('UnifiedDatabase: Firebase Auth sign-in failed: $signInError');
-                  // If email/password auth fails, try to continue (rules may be public)
-                  // But log the error for debugging
                   final errorMsg = signInError.toString();
-                  if (errorMsg.contains('user-not-found') || 
+                  
+                  // If it's a minified JS error, skip auth entirely
+                  if (errorMsg.contains('minified') || errorMsg.contains('TypeError')) {
+                    authSkipped = true;
+                    debugPrint('UnifiedDatabase: Minified JS error in Auth sign-in - skipping Auth');
+                  } else if (errorMsg.contains('user-not-found') || 
                       errorMsg.contains('wrong-password') ||
                       errorMsg.contains('invalid-email')) {
                     debugPrint('UnifiedDatabase: Admin Firebase Auth user not found or invalid credentials');
                     debugPrint('UnifiedDatabase: Please ensure admin user exists in Firebase Console');
+                    // Continue - Firestore may still work if rules are public
+                    debugPrint('UnifiedDatabase: Continuing without Firebase Auth (rules may be public)');
+                  } else {
+                    // Continue - Firestore may still work if rules are public
+                    debugPrint('UnifiedDatabase: Continuing without Firebase Auth (rules may be public)');
                   }
-                  // Continue - Firestore may still work if rules are public
-                  debugPrint('UnifiedDatabase: Continuing without Firebase Auth (rules may be public)');
                 }
-              } else {
+              } else if (!authSkipped) {
                 try {
                   final email = currentUser.email;
                   debugPrint('UnifiedDatabase: Firebase Auth already signed in as $email');
@@ -153,9 +167,24 @@ class UnifiedDatabaseProvider with ChangeNotifier {
               }
             }
           } catch (authError) {
+            final authErrorMsg = authError.toString();
             debugPrint('UnifiedDatabase: Firebase Auth error: $authError');
+            
+            // If it's a minified JS error or null check, skip auth entirely
+            if (authErrorMsg.contains('minified') || 
+                authErrorMsg.contains('TypeError') ||
+                authErrorMsg.contains('Null check operator') ||
+                authErrorMsg.contains('null value')) {
+              authSkipped = true;
+              debugPrint('UnifiedDatabase: Critical Auth error - skipping Auth completely');
+            }
+            
             // Continue - Firestore may still work if rules are public
             debugPrint('UnifiedDatabase: Continuing without Firebase Auth (rules may be public)');
+          }
+          
+          if (authSkipped) {
+            debugPrint('UnifiedDatabase: Firebase Auth skipped due to errors - proceeding with Firestore only');
           }
         } catch (e) {
           final errorMsg = e.toString();
