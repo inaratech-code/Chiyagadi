@@ -54,35 +54,33 @@
   <script>
     window.addEventListener('load', function(ev) {
       // Download main.dart.js
-      // Suppress service worker timeout errors - they're non-critical
-      const originalConsoleError = console.error;
-      console.error = function(...args) {
-        // Filter out service worker timeout warnings
-        if (args[0] && typeof args[0] === 'string' && 
-            args[0].includes('prepareServiceWorker took more than')) {
-          // Silently ignore service worker timeout - app works without it
-          return;
-        }
-        // Log other errors normally
-        originalConsoleError.apply(console, args);
-      };
-      
-      _flutter.loader.loadEntrypoint({
-        serviceWorker: serviceWorkerVersion ? {
-          serviceWorkerVersion: serviceWorkerVersion,
-        } : null, // Make service worker optional
-        onEntrypointLoaded: function(engineInitializer) {
-          engineInitializer.initializeEngine().then(function(appRunner) {
-            appRunner.runApp();
-            // Restore original console.error after app loads
-            console.error = originalConsoleError;
-          }).catch(function(error) {
-            // Restore console.error even on error
-            console.error = originalConsoleError;
-            throw error;
-          });
-        }
-      });
+      // Use newer load() API with extended timeout for service worker
+      // This helps on slower networks or when Firebase is initializing
+      if (typeof _flutter.loader.load === 'function') {
+        // Newer API (Flutter 3.0+)
+        _flutter.loader.load({
+          serviceWorker: serviceWorkerVersion ? {
+            serviceWorkerVersion: serviceWorkerVersion,
+            timeoutMillis: 10000, // 10 seconds instead of default 4 seconds
+          } : null,
+          onEntrypointLoaded: async function(engineInitializer) {
+            const appRunner = await engineInitializer.initializeEngine();
+            await appRunner.runApp();
+          }
+        });
+      } else {
+        // Fallback to older loadEntrypoint() API
+        _flutter.loader.loadEntrypoint({
+          serviceWorker: serviceWorkerVersion ? {
+            serviceWorkerVersion: serviceWorkerVersion,
+          } : null,
+          onEntrypointLoaded: function(engineInitializer) {
+            engineInitializer.initializeEngine().then(function(appRunner) {
+              appRunner.runApp();
+            });
+          }
+        });
+      }
     });
   </script>
 </body>
