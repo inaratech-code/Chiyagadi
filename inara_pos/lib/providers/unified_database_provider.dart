@@ -168,6 +168,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
       // Try to initialize the provider (Firestore or SQLite)
       // Wrap in try-catch to handle any errors gracefully
       try {
+        debugPrint('UnifiedDatabase: Initializing database provider...');
         await _provider.init();
         _isInitialized = true;
         _initFailed = false; // Reset failure flag on success
@@ -177,22 +178,34 @@ class UnifiedDatabaseProvider with ChangeNotifier {
         debugPrint('UnifiedDatabase: Provider init failed: $providerError');
         
         // If it's a null check error or minified JS error, it might be transient
-        // Don't mark as permanently failed - allow retries via forceInit()
+        // Try one more time with a delay before giving up
         if (providerErrorMsg.contains('Null check operator') || 
             providerErrorMsg.contains('null value') ||
             providerErrorMsg.contains('minified') ||
             providerErrorMsg.contains('TypeError')) {
-          debugPrint('UnifiedDatabase: Transient error in provider init (null check/minified JS)');
-          debugPrint('UnifiedDatabase: This is often caused by:');
-          debugPrint('UnifiedDatabase: 1. Firebase not fully initialized on iOS Safari');
-          debugPrint('UnifiedDatabase: 2. Firestore instance not available');
-          debugPrint('UnifiedDatabase: 3. Browser compatibility issue');
-          debugPrint('UnifiedDatabase: Will allow retries for this error (use forceInit())');
+          debugPrint('UnifiedDatabase: Transient error detected, retrying after delay...');
+          await Future.delayed(const Duration(milliseconds: 1000));
           
-          // For transient errors, mark as failed but allow retries via forceInit()
-          _initFailed = true;
-          _isInitialized = false;
-          // Don't rethrow - allow app to continue
+          try {
+            debugPrint('UnifiedDatabase: Retrying provider initialization...');
+            await _provider.init();
+            _isInitialized = true;
+            _initFailed = false;
+            debugPrint('UnifiedDatabase: Initialized successfully on retry');
+          } catch (retryError) {
+            debugPrint('UnifiedDatabase: Retry also failed: $retryError');
+            debugPrint('UnifiedDatabase: This is often caused by:');
+            debugPrint('UnifiedDatabase: 1. Firebase not fully initialized on iOS Safari');
+            debugPrint('UnifiedDatabase: 2. Firestore instance not available');
+            debugPrint('UnifiedDatabase: 3. Browser compatibility issue');
+            debugPrint('UnifiedDatabase: 4. Firestore security rules require authentication');
+            debugPrint('UnifiedDatabase: Will allow retries via forceInit()');
+            
+            // For transient errors, mark as failed but allow retries via forceInit()
+            _initFailed = true;
+            _isInitialized = false;
+            // Don't rethrow - allow app to continue
+          }
         } else {
           // For other errors, mark as failed
           _initFailed = true;
