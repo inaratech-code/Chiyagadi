@@ -61,35 +61,41 @@ class UnifiedDatabaseProvider with ChangeNotifier {
             debugPrint('UnifiedDatabase: Firebase already initialized');
           }
 
-          // IMPORTANT: This app uses its own PIN/password auth, not Firebase Auth.
-          // If Firestore rules require `request.auth != null`, we must sign in to Firebase
-          // (Anonymous auth is simplest) so new devices don't hit PERMISSION_DENIED.
+          // IMPORTANT: Sign in with Firebase Auth using admin email/password
+          // This satisfies Firestore rules that require `request.auth != null`
+          // Admin credentials: chiyagadi@gmail.com / Chiyagadi15@
           try {
             final auth = FirebaseAuth.instance;
             if (auth == null) {
               debugPrint('UnifiedDatabase: FirebaseAuth.instance is null, skipping auth');
             } else if (auth.currentUser == null) {
-              await auth.signInAnonymously();
-              debugPrint('UnifiedDatabase: Firebase Auth anonymous sign-in ok');
+              // Sign in with admin Firebase Auth credentials
+              try {
+                await auth.signInWithEmailAndPassword(
+                  email: 'chiyagadi@gmail.com',
+                  password: 'Chiyagadi15@',
+                );
+                debugPrint('UnifiedDatabase: Firebase Auth email/password sign-in ok');
+              } catch (signInError) {
+                debugPrint('UnifiedDatabase: Firebase Auth sign-in failed: $signInError');
+                // If email/password auth fails, try to continue (rules may be public)
+                // But log the error for debugging
+                final errorMsg = signInError.toString();
+                if (errorMsg.contains('user-not-found') || 
+                    errorMsg.contains('wrong-password') ||
+                    errorMsg.contains('invalid-email')) {
+                  debugPrint('UnifiedDatabase: Admin Firebase Auth user not found or invalid credentials');
+                  debugPrint('UnifiedDatabase: Please ensure admin user exists in Firebase Console');
+                }
+                // Continue - Firestore may still work if rules are public
+                debugPrint('UnifiedDatabase: Continuing without Firebase Auth (rules may be public)');
+              }
             } else {
-              debugPrint('UnifiedDatabase: Firebase Auth already signed in');
+              debugPrint('UnifiedDatabase: Firebase Auth already signed in as ${auth.currentUser?.email}');
             }
           } catch (authError) {
-            final errorMsg = authError.toString();
-            debugPrint('UnifiedDatabase: Firebase Auth sign-in failed (web): $authError');
-            // If Anonymous auth is not enabled, this will fail with a specific error
-            if (errorMsg.contains('OPERATION_NOT_ALLOWED') || 
-                errorMsg.contains('anonymous') ||
-                errorMsg.contains('not enabled')) {
-              throw Exception(
-                'Firebase Anonymous Authentication is not enabled.\n\n'
-                'Please enable it in Firebase Console:\n'
-                '1. Go to Firebase Console → Authentication → Sign-in method\n'
-                '2. Enable "Anonymous" provider\n'
-                '3. Save and refresh the app'
-              );
-            }
-            // For other auth errors, continue - Firestore may still work if rules are public
+            debugPrint('UnifiedDatabase: Firebase Auth error: $authError');
+            // Continue - Firestore may still work if rules are public
             debugPrint('UnifiedDatabase: Continuing without Firebase Auth (rules may be public)');
           }
         } catch (e) {
