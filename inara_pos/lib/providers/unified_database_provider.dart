@@ -190,16 +190,20 @@ class UnifiedDatabaseProvider with ChangeNotifier {
           final errorMsg = e.toString();
           debugPrint('UnifiedDatabase: Firebase init error (web): $e');
           
-          // Don't fail initialization if it's just a Firebase Auth error
+          // Don't fail initialization if it's a Firebase Auth error, minified JS error, or null check
           // Firestore may still work even if Auth fails
           if (errorMsg.contains('Firebase Auth') || 
               errorMsg.contains('minified') ||
-              errorMsg.contains('TypeError')) {
-            debugPrint('UnifiedDatabase: Firebase Auth error detected, continuing with Firestore init');
-            // Continue - don't rethrow Auth errors
+              errorMsg.contains('TypeError') ||
+              errorMsg.contains('Null check operator') ||
+              errorMsg.contains('null value')) {
+            debugPrint('UnifiedDatabase: Firebase Auth/null check error detected, continuing with Firestore init');
+            debugPrint('UnifiedDatabase: Skipping Firebase Auth - Firestore will initialize without Auth');
+            // Continue - don't rethrow Auth/null check errors
+            // These are often transient or can be worked around
           } else {
-            // For other errors (like Firebase initialization failures), still rethrow
-            debugPrint('UnifiedDatabase: Critical Firebase error, rethrowing');
+            // For other critical errors (like Firebase app initialization failures), still rethrow
+            debugPrint('UnifiedDatabase: Critical Firebase error (not Auth-related), rethrowing');
             rethrow;
           }
         }
