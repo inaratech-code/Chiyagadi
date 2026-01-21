@@ -327,14 +327,38 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     if (!_isInitialized) {
       await init();
     }
-    return await _provider.transaction(action);
+    
+    // If init failed, return null instead of throwing
+    if (!isAvailable) {
+      debugPrint('UnifiedDatabase: Transaction skipped - database not available');
+      return null;
+    }
+    
+    try {
+      return await _provider.transaction(action);
+    } catch (e) {
+      debugPrint('UnifiedDatabase: Transaction error: $e');
+      return null; // Return null on error
+    }
   }
 
   Future<void> resetDatabase() async {
     if (!_isInitialized) {
       await init();
     }
-    return await _provider.resetDatabase();
+    
+    // If init failed, just return (nothing to reset)
+    if (!isAvailable) {
+      debugPrint('UnifiedDatabase: Reset skipped - database not available');
+      return;
+    }
+    
+    try {
+      return await _provider.resetDatabase();
+    } catch (e) {
+      debugPrint('UnifiedDatabase: Reset error: $e');
+      // Don't throw - just log the error
+    }
   }
 
   /// Clears business data created/entered through the app while keeping
@@ -346,7 +370,19 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     if (!_isInitialized) {
       await init();
     }
-    return await _provider.clearBusinessData(seedDefaults: seedDefaults);
+    
+    // If init failed, just return (nothing to clear)
+    if (!isAvailable) {
+      debugPrint('UnifiedDatabase: Clear business data skipped - database not available');
+      return;
+    }
+    
+    try {
+      return await _provider.clearBusinessData(seedDefaults: seedDefaults);
+    } catch (e) {
+      debugPrint('UnifiedDatabase: Clear business data error: $e');
+      // Don't throw - just log the error
+    }
   }
 
   Future<void> close() async {
