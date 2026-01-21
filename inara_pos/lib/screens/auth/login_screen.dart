@@ -183,17 +183,36 @@ class _LoginScreenState extends State<LoginScreen>
                   'Database initialization failed after $maxRetries attempts.\n\n';
 
               // Provide helpful error messages based on error type
-              if (lastError.contains('Anonymous Authentication') ||
+              if (lastError.contains('Null check operator') ||
+                  lastError.contains('null value')) {
+                errorDetails +=
+                    'Error: Database initialization failed on iOS Safari.\n\n';
+                errorDetails += 'This is a known iOS Safari compatibility issue.\n\n';
+                errorDetails += 'Solutions:\n';
+                errorDetails +=
+                    '1. Hard refresh the page (hold Shift and click Reload, or Cmd+Shift+R)\n';
+                errorDetails +=
+                    '2. Clear browser cache and cookies\n';
+                errorDetails +=
+                    '3. Try a different browser (Chrome, Firefox) if available\n';
+                errorDetails +=
+                    '4. Ensure Firestore Database is enabled in Firebase Console\n';
+                errorDetails +=
+                    '5. Check browser console (F12) for detailed errors\n\n';
+                errorDetails += 'If the issue persists, the app may need additional iOS Safari compatibility fixes.';
+              } else if (lastError.contains('Anonymous Authentication') ||
                   lastError.contains('OPERATION_NOT_ALLOWED') ||
                   lastError.contains('not enabled')) {
                 errorDetails +=
-                    'Error: Firebase Anonymous Authentication is not enabled.\n\n';
+                    'Error: Firebase Email/Password Authentication issue.\n\n';
                 errorDetails += 'Solution:\n';
                 errorDetails +=
                     '1. Go to Firebase Console → Authentication → Sign-in method\n';
                 errorDetails +=
-                    '2. Enable "Anonymous" provider\n';
-                errorDetails += '3. Save and refresh the app';
+                    '2. Enable "Email/Password" provider\n';
+                errorDetails +=
+                    '3. Ensure admin user (chiyagadi@gmail.com) exists\n';
+                errorDetails += '4. Save and refresh the app';
               } else if (lastError.contains('permission') ||
                   lastError.contains('PERMISSION_DENIED')) {
                 errorDetails +=
