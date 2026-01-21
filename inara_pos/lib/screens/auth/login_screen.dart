@@ -79,7 +79,7 @@ class _LoginScreenState extends State<LoginScreen>
     // Validate username
     if (_usernameController.text.trim().isEmpty) {
       setState(() {
-        _errorMessage = 'Please enter a username';
+        _errorMessage = 'Please enter a username or email';
       });
       return;
     }
@@ -257,7 +257,7 @@ class _LoginScreenState extends State<LoginScreen>
           Navigator.of(context).pushReplacementNamed('/home');
         } else {
           setState(() {
-            _errorMessage = 'Invalid username or PIN. Please try again.';
+            _errorMessage = 'Invalid username/email or password. Please try again.';
             _isLoading = false;
           });
         }
@@ -497,7 +497,7 @@ class _LoginScreenState extends State<LoginScreen>
                                       child: TextField(
                                         controller: _usernameController,
                                         decoration: InputDecoration(
-                                          labelText: 'Username',
+                                          labelText: 'Username or Email',
                                           prefixIcon: const Icon(
                                               Icons.person_outline,
                                               color: Color(0xFFFFC107)),
@@ -651,7 +651,7 @@ class _LoginScreenState extends State<LoginScreen>
                                               ),
                                               // Add "Create Admin" button if login fails and no admin exists
                                               if (_errorMessage!.contains(
-                                                      'Invalid username or PIN') &&
+                                                      'Invalid username/email or password') &&
                                                   !_isFirstTime)
                                                 Padding(
                                                   padding:
@@ -688,7 +688,7 @@ class _LoginScreenState extends State<LoginScreen>
                                                   _errorMessage!.contains(
                                                       'Reset failed') ||
                                                   (_errorMessage!.contains(
-                                                          'Invalid username or PIN') &&
+                                                          'Invalid username/email or password') &&
                                                       !_isFirstTime))
                                                 Padding(
                                                   padding:
