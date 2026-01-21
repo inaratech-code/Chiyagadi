@@ -718,7 +718,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 TextField(
                   controller: oldPinController,
                   decoration: InputDecoration(
-                    labelText: 'Current PIN',
+                    labelText: 'Current Password',
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
                       icon: Icon(obscureOldPin
@@ -737,9 +737,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 TextField(
                   controller: newPinController,
                   decoration: InputDecoration(
-                    labelText: 'New PIN',
+                    labelText: 'New Password',
                     border: const OutlineInputBorder(),
-                    helperText: '4-6 digits',
+                    helperText: '4-20 characters (letters and numbers)',
                     suffixIcon: IconButton(
                       icon: Icon(obscureNewPin
                           ? Icons.visibility
@@ -750,14 +750,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   obscureText: obscureNewPin,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
+                  keyboardType: TextInputType.text,
+                  maxLength: 20,
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: confirmPinController,
                   decoration: InputDecoration(
-                    labelText: 'Confirm New PIN',
+                    labelText: 'Confirm New Password',
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
                       icon: Icon(obscureConfirmPin
@@ -770,8 +770,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   obscureText: obscureConfirmPin,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
+                  keyboardType: TextInputType.text,
+                  maxLength: 20,
                 ),
               ],
             ),
@@ -804,10 +804,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return;
       }
 
-      if (newPin.length < 4 || newPin.length > 6) {
+      // Validate password: 4-20 alphanumeric characters
+      if (newPin.length < 4 || newPin.length > 20) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('PIN must be 4-6 digits')),
+            const SnackBar(content: Text('Password must be 4-20 characters (letters and numbers)')),
+          );
+        }
+        return;
+      }
+      // Check if password contains only letters and numbers
+      final alphanumericRegex = RegExp(r'^[a-zA-Z0-9]+$');
+      if (!alphanumericRegex.hasMatch(newPin)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Password can only contain letters and numbers')),
           );
         }
         return;
@@ -816,7 +827,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (newPin != confirmPin) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('New PINs do not match')),
+            const SnackBar(content: Text('New passwords do not match')),
           );
         }
         return;

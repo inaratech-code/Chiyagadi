@@ -25,6 +25,14 @@ class AuthProvider with ChangeNotifier {
   // Auto-lock after 5 minutes of inactivity
   static const int _inactivityTimeoutMinutes = 5;
 
+  /// Validate password: alphanumeric (letters and numbers), 4-20 characters
+  static bool _isValidPassword(String password) {
+    if (password.length < 4 || password.length > 20) return false;
+    // Allow only letters (a-z, A-Z) and numbers (0-9)
+    final alphanumericRegex = RegExp(r'^[a-zA-Z0-9]+$');
+    return alphanumericRegex.hasMatch(password);
+  }
+
   /// NEW: Load login lock behavior (best-effort; SharedPreferences works on web + mobile).
   /// PERF: Only notify listeners if value actually changed.
   Future<void> loadLockMode() async {
@@ -82,12 +90,12 @@ class AuthProvider with ChangeNotifier {
     return prefs.containsKey('admin_pin');
   }
 
-  /// NEW: Verify admin PIN for sensitive actions (delete orders, inventory, etc.)
+  /// NEW: Verify password for sensitive actions (delete orders, inventory, etc.)
   ///
   /// SECURITY: We store only a hash in SharedPreferences (`admin_pin`).
   /// This works offline on Android and on Web/PWA (best-effort).
   Future<bool> verifyAdminPin(String pin) async {
-    if (pin.length < 4 || pin.length > 6) return false;
+    if (!_isValidPassword(pin)) return false;
     try {
       final prefs = await SharedPreferences.getInstance();
       final storedHash = prefs.getString('admin_pin');
@@ -101,7 +109,7 @@ class AuthProvider with ChangeNotifier {
 
   // Force create admin user (useful for reset scenarios)
   Future<bool> forceCreateAdmin(String pin) async {
-    if (pin.length < 4 || pin.length > 6) {
+    if (!_isValidPassword(pin)) {
       return false;
     }
 
@@ -145,8 +153,8 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<bool> setupAdminPin(String pin) async {
-    if (pin.length < 4 || pin.length > 6) {
-      debugPrint('SetupAdminPin: PIN length invalid: ${pin.length}');
+    if (!_isValidPassword(pin)) {
+      debugPrint('SetupAdminPin: Password invalid (must be 4-20 alphanumeric characters)');
       return false;
     }
 
@@ -249,8 +257,8 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<bool> login(String username, String pin) async {
-    if (pin.length < 4 || pin.length > 6) {
-      debugPrint('Login: PIN length invalid: ${pin.length}');
+    if (!_isValidPassword(pin)) {
+      debugPrint('Login: Password invalid (must be 4-20 alphanumeric characters)');
       return false;
     }
 
@@ -376,10 +384,7 @@ class AuthProvider with ChangeNotifier {
 
   // Change password for current user
   Future<bool> changePassword(String oldPin, String newPin) async {
-    if (oldPin.length < 4 ||
-        oldPin.length > 6 ||
-        newPin.length < 4 ||
-        newPin.length > 6) {
+    if (!_isValidPassword(oldPin) || !_isValidPassword(newPin)) {
       return false;
     }
 
@@ -433,7 +438,7 @@ class AuthProvider with ChangeNotifier {
 
   // Create new user (admin only)
   Future<bool> createUser(String username, String pin, String role) async {
-    if (pin.length < 4 || pin.length > 6) {
+    if (!_isValidPassword(pin)) {
       return false;
     }
 
@@ -478,7 +483,7 @@ class AuthProvider with ChangeNotifier {
   /// Create a user with a specific document ID (for Firestore) or regular insert (SQLite)
   /// Useful for migrating users or setting up specific user IDs
   Future<bool> createUserWithId(String userId, String username, String pin, String role) async {
-    if (pin.length < 4 || pin.length > 6) {
+    if (!_isValidPassword(pin)) {
       return false;
     }
 
@@ -579,10 +584,10 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Admin-only: reset PIN for another user
+  // Admin-only: reset password for another user
   Future<bool> resetUserPin(
       {required dynamic userId, required String newPin}) async {
-    if (newPin.length < 4 || newPin.length > 6) return false;
+    if (!_isValidPassword(newPin)) return false;
     try {
       final dbProvider = _getDatabaseProvider();
       await dbProvider.init();

@@ -1449,20 +1449,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Order (Admin PIN required)'),
+        title: const Text('Delete Order (Password Required)'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-                'Deleting an order is a sensitive action and requires Admin PIN confirmation.'),
+                'Deleting an order is a sensitive action and requires password confirmation.'),
             const SizedBox(height: 12),
             TextField(
               controller: pinController,
-              keyboardType: TextInputType.number,
+              keyboardType: TextInputType.text,
               obscureText: true,
-              maxLength: 6,
+              maxLength: 20,
               decoration: const InputDecoration(
-                labelText: 'Admin PIN',
+                labelText: 'Password',
+                helperText: '4-20 characters (letters and numbers)',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -1481,7 +1482,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Invalid Admin PIN'),
+                      content: Text('Invalid Password'),
                       backgroundColor: Colors.red,
                     ),
                   );

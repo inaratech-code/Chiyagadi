@@ -9,7 +9,7 @@ Future<bool> addAdminUserWithId(
   AuthProvider authProvider,
   String documentId, {
   String username = 'admin',
-  String pin = '1234', // Default PIN - user should change this
+  String pin = 'admin123', // Default password - user should change this
 }) async {
   try {
     await dbProvider.init();

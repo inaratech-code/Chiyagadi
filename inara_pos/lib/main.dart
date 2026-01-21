@@ -93,7 +93,7 @@ class _WarmStartState extends State<_WarmStart> {
             authProvider,
             'cruFy4iy9kMP136d8H99DrBjBbG3',
             username: 'admin',
-            pin: '1234', // Default PIN - change after first login
+            pin: 'admin123', // Default password - change after first login
           );
         }
       } catch (e) {

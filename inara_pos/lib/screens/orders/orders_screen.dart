@@ -29,7 +29,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   int _ordersLimit = 50;
   bool _canLoadMore = false;
 
-  // NEW: Sensitive action confirmation (admin PIN)
+  // NEW: Sensitive action confirmation (password)
   Future<bool> _confirmAdminPin() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final pinController = TextEditingController();
@@ -37,14 +37,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Admin PIN required'),
+        title: const Text('Password Required'),
         content: TextField(
           controller: pinController,
-          keyboardType: TextInputType.number,
+          keyboardType: TextInputType.text,
           obscureText: true,
-          maxLength: 6,
+          maxLength: 20,
           decoration: const InputDecoration(
-            labelText: 'Admin PIN',
+            labelText: 'Password',
+            helperText: '4-20 characters (letters and numbers)',
             border: OutlineInputBorder(),
           ),
         ),
@@ -60,7 +61,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Invalid Admin PIN'),
+                      content: Text('Invalid Password'),
                       backgroundColor: Colors.red,
                     ),
                   );

@@ -84,10 +84,19 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-    // Validate PIN
-    if (_pinController.text.length < 4 || _pinController.text.length > 6) {
+    // Validate password (alphanumeric, 4-20 characters)
+    final password = _pinController.text.trim();
+    if (password.length < 4 || password.length > 20) {
       setState(() {
-        _errorMessage = 'PIN must be 4-6 digits';
+        _errorMessage = 'Password must be 4-20 characters (letters and numbers)';
+      });
+      return;
+    }
+    // Check if password contains only letters and numbers
+    final alphanumericRegex = RegExp(r'^[a-zA-Z0-9]+$');
+    if (!alphanumericRegex.hasMatch(password)) {
+      setState(() {
+        _errorMessage = 'Password can only contain letters and numbers';
       });
       return;
     }
@@ -219,7 +228,7 @@ class _LoginScreenState extends State<LoginScreen>
       final username = _usernameController.text.trim();
 
       if (_isFirstTime) {
-        // Setup admin PIN with username
+        // Setup password with username
         try {
           final success = await authProvider.setupAdminPin(_pinController.text);
           if (success) {
@@ -452,7 +461,7 @@ class _LoginScreenState extends State<LoginScreen>
                                       offset: Offset(0, 10 * (1 - value)),
                                       child: Text(
                                         _isFirstTime
-                                            ? 'Setup Admin PIN'
+                                            ? 'Setup Password'
                                             : 'Welcome Back',
                                         style: Theme.of(context)
                                             .textTheme
@@ -470,7 +479,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8.0),
                                   child: Text(
-                                    'Enter a 4-6 digit PIN to get started',
+                                    'Enter a password (4-20 characters, letters and numbers) to get started',
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodySmall
@@ -547,10 +556,11 @@ class _LoginScreenState extends State<LoginScreen>
                                       child: TextField(
                                         controller: _pinController,
                                         obscureText: _obscurePin,
-                                        keyboardType: TextInputType.number,
-                                        maxLength: 6,
+                                        keyboardType: TextInputType.text,
+                                        maxLength: 20,
                                         decoration: InputDecoration(
-                                          labelText: 'PIN (4-6 digits)',
+                                          labelText: 'Password',
+                                          helperText: '4-20 characters (letters and numbers)',
                                           prefixIcon: const Icon(
                                               Icons.lock_outline,
                                               color: Color(0xFFFFC107)),
