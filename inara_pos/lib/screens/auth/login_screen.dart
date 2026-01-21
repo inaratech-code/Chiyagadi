@@ -399,8 +399,11 @@ class _LoginScreenState extends State<LoginScreen>
                                         controller: _emailController,
                                         keyboardType:
                                             TextInputType.emailAddress,
+                                        autofillHints: const [AutofillHints.email],
+                                        textInputAction: TextInputAction.next,
                                         decoration: InputDecoration(
                                           labelText: 'Email',
+                                          hintText: 'Enter your email',
                                           prefixIcon: const Icon(
                                             Icons.email_outlined,
                                             color: Color(0xFFFFC107),
@@ -454,8 +457,12 @@ class _LoginScreenState extends State<LoginScreen>
                                         obscureText: _obscurePin,
                                         keyboardType: TextInputType.text,
                                         maxLength: 20,
+                                        autofillHints: const [AutofillHints.password],
+                                        textInputAction: TextInputAction.done,
+                                        onSubmitted: (_) => _handleLogin(),
                                         decoration: InputDecoration(
                                           labelText: 'Password',
+                                          hintText: 'Enter your password',
                                           prefixIcon: const Icon(
                                               Icons.lock_outline,
                                               color: Color(0xFFFFC107)),
