@@ -413,24 +413,42 @@ class InaraAuthProvider with ChangeNotifier {
             }, documentId: kIsWeb ? adminDocumentId : null);
             
             debugPrint('Login: Created admin user document with ID: $adminDocumentId');
-            
-            _isAuthenticated = true;
-            _currentUserId = adminDocumentId;
-            _currentUserRole = 'admin';
-            _currentUsername = 'admin';
-            
-            debugPrint('Login: Success! Admin authenticated with newly created document ID: $_currentUserId');
-            if (_lockMode == 'timeout') {
-              _resetInactivityTimer();
-            } else {
-              _inactivityTimer?.cancel();
-              _inactivityTimer = null;
-            }
-            notifyListeners();
-            return true;
+          } else {
+            debugPrint('Login: Admin document already exists, using it');
           }
+          
+          // Set authenticated state with admin document ID
+          _isAuthenticated = true;
+          _currentUserId = adminDocumentId;
+          _currentUserRole = 'admin';
+          _currentUsername = 'admin';
+          
+          debugPrint('Login: Success! Admin authenticated with document ID: $_currentUserId');
+          if (_lockMode == 'timeout') {
+            _resetInactivityTimer();
+          } else {
+            _inactivityTimer?.cancel();
+            _inactivityTimer = null;
+          }
+          notifyListeners();
+          return true;
         } catch (e) {
-          debugPrint('Login: Error creating admin document: $e');
+          debugPrint('Login: Error creating/accessing admin document: $e');
+          // Even if document creation fails, allow login with Firebase Auth UID
+          debugPrint('Login: Falling back to Firebase Auth UID for admin');
+          _isAuthenticated = true;
+          _currentUserId = userCredential.user!.uid;
+          _currentUserRole = 'admin';
+          _currentUsername = 'admin';
+          
+          if (_lockMode == 'timeout') {
+            _resetInactivityTimer();
+          } else {
+            _inactivityTimer?.cancel();
+            _inactivityTimer = null;
+          }
+          notifyListeners();
+          return true;
         }
       }
       
