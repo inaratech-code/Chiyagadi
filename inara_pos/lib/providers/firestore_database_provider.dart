@@ -46,16 +46,48 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
       // Get Firestore instance with defensive error handling
       // iOS Safari sometimes needs a small delay after Firebase.initializeApp()
+      FirebaseFirestore? firestoreInstance;
       try {
         // Small delay for iOS Safari to ensure Firebase is fully ready
         if (kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-          await Future.delayed(const Duration(milliseconds: 100));
+          await Future.delayed(const Duration(milliseconds: 200));
         }
         
-        _firestore = FirebaseFirestore.instance;
-        if (_firestore == null) {
+        // Try to get Firestore instance - wrap in try-catch to catch any null check errors
+        try {
+          firestoreInstance = FirebaseFirestore.instance;
+        } catch (instanceError) {
+          final instanceErrorMsg = instanceError.toString();
+          debugPrint('FirestoreDatabase: FirebaseFirestore.instance threw: $instanceError');
+          
+          // If it's a null check error, wait a bit more and retry
+          if (instanceErrorMsg.contains('Null check operator') || 
+              instanceErrorMsg.contains('null value') ||
+              instanceErrorMsg.contains('NoSuchMethodError')) {
+            debugPrint('FirestoreDatabase: Retrying after additional delay...');
+            await Future.delayed(const Duration(milliseconds: 300));
+            try {
+              firestoreInstance = FirebaseFirestore.instance;
+            } catch (retryError) {
+              throw StateError(
+                'Firestore initialization failed on iOS Safari after retry.\n\n'
+                'Please ensure:\n'
+                '1. Firestore Database is enabled in Firebase Console\n'
+                '2. Security rules are published\n'
+                '3. Try hard refreshing the page (Cmd+Shift+R)\n\n'
+                'Error: $retryError'
+              );
+            }
+          } else {
+            rethrow;
+          }
+        }
+        
+        if (firestoreInstance == null) {
           throw StateError('FirebaseFirestore.instance returned null');
         }
+        
+        _firestore = firestoreInstance;
         debugPrint('FirestoreDatabase: Firestore instance obtained');
       } catch (e) {
         final errorMsg = e.toString();
