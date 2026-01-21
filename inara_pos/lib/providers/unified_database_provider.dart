@@ -31,10 +31,19 @@ class UnifiedDatabaseProvider with ChangeNotifier {
       if (kIsWeb) {
         try {
           if (Firebase.apps.isEmpty) {
-            await Firebase.initializeApp(
-              options: DefaultFirebaseOptions.currentPlatform,
-            );
-            debugPrint('UnifiedDatabase: Firebase initialized (web)');
+            try {
+              final options = DefaultFirebaseOptions.currentPlatform;
+              if (options == null) {
+                throw StateError('DefaultFirebaseOptions.currentPlatform returned null');
+              }
+              await Firebase.initializeApp(options: options);
+              debugPrint('UnifiedDatabase: Firebase initialized (web)');
+            } catch (optionsError) {
+              debugPrint('UnifiedDatabase: Failed to get Firebase options: $optionsError');
+              throw StateError('Failed to initialize Firebase: $optionsError');
+            }
+          } else {
+            debugPrint('UnifiedDatabase: Firebase already initialized');
           }
 
           // IMPORTANT: This app uses its own PIN/password auth, not Firebase Auth.

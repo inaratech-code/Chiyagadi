@@ -20,7 +20,15 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
   FirebaseFirestore get firestore {
     if (_firestore == null) {
-      throw StateError('Firestore not initialized. Call init() first.');
+      // Try to get instance if not set (defensive fallback)
+      try {
+        _firestore = FirebaseFirestore.instance;
+        if (_firestore == null) {
+          throw StateError('Firestore not initialized. Call init() first.');
+        }
+      } catch (e) {
+        throw StateError('Firestore not initialized. Call init() first. Error: $e');
+      }
     }
     return _firestore!;
   }
@@ -36,12 +44,16 @@ class FirestoreDatabaseProvider with ChangeNotifier {
     try {
       debugPrint('FirestoreDatabase: Initializing Firestore...');
 
-      // Get Firestore instance
-      _firestore = FirebaseFirestore.instance;
-      
-      // Defensive check: ensure Firestore instance is not null
-      if (_firestore == null) {
-        throw StateError('FirebaseFirestore.instance returned null');
+      // Get Firestore instance with defensive error handling
+      try {
+        _firestore = FirebaseFirestore.instance;
+        if (_firestore == null) {
+          throw StateError('FirebaseFirestore.instance returned null');
+        }
+        debugPrint('FirestoreDatabase: Firestore instance obtained');
+      } catch (e) {
+        debugPrint('FirestoreDatabase: Failed to get Firestore instance: $e');
+        throw StateError('Failed to get Firestore instance: $e');
       }
 
       // Web/iOS Safari often fails (or behaves inconsistently) with persistence enabled.
@@ -90,9 +102,10 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       unawaited(() async {
         // Best-effort connection check
         try {
-          if (_firestore != null) {
+          final fs = _firestore;
+          if (fs != null) {
             debugPrint('FirestoreDatabase: Background connection test...');
-            await _firestore!.collection('_test').limit(1).get();
+            await fs.collection('_test').limit(1).get();
             debugPrint('FirestoreDatabase: Background connection test ok');
           }
         } catch (e) {
@@ -101,7 +114,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
         // Best-effort default data init
         try {
-          if (_firestore != null) {
+          final fs = _firestore;
+          if (fs != null) {
             await _initializeDefaultData();
           }
         } catch (e) {
@@ -600,8 +614,10 @@ class FirestoreDatabaseProvider with ChangeNotifier {
           inField == 'document_id';
       if (isDocIdField) {
         q = q.where(FieldPath.documentId, whereIn: vals);
+      } else if (inField != null && inField.isNotEmpty) {
+        q = q.where(inField, whereIn: vals);
       } else {
-        q = q.where(inField!, whereIn: vals);
+        throw ArgumentError('Invalid inField for whereIn query');
       }
 
       // Avoid applying orderBy server-side here to reduce index requirements;
