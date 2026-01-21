@@ -263,7 +263,7 @@ class InaraAuthProvider with ChangeNotifier {
   }
 
   /// Login using Firebase Authentication
-  /// Connects to Firestore documents with IDs dSc8mQzHPsftOpqb200d7xPhS7K2 or GrH4UWRy6UhEBMOaXxx0hBTfUbJ3 for admin
+  /// Connects to Firestore document with ID dSc8mQzHPsftOpqb200d7xPhS7K2 for admin
   Future<bool> login(String email, String password) async {
     if (email.isEmpty || password.isEmpty) {
       debugPrint('Login: Email and password are required');
@@ -306,51 +306,44 @@ class InaraAuthProvider with ChangeNotifier {
       final dbProvider = _getDatabaseProvider();
       await dbProvider.init();
       
-      // Connect to Firestore documents for admin users
-      // Support multiple admin document IDs (primary: GrH4UWRy6UhEBMOaXxx0hBTfUbJ3)
-      const adminDocumentIds = [
-        'GrH4UWRy6UhEBMOaXxx0hBTfUbJ3', // Primary admin ID
-        'dSc8mQzHPsftOpqb200d7xPhS7K2', // Secondary admin ID
-      ];
+      // Connect to Firestore document for admin user
+      const adminDocumentId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
       
-      // Try to find admin user by document ID first
+      // Try to find admin user by document ID
       try {
-        // Try each admin document ID
-        for (final adminDocumentId in adminDocumentIds) {
-          final adminUsers = await dbProvider.query(
-            'users',
-            where: 'documentId = ?',
-            whereArgs: [adminDocumentId],
-          );
+        final adminUsers = await dbProvider.query(
+          'users',
+          where: 'documentId = ?',
+          whereArgs: [adminDocumentId],
+        );
+        
+        if (adminUsers.isNotEmpty) {
+          final adminUser = adminUsers.first;
+          final adminEmail = adminUser['email'] as String?;
           
-          if (adminUsers.isNotEmpty) {
-            final adminUser = adminUsers.first;
-            final adminEmail = adminUser['email'] as String?;
-            
-            // Verify this is the admin user by email (normalize both to lowercase)
-            if (adminEmail?.toLowerCase() == trimmedEmail.toLowerCase()) {
-              final isActive = (adminUser['is_active'] as num?)?.toInt();
-              if (isActive != null && isActive == 0) {
-                debugPrint('Login: Admin user is disabled');
-                await auth.signOut();
-                return false;
-              }
-              
-              _isAuthenticated = true;
-              _currentUserId = adminDocumentId;
-              _currentUserRole = 'admin';
-              _currentUsername = adminUser['username'] as String? ?? 'admin';
-              
-              debugPrint('Login: Success! Admin authenticated with document ID: $_currentUserId');
-              if (_lockMode == 'timeout') {
-                _resetInactivityTimer();
-              } else {
-                _inactivityTimer?.cancel();
-                _inactivityTimer = null;
-              }
-              notifyListeners();
-              return true;
+          // Verify this is the admin user by email (normalize both to lowercase)
+          if (adminEmail?.toLowerCase() == trimmedEmail.toLowerCase()) {
+            final isActive = (adminUser['is_active'] as num?)?.toInt();
+            if (isActive != null && isActive == 0) {
+              debugPrint('Login: Admin user is disabled');
+              await auth.signOut();
+              return false;
             }
+            
+            _isAuthenticated = true;
+            _currentUserId = adminDocumentId;
+            _currentUserRole = 'admin';
+            _currentUsername = adminUser['username'] as String? ?? 'admin';
+            
+            debugPrint('Login: Success! Admin authenticated with document ID: $_currentUserId');
+            if (_lockMode == 'timeout') {
+              _resetInactivityTimer();
+            } else {
+              _inactivityTimer?.cancel();
+              _inactivityTimer = null;
+            }
+            notifyListeners();
+            return true;
           }
         }
       } catch (e) {
@@ -397,59 +390,47 @@ class InaraAuthProvider with ChangeNotifier {
       if (trimmedEmail.toLowerCase() == 'chiyagadi@gmail.com') {
         debugPrint('Login: Admin email detected but Firestore document not found. Creating admin document...');
         
-        // Try to create admin user with the first available document ID
-        const adminDocumentIds = [
-          'GrH4UWRy6UhEBMOaXxx0hBTfUbJ3', // Primary admin ID
-          'dSc8mQzHPsftOpqb200d7xPhS7K2', // Secondary admin ID
-        ];
-        
-        String? createdAdminId;
-        for (final adminDocumentId in adminDocumentIds) {
-          try {
-            // Check if document already exists
-            final existing = await dbProvider.query(
-              'users',
-              where: 'documentId = ?',
-              whereArgs: [adminDocumentId],
-            );
-            
-            if (existing.isEmpty) {
-              // Create admin user document
-              final now = DateTime.now().millisecondsSinceEpoch;
-              await dbProvider.insert('users', {
-                'username': 'admin',
-                'email': trimmedEmail.toLowerCase(),
-                'role': 'admin',
-                'is_active': 1,
-                'created_at': now,
-                'updated_at': now,
-              }, documentId: kIsWeb ? adminDocumentId : null);
-              
-              createdAdminId = adminDocumentId;
-              debugPrint('Login: Created admin user document with ID: $adminDocumentId');
-              break;
-            }
-          } catch (e) {
-            debugPrint('Login: Error creating admin document $adminDocumentId: $e');
-            continue;
-          }
-        }
-        
-        if (createdAdminId != null) {
-          _isAuthenticated = true;
-          _currentUserId = createdAdminId;
-          _currentUserRole = 'admin';
-          _currentUsername = 'admin';
+        // Try to create admin user document if it doesn't exist
+        const adminDocumentId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
+        try {
+          // Check if document already exists
+          final existing = await dbProvider.query(
+            'users',
+            where: 'documentId = ?',
+            whereArgs: [adminDocumentId],
+          );
           
-          debugPrint('Login: Success! Admin authenticated with newly created document ID: $_currentUserId');
-          if (_lockMode == 'timeout') {
-            _resetInactivityTimer();
-          } else {
-            _inactivityTimer?.cancel();
-            _inactivityTimer = null;
+          if (existing.isEmpty) {
+            // Create admin user document
+            final now = DateTime.now().millisecondsSinceEpoch;
+            await dbProvider.insert('users', {
+              'username': 'admin',
+              'email': trimmedEmail.toLowerCase(),
+              'role': 'admin',
+              'is_active': 1,
+              'created_at': now,
+              'updated_at': now,
+            }, documentId: kIsWeb ? adminDocumentId : null);
+            
+            debugPrint('Login: Created admin user document with ID: $adminDocumentId');
+            
+            _isAuthenticated = true;
+            _currentUserId = adminDocumentId;
+            _currentUserRole = 'admin';
+            _currentUsername = 'admin';
+            
+            debugPrint('Login: Success! Admin authenticated with newly created document ID: $_currentUserId');
+            if (_lockMode == 'timeout') {
+              _resetInactivityTimer();
+            } else {
+              _inactivityTimer?.cancel();
+              _inactivityTimer = null;
+            }
+            notifyListeners();
+            return true;
           }
-          notifyListeners();
-          return true;
+        } catch (e) {
+          debugPrint('Login: Error creating admin document: $e');
         }
       }
       
