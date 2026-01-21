@@ -585,6 +585,19 @@ class _MenuScreenState extends State<MenuScreen> {
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               actions: [
+                // Seed menu items button (admin only)
+                Consumer<InaraAuthProvider>(
+                  builder: (context, auth, _) {
+                    if (auth.isAdmin) {
+                      return IconButton(
+                        icon: const Icon(Icons.restaurant_menu),
+                        onPressed: () => _seedMenuItems(),
+                        tooltip: 'Seed Menu Items',
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
                 IconButton(
                   icon: const Icon(Icons.category),
                   onPressed: () => _showAddCategoryDialog(),
