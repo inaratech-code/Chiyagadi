@@ -94,7 +94,7 @@ class _WarmStartState extends State<_WarmStart> {
             'cruFy4iy9kMP136d8H99DrBjBbG3',
             username: 'admin',
             pin: 'Chiyagadi15@', // Admin password
-            email: 'chiyagadi@gmail.com', // Admin email
+            email: 'chiyagadi', // Admin email
           );
         }
       } catch (e) {
