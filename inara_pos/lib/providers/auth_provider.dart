@@ -271,15 +271,21 @@ class InaraAuthProvider with ChangeNotifier {
     }
 
     try {
-      debugPrint('Login: Attempting Firebase Auth login for email: $email');
+      final trimmedEmail = email.trim();
+      debugPrint('Login: Attempting Firebase Auth login for email: $trimmedEmail');
+      debugPrint('Login: Password length: ${password.length}');
       
       // Sign in with Firebase Auth
       final auth = FirebaseAuth.instance;
       final userCredential = await auth.signInWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
+        email: trimmedEmail,
+        password: password, // Don't trim password - it may contain leading/trailing spaces intentionally
       ).catchError((error) {
         debugPrint('Login: Firebase Auth error: $error');
+        if (error is FirebaseAuthException) {
+          debugPrint('Login: Firebase Auth error code: ${error.code}');
+          debugPrint('Login: Firebase Auth error message: ${error.message}');
+        }
         // Re-throw to be caught by the outer catch block
         throw error;
       });
