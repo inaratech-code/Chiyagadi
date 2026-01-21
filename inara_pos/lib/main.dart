@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'dart:ui' show PlatformDispatcher;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -24,12 +25,14 @@ void main() {
     debugPrint('Stack: ${details.stack}');
   };
   
-  // Handle async errors
-  PlatformDispatcher.instance.onError = (error, stack) {
-    debugPrint('PlatformDispatcher error: $error');
-    debugPrint('Stack: $stack');
-    return true; // Prevent app from crashing
-  };
+  // Handle async errors (only on non-web platforms or use try-catch in web)
+  if (!kIsWeb) {
+    PlatformDispatcher.instance.onError = (error, stack) {
+      debugPrint('PlatformDispatcher error: $error');
+      debugPrint('Stack: $stack');
+      return true; // Prevent app from crashing
+    };
+  }
   
   // CRITICAL: Do not block first frame on Firebase/DB init.
   // We warm these up asynchronously after the UI is on screen.
