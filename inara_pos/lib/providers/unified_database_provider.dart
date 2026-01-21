@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart'
     show kIsWeb, ChangeNotifier, debugPrint;
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'database_provider.dart';
 import 'firestore_database_provider.dart';
 import '../firebase_options.dart';
@@ -34,6 +35,20 @@ class UnifiedDatabaseProvider with ChangeNotifier {
               options: DefaultFirebaseOptions.currentPlatform,
             );
             debugPrint('UnifiedDatabase: Firebase initialized (web)');
+          }
+
+          // IMPORTANT: This app uses its own PIN/password auth, not Firebase Auth.
+          // If Firestore rules require `request.auth != null`, we must sign in to Firebase
+          // (Anonymous auth is simplest) so new devices don't hit PERMISSION_DENIED.
+          try {
+            final auth = FirebaseAuth.instance;
+            if (auth.currentUser == null) {
+              await auth.signInAnonymously();
+              debugPrint('UnifiedDatabase: Firebase Auth anonymous sign-in ok');
+            }
+          } catch (e) {
+            debugPrint('UnifiedDatabase: Firebase Auth sign-in failed (web): $e');
+            // Continue; Firestore may still work if rules are public.
           }
         } catch (e) {
           debugPrint('UnifiedDatabase: Firebase init failed (web): $e');
