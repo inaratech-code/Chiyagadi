@@ -123,6 +123,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                   },
                 ),
                 // Email field - only shown and required for admin role
+                // For cashiers, email will be auto-generated
                 if (selectedRole == 'admin') ...[
                   const SizedBox(height: 12),
                   TextField(
@@ -132,6 +133,31 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                       labelText: 'Email *',
                       border: OutlineInputBorder(),
                       helperText: 'Required for admin users',
+                    ),
+                  ),
+                ] else if (selectedRole == 'cashier') ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue[200]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Email will be auto-generated for cashier login',
+                            style: TextStyle(
+                              color: Colors.blue[900],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -234,10 +260,24 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
     );
     if (!mounted) return;
     if (ok) {
+      // For cashiers, show the generated email
+      String message = 'User "$username" created';
+      if (selectedRole == 'cashier') {
+        // Get the generated email from the user list
+        await _loadUsers();
+        final createdUser = _users.firstWhere(
+          (u) => u['username'] == username,
+          orElse: () => {},
+        );
+        if (createdUser.isNotEmpty && createdUser['email'] != null) {
+          message = 'User "$username" created\nLogin email: ${createdUser['email']}';
+        }
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text('User "$username" created'),
-            backgroundColor: AppTheme.successColor),
+            content: Text(message),
+            backgroundColor: AppTheme.successColor,
+            duration: const Duration(seconds: 5)),
       );
       await _loadUsers();
     } else {

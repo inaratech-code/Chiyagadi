@@ -868,18 +868,50 @@ class InaraAuthProvider with ChangeNotifier {
 
       final pinHash = _hashPin(pin);
       final now = DateTime.now().millisecondsSinceEpoch;
-      final normalizedEmail = (email != null && email.trim().isNotEmpty) ? email.trim() : null;
+      
+      // Auto-generate temporary email for cashiers if not provided
+      String? normalizedEmail;
+      if (email != null && email.trim().isNotEmpty) {
+        normalizedEmail = email.trim().toLowerCase();
+      } else if (role == 'cashier') {
+        // Generate temporary email: cashier_username@temp.chiyagadi.local
+        final sanitizedUsername = username.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+        normalizedEmail = 'cashier_$sanitizedUsername@temp.chiyagadi.local';
+        debugPrint('createUser: Auto-generated temporary email for cashier: $normalizedEmail');
+      }
 
+      // Create Firebase Auth user if on web (for email-based login)
+      if (kIsWeb && normalizedEmail != null) {
+        try {
+          dynamic authInstance = FirebaseAuth.instance;
+          await authInstance.createUserWithEmailAndPassword(
+            email: normalizedEmail,
+            password: pin,
+          );
+          debugPrint('createUser: Firebase Auth user created with email: $normalizedEmail');
+        } catch (authError) {
+          final errorMsg = authError.toString();
+          debugPrint('createUser: Firebase Auth user creation failed: $authError');
+          
+          // If user already exists, that's okay - continue with database insert
+          if (!errorMsg.contains('email-already-in-use')) {
+            debugPrint('createUser: Firebase Auth error (non-critical), continuing with database insert');
+          }
+        }
+      }
+
+      // Store user in database
       await dbProvider.insert('users', {
         'username': username,
         'pin_hash': pinHash,
-        if (normalizedEmail != null) 'email': normalizedEmail,
+        'email': normalizedEmail,
         'role': role,
         'is_active': 1,
         'created_at': now,
         'updated_at': now,
       });
 
+      debugPrint('createUser: User created successfully - username: $username, email: $normalizedEmail, role: $role');
       return true;
     } catch (e) {
       debugPrint('Error creating user: $e');
