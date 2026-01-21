@@ -53,12 +53,23 @@ class UnifiedDatabaseProvider with ChangeNotifier {
               
               await Firebase.initializeApp(options: options);
               debugPrint('UnifiedDatabase: Firebase initialized (web)');
+              
+              // iOS Safari: Wait a bit longer to ensure Firebase is fully ready
+              if (defaultTargetPlatform == TargetPlatform.iOS) {
+                await Future.delayed(const Duration(milliseconds: 300));
+                debugPrint('UnifiedDatabase: iOS Safari delay applied');
+              }
             } catch (initError) {
               debugPrint('UnifiedDatabase: Failed to initialize Firebase: $initError');
               throw StateError('Failed to initialize Firebase: $initError');
             }
           } else {
             debugPrint('UnifiedDatabase: Firebase already initialized');
+          }
+          
+          // Additional delay for iOS Safari before accessing Firestore
+          if (kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+            await Future.delayed(const Duration(milliseconds: 200));
           }
 
           // IMPORTANT: Sign in with Firebase Auth using admin email/password
