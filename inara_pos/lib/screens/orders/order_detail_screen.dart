@@ -1463,7 +1463,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               maxLength: 20,
               decoration: const InputDecoration(
                 labelText: 'Password',
-                helperText: '4-20 characters (letters and numbers)',
+                helperText: '4-20 characters',
                 border: OutlineInputBorder(),
               ),
             ),

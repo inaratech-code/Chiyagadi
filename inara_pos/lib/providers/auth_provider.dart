@@ -25,12 +25,12 @@ class AuthProvider with ChangeNotifier {
   // Auto-lock after 5 minutes of inactivity
   static const int _inactivityTimeoutMinutes = 5;
 
-  /// Validate password: alphanumeric (letters and numbers), 4-20 characters
+  /// Validate password: letters, numbers, and special characters, 4-20 characters
   static bool _isValidPassword(String password) {
     if (password.length < 4 || password.length > 20) return false;
-    // Allow only letters (a-z, A-Z) and numbers (0-9)
-    final alphanumericRegex = RegExp(r'^[a-zA-Z0-9]+$');
-    return alphanumericRegex.hasMatch(password);
+    // Allow letters, numbers, and common special characters (no spaces)
+    final passwordRegex = RegExp(r'^[a-zA-Z0-9@#$%^&*()_+\-=\[\]{};\':"\\|,.<>\/?]+$');
+    return passwordRegex.hasMatch(password);
   }
 
   /// NEW: Load login lock behavior (best-effort; SharedPreferences works on web + mobile).
@@ -258,7 +258,7 @@ class AuthProvider with ChangeNotifier {
 
   Future<bool> login(String username, String pin) async {
     if (!_isValidPassword(pin)) {
-      debugPrint('Login: Password invalid (must be 4-20 alphanumeric characters)');
+      debugPrint('Login: Password invalid (must be 4-20 characters)');
       return false;
     }
 

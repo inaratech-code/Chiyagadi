@@ -739,7 +739,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   decoration: InputDecoration(
                     labelText: 'New Password',
                     border: const OutlineInputBorder(),
-                    helperText: '4-20 characters (letters and numbers)',
+                    helperText: '4-20 characters',
                     suffixIcon: IconButton(
                       icon: Icon(obscureNewPin
                           ? Icons.visibility
@@ -808,7 +808,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (newPin.length < 4 || newPin.length > 20) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Password must be 4-20 characters (letters and numbers)')),
+            const SnackBar(content: Text('Password must be 4-20 characters')),
           );
         }
         return;

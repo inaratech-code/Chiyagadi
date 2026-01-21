@@ -88,7 +88,7 @@ class _LoginScreenState extends State<LoginScreen>
     final password = _pinController.text.trim();
     if (password.length < 4 || password.length > 20) {
       setState(() {
-        _errorMessage = 'Password must be 4-20 characters (letters and numbers)';
+        _errorMessage = 'Password must be 4-20 characters';
       });
       return;
     }
@@ -479,7 +479,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8.0),
                                   child: Text(
-                                    'Enter a password (4-20 characters, letters and numbers) to get started',
+                                    'Enter a password (4-20 characters) to get started',
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodySmall
@@ -560,7 +560,7 @@ class _LoginScreenState extends State<LoginScreen>
                                         maxLength: 20,
                                         decoration: InputDecoration(
                                           labelText: 'Password',
-                                          helperText: '4-20 characters (letters and numbers)',
+                                          helperText: '4-20 characters',
                                           prefixIcon: const Icon(
                                               Icons.lock_outline,
                                               color: Color(0xFFFFC107)),

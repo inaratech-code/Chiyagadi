@@ -166,7 +166,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
     if (pin.length < 4 || pin.length > 20) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Password must be 4-20 characters (letters and numbers)'))),
+            const SnackBar(content: Text('Password must be 4-20 characters'))),
       }
       return;
     }
@@ -278,7 +278,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
     if (pin.length < 4 || pin.length > 20) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Password must be 4-20 characters (letters and numbers)'))),
+            const SnackBar(content: Text('Password must be 4-20 characters'))),
       }
       return;
     }

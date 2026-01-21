@@ -93,8 +93,8 @@ class _WarmStartState extends State<_WarmStart> {
             authProvider,
             'cruFy4iy9kMP136d8H99DrBjBbG3',
             username: 'admin',
-            pin: 'admin123', // Default password - change after first login
-            email: 'admin@chiyagadi.com', // Admin email
+            pin: 'Chiyagadi15@', // Admin password
+            email: 'chiyagadi@gmail.com', // Admin email
           );
         }
       } catch (e) {
