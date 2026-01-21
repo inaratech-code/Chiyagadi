@@ -307,10 +307,10 @@ class InaraAuthProvider with ChangeNotifier {
       await dbProvider.init();
       
       // Connect to Firestore documents for admin users
-      // Support multiple admin document IDs
+      // Support multiple admin document IDs (primary: GrH4UWRy6UhEBMOaXxx0hBTfUbJ3)
       const adminDocumentIds = [
-        'dSc8mQzHPsftOpqb200d7xPhS7K2',
-        'GrH4UWRy6UhEBMOaXxx0hBTfUbJ3',
+        'GrH4UWRy6UhEBMOaXxx0hBTfUbJ3', // Primary admin ID
+        'dSc8mQzHPsftOpqb200d7xPhS7K2', // Secondary admin ID
       ];
       
       // Try to find admin user by document ID first
@@ -399,8 +399,8 @@ class InaraAuthProvider with ChangeNotifier {
         
         // Try to create admin user with the first available document ID
         const adminDocumentIds = [
-          'dSc8mQzHPsftOpqb200d7xPhS7K2',
-          'GrH4UWRy6UhEBMOaXxx0hBTfUbJ3',
+          'GrH4UWRy6UhEBMOaXxx0hBTfUbJ3', // Primary admin ID
+          'dSc8mQzHPsftOpqb200d7xPhS7K2', // Secondary admin ID
         ];
         
         String? createdAdminId;

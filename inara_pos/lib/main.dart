@@ -91,15 +91,42 @@ class _WarmStartState extends State<_WarmStart> {
         // Add admin user with specific document ID if on web
         if (kIsWeb) {
           final authProvider = context.read<InaraAuthProvider>();
-          // Add admin user with document ID: dSc8mQzHPsftOpqb200d7xPhS7K2
-          await addAdminUserWithId(
-            dbProvider,
-            authProvider,
-            'dSc8mQzHPsftOpqb200d7xPhS7K2',
-            username: 'admin',
-            pin: 'Chiyagadi15@', // Admin password
-            email: 'chiyagadi@gmail.com', // Admin email
-          );
+          // Add admin user with document IDs (try both, create the one that doesn't exist)
+          const adminDocumentIds = [
+            'GrH4UWRy6UhEBMOaXxx0hBTfUbJ3', // Primary admin ID
+            'dSc8mQzHPsftOpqb200d7xPhS7K2', // Secondary admin ID
+          ];
+          
+          // Try to create admin user with the primary ID first
+          for (final adminDocumentId in adminDocumentIds) {
+            try {
+              // Check if user already exists
+              final existing = await dbProvider.query(
+                'users',
+                where: 'documentId = ?',
+                whereArgs: [adminDocumentId],
+              );
+              
+              if (existing.isEmpty) {
+                // Create admin user with this document ID
+                await addAdminUserWithId(
+                  dbProvider,
+                  authProvider,
+                  adminDocumentId,
+                  username: 'admin',
+                  pin: 'Chiyagadi15@', // Admin password
+                  email: 'chiyagadi@gmail.com', // Admin email
+                );
+                debugPrint('Main: Created admin user with document ID: $adminDocumentId');
+                break; // Created successfully, no need to try other IDs
+              } else {
+                debugPrint('Main: Admin user with document ID $adminDocumentId already exists');
+              }
+            } catch (e) {
+              debugPrint('Main: Error creating admin user with ID $adminDocumentId: $e');
+              // Continue to next ID
+            }
+          }
         }
       } catch (e) {
         debugPrint('WarmStart: DB init failed: $e');
@@ -182,10 +209,10 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
             final dbProvider = context.read<UnifiedDatabaseProvider>();
             await dbProvider.init();
             
-            // Support multiple admin document IDs
+            // Support multiple admin document IDs (primary: GrH4UWRy6UhEBMOaXxx0hBTfUbJ3)
             const adminDocumentIds = [
-              'dSc8mQzHPsftOpqb200d7xPhS7K2',
-              'GrH4UWRy6UhEBMOaXxx0hBTfUbJ3',
+              'GrH4UWRy6UhEBMOaXxx0hBTfUbJ3', // Primary admin ID
+              'dSc8mQzHPsftOpqb200d7xPhS7K2', // Secondary admin ID
             ];
             
             // Try to find admin by any of the document IDs
