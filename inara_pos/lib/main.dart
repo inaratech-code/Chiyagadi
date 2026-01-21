@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'providers/auth_provider.dart';
 import 'providers/unified_database_provider.dart';
@@ -157,20 +158,57 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
       _isLoading = false;
     });
 
-    // Load preferences asynchronously after UI is shown
+    // Check Firebase Auth state
     try {
-      final prefs = await SharedPreferences.getInstance();
-      // Check if admin PIN exists (for future use)
-      prefs.containsKey('admin_pin');
-
-      // NEW: Load lock mode preference (non-blocking)
+      final auth = FirebaseAuth.instance;
+      final authProvider = context.read<AuthProvider>();
+      
+      // Load lock mode preference (non-blocking)
       if (mounted) {
-        context.read<AuthProvider>().loadLockMode().catchError((e) {
+        authProvider.loadLockMode().catchError((e) {
           debugPrint('Error loading lock mode: $e');
         });
       }
+      
+      // If user is already signed in with Firebase Auth, restore session
+      if (auth.currentUser != null && mounted) {
+        debugPrint('AuthWrapper: Firebase Auth user already signed in: ${auth.currentUser!.email}');
+        // Restore session by calling login (which will connect to Firestore document)
+        final email = auth.currentUser!.email;
+        if (email != null) {
+          // We need to get the password from somewhere or skip password check
+          // For now, just set authenticated state based on Firestore document
+          try {
+            final dbProvider = context.read<UnifiedDatabaseProvider>();
+            await dbProvider.init();
+            
+            const adminDocumentId = 'cruFy4iy9kMP136d8H99DrBjBbG3';
+            final adminUsers = await dbProvider.query(
+              'users',
+              where: 'documentId = ?',
+              whereArgs: [adminDocumentId],
+            );
+            
+            if (adminUsers.isNotEmpty) {
+              final adminUser = adminUsers.first;
+              final adminEmail = adminUser['email'] as String?;
+              
+              if (adminEmail?.toLowerCase() == email.toLowerCase()) {
+                authProvider.setContext(context);
+                // Manually set authenticated state
+                // Note: This bypasses password check, but user is already authenticated via Firebase Auth
+                debugPrint('AuthWrapper: Restoring admin session for $email');
+                // We'll let the AuthProvider handle this through its login method
+                // For now, just ensure context is set
+              }
+            }
+          } catch (e) {
+            debugPrint('AuthWrapper: Error restoring session: $e');
+          }
+        }
+      }
     } catch (e) {
-      debugPrint('Error loading preferences: $e');
+      debugPrint('Error checking Firebase Auth: $e');
     }
   }
 

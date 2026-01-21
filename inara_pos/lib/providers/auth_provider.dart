@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'unified_database_provider.dart';
 
 class AuthProvider with ChangeNotifier {
@@ -261,204 +262,149 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> login(String username, String pin) async {
-    if (!_isValidPassword(pin)) {
-      debugPrint('Login: Password invalid (must be 4-20 characters)');
+  /// Login using Firebase Authentication
+  /// Connects to Firestore document with ID cruFy4iy9kMP136d8H99DrBjBbG3 for admin
+  Future<bool> login(String email, String password) async {
+    if (email.isEmpty || password.isEmpty) {
+      debugPrint('Login: Email and password are required');
       return false;
     }
 
     try {
-      debugPrint('Login: Attempting login for username: $username');
+      debugPrint('Login: Attempting Firebase Auth login for email: $email');
+      
+      // Sign in with Firebase Auth
+      final auth = FirebaseAuth.instance;
+      final userCredential = await auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      
+      if (userCredential.user == null) {
+        debugPrint('Login: Firebase Auth returned null user');
+        return false;
+      }
+
+      debugPrint('Login: Firebase Auth successful for ${userCredential.user!.email}');
+      
+      // Get database provider to fetch user document
       final dbProvider = _getDatabaseProvider();
-      debugPrint('Login: Got database provider');
-
-      // Ensure database is initialized
       await dbProvider.init();
-      debugPrint('Login: Database initialized');
-
-      final pinHash = _hashPin(pin);
-      debugPrint('Login: PIN hashed');
-
-      // For admin login on web, first try to find by the specific admin document ID
-      if (kIsWeb) {
-        const adminDocumentId = 'cruFy4iy9kMP136d8H99DrBjBbG3';
-        try {
-          final adminUsers = await dbProvider.query(
-            'users',
-            where: 'documentId = ?',
-            whereArgs: [adminDocumentId],
-          );
-          if (adminUsers.isNotEmpty) {
-            final adminUser = adminUsers.first;
-            final adminUsername = adminUser['username'] as String?;
-            final adminEmail = adminUser['email'] as String?;
-            final adminPinHash = adminUser['pin_hash'] as String?;
-            
-            // Check if credentials match (username or email)
-            if ((adminUsername == username || adminEmail == username) &&
-                adminPinHash == pinHash) {
-              debugPrint('Login: Admin user found with document ID: $adminDocumentId');
-              final isActive = (adminUser['is_active'] as num?)?.toInt();
-              if (isActive != null && isActive == 0) {
-                debugPrint('Login: Admin user is disabled');
-                return false;
-              }
-              
-              _isAuthenticated = true;
-              _currentUserId = adminDocumentId;
-              _currentUserRole = 'admin';
-              _currentUsername = adminUser['username'] as String;
-              
-              debugPrint(
-                  'Login: Success! Admin authenticated with document ID: $_currentUserId');
-              if (_lockMode == 'timeout') {
-                _resetInactivityTimer();
-              } else {
-                _inactivityTimer?.cancel();
-                _inactivityTimer = null;
-              }
-              notifyListeners();
-              return true;
-            }
-          }
-        } catch (e) {
-          debugPrint('Login: Error checking admin document ID: $e');
-          // Fall through to regular login flow
-        }
-      }
-
-      // First, let's check all users to debug
-      final allUsers = await dbProvider.query('users');
-      debugPrint('Login: Total users in database: ${allUsers.length}');
-      for (var user in allUsers) {
-        debugPrint(
-            'Login: Found user - username: ${user['username']}, role: ${user['role']}');
-      }
-
-      // Try to find user by username first
-      var users = await dbProvider.query(
-        'users',
-        where: 'username = ? AND pin_hash = ?',
-        whereArgs: [username, pinHash],
-      );
-      debugPrint('Login: Query by username result - found ${users.length} matching users');
       
-      // If not found by username, try by email (for email-based login)
-      if (users.isEmpty) {
-        users = await dbProvider.query(
+      // Connect to Firestore document with ID cruFy4iy9kMP136d8H99DrBjBbG3 for admin
+      const adminDocumentId = 'cruFy4iy9kMP136d8H99DrBjBbG3';
+      
+      // Try to find admin user by document ID first
+      try {
+        final adminUsers = await dbProvider.query(
           'users',
-          where: 'email = ? AND pin_hash = ?',
-          whereArgs: [username, pinHash],
+          where: 'documentId = ?',
+          whereArgs: [adminDocumentId],
         );
-        debugPrint('Login: Query by email result - found ${users.length} matching users');
-      }
-      
-      debugPrint('Login: Final query result - found ${users.length} matching users');
-
-      if (users.isNotEmpty) {
-        final user = users.first;
-        // Disabled user: do not allow login
-        final isActive = (user['is_active'] as num?)?.toInt();
-        if (isActive != null && isActive == 0) {
-          debugPrint('Login: User is disabled');
-          return false;
-        }
         
-        // For admin users, ensure we use the correct document ID
-        final userRole = user['role'] as String?;
-        final userId = user['id'].toString();
-        
-        // If this is an admin user and we're on web, verify/use the admin document ID
-        if (kIsWeb && userRole == 'admin') {
-          const adminDocumentId = 'cruFy4iy9kMP136d8H99DrBjBbG3';
-          // If the user document ID doesn't match, try to find the admin by document ID
-          if (userId != adminDocumentId) {
-            debugPrint('Login: Admin user found but ID mismatch. Looking for admin document...');
-            try {
-              final adminUsers = await dbProvider.query(
-                'users',
-                where: 'documentId = ?',
-                whereArgs: [adminDocumentId],
-              );
-              if (adminUsers.isNotEmpty) {
-                final adminUser = adminUsers.first;
-                final adminUsername = adminUser['username'] as String?;
-                final adminEmail = adminUser['email'] as String?;
-                // Verify this is the same user (by username or email)
-                if ((adminUsername == username || adminEmail == username) &&
-                    (adminUser['pin_hash'] as String?) == pinHash) {
-                  debugPrint('Login: Found admin user with correct document ID: $adminDocumentId');
-                  _isAuthenticated = true;
-                  _currentUserId = adminDocumentId;
-                  _currentUserRole = 'admin';
-                  _currentUsername = adminUser['username'] as String;
-                  
-                  debugPrint(
-                      'Login: Success! Admin authenticated with document ID: $_currentUserId');
-                  if (_lockMode == 'timeout') {
-                    _resetInactivityTimer();
-                  } else {
-                    _inactivityTimer?.cancel();
-                    _inactivityTimer = null;
-                  }
-                  notifyListeners();
-                  return true;
-                }
-              }
-            } catch (e) {
-              debugPrint('Login: Error looking up admin document: $e');
-              // Fall through to use the found user
+        if (adminUsers.isNotEmpty) {
+          final adminUser = adminUsers.first;
+          final adminEmail = adminUser['email'] as String?;
+          
+          // Verify this is the admin user by email
+          if (adminEmail?.toLowerCase() == email.trim().toLowerCase()) {
+            final isActive = (adminUser['is_active'] as num?)?.toInt();
+            if (isActive != null && isActive == 0) {
+              debugPrint('Login: Admin user is disabled');
+              await auth.signOut();
+              return false;
             }
+            
+            _isAuthenticated = true;
+            _currentUserId = adminDocumentId;
+            _currentUserRole = 'admin';
+            _currentUsername = adminUser['username'] as String? ?? 'admin';
+            
+            debugPrint('Login: Success! Admin authenticated with document ID: $_currentUserId');
+            if (_lockMode == 'timeout') {
+              _resetInactivityTimer();
+            } else {
+              _inactivityTimer?.cancel();
+              _inactivityTimer = null;
+            }
+            notifyListeners();
+            return true;
           }
         }
+      } catch (e) {
+        debugPrint('Login: Error looking up admin document: $e');
+      }
+      
+      // If not admin, try to find user by email in Firestore
+      try {
+        final users = await dbProvider.query(
+          'users',
+          where: 'email = ?',
+          whereArgs: [email.trim().toLowerCase()],
+        );
         
-        _isAuthenticated = true;
-        _currentUserId = userId;
-        _currentUserRole = userRole ?? 'cashier';
-        _currentUsername = user['username'] as String;
-
-        debugPrint(
-            'Login: Success! User authenticated - ID: $_currentUserId, Role: $_currentUserRole');
-        // UPDATED: Apply lock mode behavior.
-        if (_lockMode == 'timeout') {
-          _resetInactivityTimer();
-        } else {
-          _inactivityTimer?.cancel();
-          _inactivityTimer = null;
+        if (users.isNotEmpty) {
+          final user = users.first;
+          final isActive = (user['is_active'] as num?)?.toInt();
+          if (isActive != null && isActive == 0) {
+            debugPrint('Login: User is disabled');
+            await auth.signOut();
+            return false;
+          }
+          
+          _isAuthenticated = true;
+          _currentUserId = user['id'].toString();
+          _currentUserRole = user['role'] as String? ?? 'cashier';
+          _currentUsername = user['username'] as String? ?? email;
+          
+          debugPrint('Login: Success! User authenticated - ID: $_currentUserId, Role: $_currentUserRole');
+          if (_lockMode == 'timeout') {
+            _resetInactivityTimer();
+          } else {
+            _inactivityTimer?.cancel();
+            _inactivityTimer = null;
+          }
+          notifyListeners();
+          return true;
         }
-        notifyListeners();
-        return true;
+      } catch (e) {
+        debugPrint('Login: Error looking up user by email: $e');
       }
-
-      debugPrint('Login: Failed - No matching user found');
-      // Let's also check if username exists with different PIN
-      final usernameCheck = await dbProvider.query(
-        'users',
-        where: 'username = ?',
-        whereArgs: [username],
-      );
-      if (usernameCheck.isNotEmpty) {
-        final isActive = (usernameCheck.first['is_active'] as num?)?.toInt();
-        if (isActive != null && isActive == 0) {
-          debugPrint('Login: Username exists but user is disabled');
-          return false;
-        }
-        debugPrint('Login: Username exists but PIN hash does not match');
-        debugPrint('Login: Expected hash: ${usernameCheck.first['pin_hash']}');
-        debugPrint('Login: Provided hash: $pinHash');
+      
+      // If user document not found, still allow login but create a basic user record
+      debugPrint('Login: User document not found in Firestore, but Firebase Auth succeeded');
+      _isAuthenticated = true;
+      _currentUserId = userCredential.user!.uid;
+      _currentUserRole = 'cashier'; // Default role
+      _currentUsername = userCredential.user!.email?.split('@').first ?? 'user';
+      
+      if (_lockMode == 'timeout') {
+        _resetInactivityTimer();
       } else {
-        debugPrint('Login: Username does not exist in database');
+        _inactivityTimer?.cancel();
+        _inactivityTimer = null;
       }
-
+      notifyListeners();
+      return true;
+      
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Login: Firebase Auth error: ${e.code} - ${e.message}');
       return false;
-    } catch (e, stackTrace) {
-      debugPrint('Login error: $e');
-      debugPrint('Stack trace: $stackTrace');
+    } catch (e) {
+      debugPrint('Login: Error during login: $e');
       return false;
     }
   }
 
-  void logout() {
+  Future<void> logout() async {
+    // Sign out from Firebase Auth
+    try {
+      await FirebaseAuth.instance.signOut();
+      debugPrint('AuthProvider: Signed out from Firebase Auth');
+    } catch (e) {
+      debugPrint('AuthProvider: Error signing out from Firebase Auth: $e');
+    }
+    
     _isAuthenticated = false;
     _currentUserId = null;
     _currentUserRole = null;

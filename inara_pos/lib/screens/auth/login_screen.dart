@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/unified_database_provider.dart';
 
@@ -14,7 +15,6 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _pinController = TextEditingController();
-  final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   bool _isLoading = false;
   bool _isFirstTime = false;
@@ -78,7 +78,7 @@ class _LoginScreenState extends State<LoginScreen>
         setState(() {
           _isFirstTime = !hasPin;
           if (_isFirstTime) {
-            _usernameController.text = 'admin';
+            _emailController.text = 'chiyagadi@gmail.com';
           }
         });
       }
@@ -86,23 +86,21 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _handleLogin() async {
-    final username = _usernameController.text.trim();
     final email = _emailController.text.trim();
-    final identifier = email.isNotEmpty ? email : username;
+    final password = _pinController.text.trim();
 
-    // Validate username/email (at least one required)
-    if (identifier.isEmpty) {
+    // Validate email
+    if (email.isEmpty) {
       setState(() {
-        _errorMessage = 'Please enter a username or email';
+        _errorMessage = 'Please enter your email address';
       });
       return;
     }
 
-    // Validate password (4-20 characters, allows special characters)
-    final password = _pinController.text.trim();
-    if (password.length < 4 || password.length > 20) {
+    // Validate password
+    if (password.isEmpty) {
       setState(() {
-        _errorMessage = 'Password must be 4-20 characters';
+        _errorMessage = 'Please enter your password';
       });
       return;
     }
@@ -113,219 +111,51 @@ class _LoginScreenState extends State<LoginScreen>
     });
 
     try {
-      // Get providers
-      final dbProvider =
-          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
+      
       // Ensure context is set for database access
       authProvider.setContext(context);
 
-      // Ensure database is initialized first with retry logic
-      bool dbInitialized = false;
-      int retryCount = 0;
-      const maxRetries = 3;
-
-      while (!dbInitialized && retryCount < maxRetries) {
-        try {
-          await dbProvider.init();
-          // Verify database is actually working by trying a simple query
-          try {
-            await dbProvider.query('users', limit: 1);
-            dbInitialized = true;
-          } catch (queryError) {
-            final msg = queryError.toString();
-            debugPrint('Database query test failed: $msg');
-
-            // Fail fast on common Firestore configuration errors (web)
-            if (msg.contains('permission') ||
-                msg.contains('PERMISSION_DENIED') ||
-                msg.contains('Missing or insufficient permissions') ||
-                msg.contains('not enabled') ||
-                msg.contains('Firestore')) {
-              setState(() {
-                _errorMessage =
-                    'Database access error:\n\n$msg\n\n'
-                    'If you are using web:\n'
-                    '- Ensure Firestore Database is enabled\n'
-                    '- Ensure Firestore rules allow read/write (or publish your rules)\n';
-                _isLoading = false;
-              });
-              return;
-            }
-
-            if (retryCount < maxRetries - 1) {
-              // Try to reset and reinitialize
-              try {
-                await dbProvider.resetDatabase();
-              } catch (resetError) {
-                debugPrint('Database reset failed: $resetError');
-              }
-            }
-            retryCount++;
-          }
-        } catch (initError) {
-          debugPrint(
-              'Database initialization attempt ${retryCount + 1} failed: $initError');
-          // Store the last error for display
-          final lastError = initError.toString();
-          if (retryCount < maxRetries - 1) {
-            // Try to reset and reinitialize
-            try {
-              await dbProvider.resetDatabase();
-            } catch (resetError) {
-              debugPrint('Database reset failed: $resetError');
-            }
-          } else {
-            // Last attempt failed - show detailed error
-            setState(() {
-              String errorDetails =
-                  'Database initialization failed after $maxRetries attempts.\n\n';
-
-              // Provide helpful error messages based on error type
-              if (lastError.contains('Null check operator') ||
-                  lastError.contains('null value')) {
-                errorDetails +=
-                    'Error: Database initialization failed on iOS Safari.\n\n';
-                errorDetails += 'This is a known iOS Safari compatibility issue.\n\n';
-                errorDetails += 'Solutions:\n';
-                errorDetails +=
-                    '1. Hard refresh the page (hold Shift and click Reload, or Cmd+Shift+R)\n';
-                errorDetails +=
-                    '2. Clear browser cache and cookies\n';
-                errorDetails +=
-                    '3. Try a different browser (Chrome, Firefox) if available\n';
-                errorDetails +=
-                    '4. Ensure Firestore Database is enabled in Firebase Console\n';
-                errorDetails +=
-                    '5. Check browser console (F12) for detailed errors\n\n';
-                errorDetails += 'If the issue persists, the app may need additional iOS Safari compatibility fixes.';
-              } else if (lastError.contains('Anonymous Authentication') ||
-                  lastError.contains('OPERATION_NOT_ALLOWED') ||
-                  lastError.contains('not enabled')) {
-                errorDetails +=
-                    'Error: Firebase Email/Password Authentication issue.\n\n';
-                errorDetails += 'Solution:\n';
-                errorDetails +=
-                    '1. Go to Firebase Console → Authentication → Sign-in method\n';
-                errorDetails +=
-                    '2. Enable "Email/Password" provider\n';
-                errorDetails +=
-                    '3. Ensure admin user (chiyagadi@gmail.com) exists\n';
-                errorDetails += '4. Save and refresh the app';
-              } else if (lastError.contains('permission') ||
-                  lastError.contains('PERMISSION_DENIED')) {
-                errorDetails +=
-                    'Error: Firestore security rules are blocking access.\n\n';
-                errorDetails += 'Your rules require authentication (request.auth != null).\n\n';
-                errorDetails += 'Solution:\n';
-                errorDetails +=
-                    '1. Go to Firebase Console → Authentication → Sign-in method\n';
-                errorDetails +=
-                    '2. Enable "Anonymous" provider\n';
-                errorDetails += '3. Save and refresh the app\n\n';
-                errorDetails +=
-                    'OR if you want public access (less secure):\n';
-                errorDetails +=
-                    '1. Go to Firebase Console → Firestore Database → Rules\n';
-                errorDetails +=
-                    '2. Set rules to: allow read, write: if true;\n';
-                errorDetails += '3. Click "Publish"';
-              } else if (lastError.contains('not enabled') ||
-                  lastError.contains('database')) {
-                errorDetails += 'Error: Firestore Database is not enabled.\n\n';
-                errorDetails += 'Solution:\n';
-                errorDetails +=
-                    '1. Go to Firebase Console → Firestore Database\n';
-                errorDetails += '2. Click "Create database"\n';
-                errorDetails += '3. Choose "Start in test mode"\n';
-                errorDetails += '4. Select location and click "Enable"';
-              } else {
-                errorDetails += 'Error: $lastError\n\n';
-                errorDetails += 'Please check:\n';
-                errorDetails +=
-                    '1. Browser console (F12) for detailed errors\n';
-                errorDetails +=
-                    '2. Firestore Database is enabled in Firebase Console\n';
-                errorDetails += '3. Security rules are published';
-              }
-
-              _errorMessage = errorDetails;
-              _isLoading = false;
-            });
-            return;
-          }
-          retryCount++;
-        }
-      }
-
-      if (!dbInitialized) {
-        // This shouldn't happen as we return above, but just in case
+      // Login using Firebase Auth
+      final success = await authProvider.login(email, password);
+      
+      if (success && mounted) {
+        // Go back to root so AuthWrapper can show HomeScreen.
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/',
+          (route) => false,
+        );
+      } else {
         setState(() {
-          _errorMessage =
-              'Database initialization failed after $maxRetries attempts. Please check browser console (F12) for details.';
+          _errorMessage = 'Invalid email or password. Please try again.';
           _isLoading = false;
         });
-        return;
       }
-
-      final username = _usernameController.text.trim();
-
-      if (_isFirstTime) {
-        // Setup password with username
-        try {
-          final success = await authProvider.setupAdminPin(
-            _pinController.text,
-            email: email.isNotEmpty ? email : null,
-          );
-          if (success) {
-            // Login after setup using username or email
-            final loginSuccess =
-                await authProvider.login(identifier, _pinController.text);
-            if (loginSuccess && mounted) {
-              // Go back to root so AuthWrapper can show HomeScreen.
-              Navigator.of(context).pushNamedAndRemoveUntil(
-                '/',
-                (route) => false,
-              );
-            } else {
-              setState(() {
-                _errorMessage =
-                    'Setup succeeded but login failed. Please try logging in.';
-                _isLoading = false;
-              });
-            }
-          } else {
-            setState(() {
-              _errorMessage =
-                  'Setup failed. The database may be corrupted. Try resetting the database using the button below.';
-              _isLoading = false;
-            });
-          }
-        } catch (e) {
-          setState(() {
-            _errorMessage =
-                'Setup error: ${e.toString()}. Try resetting the database.';
-            _isLoading = false;
-          });
-        }
-      } else {
-        // Regular login
-        final success =
-            await authProvider.login(identifier, _pinController.text);
-        if (success && mounted) {
-          // Go back to root so AuthWrapper can show HomeScreen.
-          Navigator.of(context).pushNamedAndRemoveUntil(
-            '/',
-            (route) => false,
-          );
-        } else {
-          setState(() {
-            _errorMessage = 'Invalid username/email or password. Please try again.';
-            _isLoading = false;
-          });
-        }
+    } on FirebaseAuthException catch (e) {
+      String errorMsg = 'Login failed. ';
+      switch (e.code) {
+        case 'user-not-found':
+          errorMsg += 'No user found with this email.';
+          break;
+        case 'wrong-password':
+          errorMsg += 'Incorrect password.';
+          break;
+        case 'invalid-email':
+          errorMsg += 'Invalid email address.';
+          break;
+        case 'user-disabled':
+          errorMsg += 'This account has been disabled.';
+          break;
+        case 'too-many-requests':
+          errorMsg += 'Too many failed attempts. Please try again later.';
+          break;
+        default:
+          errorMsg += e.message ?? 'Please try again.';
       }
+      setState(() {
+        _errorMessage = errorMsg;
+        _isLoading = false;
+      });
     } catch (e) {
       setState(() {
         _errorMessage = 'Error: ${e.toString()}';
@@ -547,58 +377,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                               const SizedBox(height: 32),
 
-                              // Username field (always required)
-                              TweenAnimationBuilder<double>(
-                                tween: Tween(begin: 0.0, end: 1.0),
-                                duration: const Duration(milliseconds: 1100),
-                                curve: const Interval(0.55, 1.0,
-                                    curve: Curves.easeOut),
-                                builder: (context, value, child) {
-                                  return Opacity(
-                                    opacity: value,
-                                    child: Transform.translate(
-                                      offset: Offset(0, 20 * (1 - value)),
-                                      child: TextField(
-                                        controller: _usernameController,
-                                        decoration: InputDecoration(
-                                          labelText: 'Username',
-                                          prefixIcon: const Icon(
-                                              Icons.person_outline,
-                                              color: Color(0xFFFFC107)),
-                                          border: OutlineInputBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                            borderSide: BorderSide(
-                                                color: Colors.grey[300]!),
-                                          ),
-                                          enabledBorder: OutlineInputBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                            borderSide: BorderSide(
-                                                color: Colors.grey[300]!),
-                                          ),
-                                          focusedBorder: OutlineInputBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                            borderSide: const BorderSide(
-                                                color: Color(0xFFFFC107),
-                                                width: 2),
-                                          ),
-                                          filled: true,
-                                          fillColor: Colors.grey[50],
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(
-                                                  horizontal: 16,
-                                                  vertical: 16),
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 20),
-
-                              // Email field (optional; can be used to login)
+                              // Email field (required for Firebase Auth)
                               TweenAnimationBuilder<double>(
                                 tween: Tween(begin: 0.0, end: 1.0),
                                 duration: const Duration(milliseconds: 1150),
@@ -670,7 +449,6 @@ class _LoginScreenState extends State<LoginScreen>
                                         maxLength: 20,
                                         decoration: InputDecoration(
                                           labelText: 'Password',
-                                          helperText: '4-20 characters',
                                           prefixIcon: const Icon(
                                               Icons.lock_outline,
                                               color: Color(0xFFFFC107)),
@@ -783,12 +561,12 @@ class _LoginScreenState extends State<LoginScreen>
                                                               _isFirstTime =
                                                                   true;
                                                               _errorMessage =
-                                                                  'Please enter a new PIN to create admin account';
+                                                                  'Please enter email and password to create admin account';
                                                               _pinController
                                                                   .clear();
-                                                              _usernameController
+                                                              _emailController
                                                                       .text =
-                                                                  'admin';
+                                                                  'chiyagadi@gmail.com';
                                                             });
                                                           },
                                                     child: const Text(
@@ -865,14 +643,14 @@ class _LoginScreenState extends State<LoginScreen>
 
                                                                   setState(() {
                                                                     _errorMessage =
-                                                                        'Database reset successfully! Please set up your PIN again.';
+                                                                        'Database reset successfully! Please login with your email and password.';
                                                                     _isFirstTime =
                                                                         !hasPin;
                                                                     _pinController
                                                                         .clear();
-                                                                    _usernameController
+                                                                    _emailController
                                                                             .text =
-                                                                        'admin';
+                                                                        'chiyagadi@gmail.com';
                                                                     _isLoading =
                                                                         false;
                                                                   });
@@ -1042,7 +820,6 @@ class _LoginScreenState extends State<LoginScreen>
   void dispose() {
     _animationController.dispose();
     _pinController.dispose();
-    _usernameController.dispose();
     _emailController.dispose();
     super.dispose();
   }
