@@ -42,7 +42,9 @@ class UnifiedDatabaseProvider with ChangeNotifier {
           // (Anonymous auth is simplest) so new devices don't hit PERMISSION_DENIED.
           try {
             final auth = FirebaseAuth.instance;
-            if (auth.currentUser == null) {
+            if (auth == null) {
+              debugPrint('UnifiedDatabase: FirebaseAuth.instance is null, skipping auth');
+            } else if (auth.currentUser == null) {
               await auth.signInAnonymously();
               debugPrint('UnifiedDatabase: Firebase Auth anonymous sign-in ok');
             } else {

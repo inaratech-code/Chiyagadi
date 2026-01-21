@@ -38,6 +38,11 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
       // Get Firestore instance
       _firestore = FirebaseFirestore.instance;
+      
+      // Defensive check: ensure Firestore instance is not null
+      if (_firestore == null) {
+        throw StateError('FirebaseFirestore.instance returned null');
+      }
 
       // Web/iOS Safari often fails (or behaves inconsistently) with persistence enabled.
       // This can surface as opaque "Null check operator used on a null value" errors on new devices.
@@ -48,7 +53,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       final isWebIOS = kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
       if (isWebIOS) {
         try {
-          _firestore!.settings = const Settings(
+          _firestore?.settings = const Settings(
             persistenceEnabled: false,
           );
           debugPrint(
@@ -59,7 +64,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         }
       } else {
         try {
-          _firestore!.settings = const Settings(
+          _firestore?.settings = const Settings(
             persistenceEnabled: true,
             cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
           );
@@ -68,7 +73,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
           debugPrint(
               'FirestoreDatabase: Could not enable persistence; falling back to disabled: $settingsError');
           try {
-            _firestore!.settings = const Settings(
+            _firestore?.settings = const Settings(
               persistenceEnabled: false,
             );
           } catch (_) {
@@ -85,16 +90,20 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       unawaited(() async {
         // Best-effort connection check
         try {
-          debugPrint('FirestoreDatabase: Background connection test...');
-          await _firestore!.collection('_test').limit(1).get();
-          debugPrint('FirestoreDatabase: Background connection test ok');
+          if (_firestore != null) {
+            debugPrint('FirestoreDatabase: Background connection test...');
+            await _firestore!.collection('_test').limit(1).get();
+            debugPrint('FirestoreDatabase: Background connection test ok');
+          }
         } catch (e) {
           debugPrint('FirestoreDatabase: Background connection test failed: $e');
         }
 
         // Best-effort default data init
         try {
-          await _initializeDefaultData();
+          if (_firestore != null) {
+            await _initializeDefaultData();
+          }
         } catch (e) {
           debugPrint('FirestoreDatabase: Background seed failed: $e');
         }
