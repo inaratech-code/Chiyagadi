@@ -331,6 +331,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
       // Ensure categories exist (by exact name match first, then normalized as fallback)
       final Map<String, String> categoryIdByNormName = {};
+      int categoriesToAdd = 0;
+      
       for (final cat in chiyagaadiSeedCategories) {
         final snap = await firestore
             .collection('categories')
@@ -339,12 +341,15 @@ class FirestoreDatabaseProvider with ChangeNotifier {
             .get();
         if (snap.docs.isNotEmpty) {
           categoryIdByNormName[norm(cat.name)] = snap.docs.first.id;
-          debugPrint('FirestoreDatabase: Category "${cat.name}" already exists');
+          debugPrint('FirestoreDatabase: Category "${cat.name}" already exists (ID: ${snap.docs.first.id})');
           continue;
         }
 
         // Check if we need a new batch
         if (operationsInCurrentBatch >= maxBatchSize) {
+          // Commit current batch before creating new one
+          await batches[currentBatchIndex].commit();
+          debugPrint('FirestoreDatabase: Committed batch ${currentBatchIndex + 1} before creating new batch');
           currentBatchIndex++;
           batches.add(firestore.batch());
           operationsInCurrentBatch = 0;
@@ -362,10 +367,11 @@ class FirestoreDatabaseProvider with ChangeNotifier {
           'updated_at': now,
         });
         operationsInCurrentBatch++;
-        debugPrint('FirestoreDatabase: Will create category "${cat.name}" in batch ${currentBatchIndex + 1}');
+        categoriesToAdd++;
+        debugPrint('FirestoreDatabase: Will create category "${cat.name}" (ID: $docRef) in batch ${currentBatchIndex + 1}');
       }
       
-      debugPrint('FirestoreDatabase: Categories processed - ${categoryIdByNormName.length} categories ready');
+      debugPrint('FirestoreDatabase: Categories processed - ${categoryIdByNormName.length} total, $categoriesToAdd to add');
 
       // Create products (menu items). Inventory is handled separately using
       // purchasable items + purchases, not menu sales.
@@ -418,37 +424,38 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
       // Commit all batches that have operations
       int batchesCommitted = 0;
-      int totalOperations = 0;
       
-      // Count total operations across all batches
+      debugPrint('FirestoreDatabase: Committing ${currentBatchIndex + 1} batches...');
+      
+      // Commit all batches (including the one we're currently using if it has operations)
       for (int i = 0; i <= currentBatchIndex; i++) {
-        // Firestore batches track operations internally, we'll commit all batches
-        totalOperations += operationsInCurrentBatch;
-      }
-      
-      debugPrint('FirestoreDatabase: Total operations to commit: $totalOperations across ${currentBatchIndex + 1} batches');
-      
-      // Commit categories batch first (if it has operations)
-      if (operationsInCurrentBatch > 0 || currentBatchIndex >= 0) {
-        for (int i = 0; i <= currentBatchIndex; i++) {
-          try {
-            await batches[i].commit();
-            batchesCommitted++;
-            debugPrint('FirestoreDatabase: Successfully committed batch ${i + 1}/${currentBatchIndex + 1}');
-          } catch (e) {
-            debugPrint('FirestoreDatabase: Error committing batch ${i + 1}: $e');
-            rethrow; // Re-throw to show error to user
-          }
+        try {
+          await batches[i].commit();
+          batchesCommitted++;
+          debugPrint('FirestoreDatabase: Successfully committed batch ${i + 1}/${currentBatchIndex + 1}');
+        } catch (e) {
+          debugPrint('FirestoreDatabase: Error committing batch ${i + 1}: $e');
+          rethrow; // Re-throw to show error to user
         }
       }
       
       debugPrint('FirestoreDatabase: Chiyagaadi menu seed completed - Added: $productsAdded products, Skipped: $productsSkipped products, Batches committed: $batchesCommitted');
       
-      // Verify data was saved by querying
+      // Wait a moment for Firestore to propagate writes
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Verify data was saved by querying directly from Firestore
       try {
-        final verifyCategories = await firestore.collection('categories').limit(5).get();
-        final verifyProducts = await firestore.collection('products').limit(5).get();
+        final verifyCategories = await firestore.collection('categories').limit(10).get();
+        final verifyProducts = await firestore.collection('products').limit(10).get();
         debugPrint('FirestoreDatabase: Verification - Found ${verifyCategories.docs.length} categories and ${verifyProducts.docs.length} products in Firestore');
+        
+        if (verifyCategories.docs.isNotEmpty) {
+          debugPrint('FirestoreDatabase: Sample categories: ${verifyCategories.docs.map((d) => d.data()['name']).join(', ')}');
+        }
+        if (verifyProducts.docs.isNotEmpty) {
+          debugPrint('FirestoreDatabase: Sample products: ${verifyProducts.docs.map((d) => d.data()['name']).join(', ')}');
+        }
       } catch (e) {
         debugPrint('FirestoreDatabase: Error verifying saved data: $e');
       }
