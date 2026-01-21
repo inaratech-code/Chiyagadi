@@ -400,29 +400,37 @@ class UnifiedDatabaseProvider with ChangeNotifier {
         await init();
       }
       
-      // If database is not available, return false
+      // If database is not available, try to reinitialize
       if (!isAvailable) {
-        debugPrint('UnifiedDatabase: Cannot seed menu - database not available');
-        return false;
+        debugPrint('UnifiedDatabase: Database not available, attempting to reinitialize...');
+        _initFailed = false; // Reset failure flag to allow retry
+        await init();
+        
+        if (!isAvailable) {
+          debugPrint('UnifiedDatabase: Cannot seed menu - database still not available after retry');
+          return false;
+        }
       }
       
       // Call the seed function on the provider
-      if (kIsWeb && _provider is FirestoreDatabaseProvider) {
-        // Access the private method via a public wrapper
-        // We'll need to make it public or create a wrapper
-        final firestoreProvider = _provider as FirestoreDatabaseProvider;
-        await firestoreProvider.seedMenuItems();
-        debugPrint('UnifiedDatabase: Menu items seeded successfully');
-        return true;
-      } else if (!kIsWeb) {
+      if (kIsWeb) {
+        // For web, use FirestoreDatabaseProvider
+        if (_provider is FirestoreDatabaseProvider) {
+          final firestoreProvider = _provider as FirestoreDatabaseProvider;
+          await firestoreProvider.seedMenuItems();
+          debugPrint('UnifiedDatabase: Menu items seeded successfully to Firestore');
+          return true;
+        } else {
+          debugPrint('UnifiedDatabase: Provider is not FirestoreDatabaseProvider on web');
+          return false;
+        }
+      } else {
         // For SQLite, the seed happens during init
         // But we can trigger it manually by calling clearBusinessData with seedDefaults=true
         await clearBusinessData(seedDefaults: true);
         debugPrint('UnifiedDatabase: Menu items seeded successfully (SQLite)');
         return true;
       }
-      
-      return false;
     } catch (e) {
       debugPrint('UnifiedDatabase: Error seeding menu items: $e');
       return false;
