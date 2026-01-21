@@ -56,154 +56,103 @@ String chiyagaadiImageAssetForName(String name) {
 }
 
 const List<ChiyagaadiSeedCategory> chiyagaadiSeedCategories = [
-  ChiyagaadiSeedCategory(name: 'Chiya (Tea)', displayOrder: 1),
-  ChiyagaadiSeedCategory(name: 'Coffee', displayOrder: 2),
-  ChiyagaadiSeedCategory(name: 'Drinks', displayOrder: 3),
-  ChiyagaadiSeedCategory(name: 'Snacks', displayOrder: 4),
-  ChiyagaadiSeedCategory(name: 'Hookah', displayOrder: 5),
+  ChiyagaadiSeedCategory(name: 'Tuto Sip', displayOrder: 1),
+  ChiyagaadiSeedCategory(name: 'Chill Sip', displayOrder: 2),
+  ChiyagaadiSeedCategory(name: 'Snacks', displayOrder: 3),
+  ChiyagaadiSeedCategory(name: 'Hookah', displayOrder: 4),
+  ChiyagaadiSeedCategory(name: 'Games & Vibes', displayOrder: 5),
   ChiyagaadiSeedCategory(name: 'Smokes', displayOrder: 6),
 ];
 
-/// Menu items transcribed from the provided board photo.
+/// Menu items from the Chiyagaadi chalkboard menu.
 ///
-/// If you want the Nepali names instead, just rename `name` fields.
+/// Organized by sections: Tuto Sip, Chill Sip, Snacks, Hookah, Games & Vibes
 const List<ChiyagaadiSeedProduct> chiyagaadiSeedProducts = [
-  // Chiya (Tea)
+  // Tuto Sip Section
   ChiyagaadiSeedProduct(
-    categoryName: 'Chiya (Tea)',
+    categoryName: 'Tuto Sip',
     name: 'Masala Chiya',
     description: 'Spiced tea',
     price: 40,
     isVeg: true,
   ),
   ChiyagaadiSeedProduct(
-    categoryName: 'Chiya (Tea)',
+    categoryName: 'Tuto Sip',
     name: 'Matka Chiya',
     description: 'Clay-pot tea',
     price: 70,
     isVeg: true,
   ),
   ChiyagaadiSeedProduct(
-    categoryName: 'Chiya (Tea)',
+    categoryName: 'Tuto Sip',
+    name: 'Edible Cup',
+    description: 'Edible cup add-on',
+    price: 30,
+    isVeg: true,
+  ),
+  ChiyagaadiSeedProduct(
+    categoryName: 'Tuto Sip',
     name: 'Black Chiya',
     description: 'Black tea',
     price: 30,
     isVeg: true,
   ),
   ChiyagaadiSeedProduct(
-    categoryName: 'Chiya (Tea)',
+    categoryName: 'Tuto Sip',
     name: 'Lemon Chiya',
     description: 'Lemon tea',
     price: 35,
     isVeg: true,
   ),
   ChiyagaadiSeedProduct(
-    categoryName: 'Chiya (Tea)',
-    name: 'Edible Cup',
-    description: 'Edible cup add-on',
-    price: 110,
-    isVeg: true,
-  ),
-
-  // Coffee
-  ChiyagaadiSeedProduct(
-    categoryName: 'Coffee',
+    categoryName: 'Tuto Sip',
     name: 'Black Coffee',
     description: 'Hot black coffee',
     price: 110,
     isVeg: true,
   ),
   ChiyagaadiSeedProduct(
-    categoryName: 'Coffee',
+    categoryName: 'Tuto Sip',
     name: 'Milk Coffee',
     description: 'Hot milk coffee',
     price: 150,
     isVeg: true,
   ),
+
+  // Chill Sip Section
   ChiyagaadiSeedProduct(
-    categoryName: 'Coffee',
+    categoryName: 'Chill Sip',
+    name: 'Pepsi / Slice / Dew',
+    description: 'Soft drinks - Pepsi, Slice, or Mountain Dew',
+    price: 80,
+    isVeg: true,
+  ),
+  ChiyagaadiSeedProduct(
+    categoryName: 'Chill Sip',
+    name: 'Masala Cold Drink',
+    description: 'Spiced cold drink',
+    price: 110,
+    isVeg: true,
+  ),
+  ChiyagaadiSeedProduct(
+    categoryName: 'Chill Sip',
     name: 'Cold Black Coffee',
     description: 'Iced black coffee',
     price: 140,
     isVeg: true,
   ),
   ChiyagaadiSeedProduct(
-    categoryName: 'Coffee',
+    categoryName: 'Chill Sip',
     name: 'Cold Milk Coffee',
     description: 'Iced milk coffee',
-    price: 150,
+    price: 160,
     isVeg: true,
   ),
 
-  // Drinks
-  ChiyagaadiSeedProduct(
-    categoryName: 'Drinks',
-    name: 'Cold Drink',
-    description: 'Soft drink',
-    price: 40,
-    isVeg: true,
-  ),
-  ChiyagaadiSeedProduct(
-    categoryName: 'Drinks',
-    name: 'Water',
-    description: 'Bottled water',
-    price: 15,
-    isVeg: true,
-  ),
-  ChiyagaadiSeedProduct(
-    categoryName: 'Drinks',
-    name: 'Soda',
-    description: 'Soda',
-    price: 35,
-    isVeg: true,
-  ),
-  ChiyagaadiSeedProduct(
-    categoryName: 'Drinks',
-    name: 'Juice',
-    description: 'Juice',
-    price: 50,
-    isVeg: true,
-  ),
-  ChiyagaadiSeedProduct(
-    categoryName: 'Drinks',
-    name: 'Orange Juice',
-    description: 'Orange juice',
-    price: 60,
-    isVeg: true,
-  ),
-  ChiyagaadiSeedProduct(
-    categoryName: 'Drinks',
-    name: 'Apple Juice',
-    description: 'Apple juice',
-    price: 60,
-    isVeg: true,
-  ),
-  ChiyagaadiSeedProduct(
-    categoryName: 'Drinks',
-    name: 'Mixed Juice',
-    description: 'Mixed juice',
-    price: 70,
-    isVeg: true,
-  ),
-  ChiyagaadiSeedProduct(
-    categoryName: 'Drinks',
-    name: 'Lassi',
-    description: 'Lassi',
-    price: 55,
-    isVeg: true,
-  ),
-  ChiyagaadiSeedProduct(
-    categoryName: 'Drinks',
-    name: 'Mango Lassi',
-    description: 'Mango lassi',
-    price: 65,
-    isVeg: true,
-  ),
-
-  // Snacks
+  // Snacks Section
   ChiyagaadiSeedProduct(
     categoryName: 'Snacks',
-    name: 'Chicken Momo',
+    name: 'Chicken Mo-Mo',
     description: 'Chicken momos',
     price: 160,
     isVeg: false,
@@ -217,27 +166,20 @@ const List<ChiyagaadiSeedProduct> chiyagaadiSeedProducts = [
   ),
   ChiyagaadiSeedProduct(
     categoryName: 'Snacks',
-    name: 'Chowchow',
+    name: 'Current Chowchow',
     description: 'Chowchow noodles',
     price: 100,
     isVeg: true,
   ),
   ChiyagaadiSeedProduct(
     categoryName: 'Snacks',
-    name: 'Egg Omelette (1)',
+    name: '1 Egg Omelete',
     description: 'One egg omelette',
     price: 70,
     isVeg: false,
   ),
 
-  // Hookah
-  ChiyagaadiSeedProduct(
-    categoryName: 'Hookah',
-    name: 'Normal Hookah',
-    description: 'Standard hookah',
-    price: 350,
-    isVeg: false,
-  ),
+  // Hookah Section
   ChiyagaadiSeedProduct(
     categoryName: 'Hookah',
     name: 'Cloud Hookah',
@@ -245,8 +187,24 @@ const List<ChiyagaadiSeedProduct> chiyagaadiSeedProducts = [
     price: 450,
     isVeg: false,
   ),
+  ChiyagaadiSeedProduct(
+    categoryName: 'Hookah',
+    name: 'Normal Hookah',
+    description: 'Standard hookah',
+    price: 350,
+    isVeg: false,
+  ),
 
-  // Smokes
+  // Games & Vibes Section (free with order - set price to 0)
+  ChiyagaadiSeedProduct(
+    categoryName: 'Games & Vibes',
+    name: 'Ludo / UNO / Chess / Stack',
+    description: 'Games - Free with order',
+    price: 0,
+    isVeg: true,
+  ),
+
+  // Smokes (keeping existing items)
   ChiyagaadiSeedProduct(
     categoryName: 'Smokes',
     name: 'Marlboro',
