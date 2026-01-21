@@ -105,6 +105,94 @@ class _MenuScreenState extends State<MenuScreen> {
     }
   }
 
+  /// Seed menu items from chiyagaadi_menu_seed.dart
+  Future<void> _seedMenuItems() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Seed Menu Items?'),
+        content: const Text(
+          'This will add all menu items from the chalkboard menu to Firestore.\n\n'
+          'Existing items will not be duplicated.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Seed Menu'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Seeding menu items...'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+
+    try {
+      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      
+      // Ensure database is initialized
+      await dbProvider.init();
+      
+      if (!dbProvider.isAvailable) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Database not available. Please check Firebase connection.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Seed menu items
+      final success = await dbProvider.seedMenuItems();
+      
+      if (!mounted) return;
+      
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Menu items seeded successfully!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        
+        // Reload menu data
+        await _loadData();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to seed menu items. Check console for details.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('MenuScreen: Error seeding menu items: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   String _normalizeNameKey(String s) {
     return s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
   }

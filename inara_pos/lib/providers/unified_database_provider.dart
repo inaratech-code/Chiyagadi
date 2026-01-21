@@ -390,4 +390,42 @@ class UnifiedDatabaseProvider with ChangeNotifier {
       await _provider.close();
     }
   }
+  
+  /// Manually seed menu items from chiyagaadi_menu_seed.dart
+  /// This will add all categories and products to Firestore
+  Future<bool> seedMenuItems() async {
+    try {
+      // Ensure database is initialized
+      if (!_isInitialized) {
+        await init();
+      }
+      
+      // If database is not available, return false
+      if (!isAvailable) {
+        debugPrint('UnifiedDatabase: Cannot seed menu - database not available');
+        return false;
+      }
+      
+      // Call the seed function on the provider
+      if (kIsWeb && _provider is FirestoreDatabaseProvider) {
+        // Access the private method via a public wrapper
+        // We'll need to make it public or create a wrapper
+        final firestoreProvider = _provider as FirestoreDatabaseProvider;
+        await firestoreProvider.seedMenuItems();
+        debugPrint('UnifiedDatabase: Menu items seeded successfully');
+        return true;
+      } else if (!kIsWeb) {
+        // For SQLite, the seed happens during init
+        // But we can trigger it manually by calling clearBusinessData with seedDefaults=true
+        await clearBusinessData(seedDefaults: true);
+        debugPrint('UnifiedDatabase: Menu items seeded successfully (SQLite)');
+        return true;
+      }
+      
+      return false;
+    } catch (e) {
+      debugPrint('UnifiedDatabase: Error seeding menu items: $e');
+      return false;
+    }
+  }
 }

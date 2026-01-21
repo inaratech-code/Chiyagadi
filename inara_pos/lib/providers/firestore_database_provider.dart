@@ -310,6 +310,11 @@ class FirestoreDatabaseProvider with ChangeNotifier {
     }
   }
 
+  /// Public method to seed menu items - can be called manually
+  Future<void> seedMenuItems() async {
+    await _ensureChiyagaadiMenuSeed();
+  }
+  
   Future<void> _ensureChiyagaadiMenuSeed() async {
     debugPrint('FirestoreDatabase: Ensuring Chiyagaadi menu seed...');
     final now = DateTime.now().millisecondsSinceEpoch;
