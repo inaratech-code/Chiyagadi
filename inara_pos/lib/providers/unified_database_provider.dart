@@ -316,14 +316,24 @@ class UnifiedDatabaseProvider with ChangeNotifier {
       await init();
     }
     
-    // If init failed, return empty list instead of throwing
+    // If init failed, try to reinitialize once
     if (!isAvailable) {
-      debugPrint('UnifiedDatabase: Query skipped - database not available');
-      return [];
+      debugPrint('UnifiedDatabase: Query skipped - database not available, attempting reinit...');
+      try {
+        await forceInit();
+        await Future.delayed(const Duration(milliseconds: 300));
+      } catch (e) {
+        debugPrint('UnifiedDatabase: Reinit failed: $e');
+      }
+      
+      if (!isAvailable) {
+        debugPrint('UnifiedDatabase: Query skipped - database still not available after reinit');
+        return [];
+      }
     }
     
     try {
-      return await _provider.query(
+      final result = await _provider.query(
         table,
         distinct: distinct,
         columns: columns,
@@ -335,8 +345,20 @@ class UnifiedDatabaseProvider with ChangeNotifier {
         limit: limit,
         offset: offset,
       );
+      debugPrint('UnifiedDatabase: Query successful - returned ${result.length} rows from $table');
+      return result;
     } catch (e) {
+      final errorMsg = e.toString();
       debugPrint('UnifiedDatabase: Query error: $e');
+      
+      // If it's a permission error, log helpful message
+      if (errorMsg.contains('permission') || 
+          errorMsg.contains('PERMISSION_DENIED') ||
+          errorMsg.contains('Missing or insufficient permissions')) {
+        debugPrint('UnifiedDatabase: Permission denied - Firestore rules may require authentication');
+        debugPrint('UnifiedDatabase: Please update Firestore rules to allow public access');
+      }
+      
       return []; // Return empty list on error
     }
   }
