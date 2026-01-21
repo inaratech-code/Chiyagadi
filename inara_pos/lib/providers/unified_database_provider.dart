@@ -53,39 +53,101 @@ class UnifiedDatabaseProvider with ChangeNotifier {
       // Ensure Firebase is initialized before any Firestore access (web).
       if (kIsWeb) {
         // Step 1: Initialize Firebase App (required for Firestore)
+        // Use defensive programming to handle null check errors
         try {
-          if (Firebase.apps.isEmpty) {
+          // Check if Firebase is already initialized using a safe method
+          bool firebaseInitialized = false;
+          try {
+            firebaseInitialized = Firebase.apps.isNotEmpty;
+          } catch (e) {
+            debugPrint('UnifiedDatabase: Error checking Firebase apps: $e');
+            // If checking fails, assume not initialized and try to initialize
+            firebaseInitialized = false;
+          }
+          
+          if (!firebaseInitialized) {
+            debugPrint('UnifiedDatabase: Initializing Firebase App...');
+            
+            // Get Firebase options with multiple fallbacks
+            FirebaseOptions? options;
+            
+            // Try currentPlatform first
             try {
-              FirebaseOptions? options;
+              options = DefaultFirebaseOptions.currentPlatform;
+              debugPrint('UnifiedDatabase: Got Firebase options from currentPlatform');
+            } catch (e) {
+              debugPrint('UnifiedDatabase: Error getting currentPlatform options: $e');
+              
+              // Fallback 1: Try web options directly
               try {
-                options = DefaultFirebaseOptions.currentPlatform;
-              } catch (e) {
-                debugPrint('UnifiedDatabase: Error getting Firebase options: $e');
-                // Fallback: try to use web options directly
+                options = DefaultFirebaseOptions.web;
+                debugPrint('UnifiedDatabase: Using web Firebase options as fallback');
+              } catch (fallbackError) {
+                debugPrint('UnifiedDatabase: Web options fallback also failed: $fallbackError');
+                
+                // Fallback 2: Try to construct options manually
                 try {
-                  options = DefaultFirebaseOptions.web;
-                  debugPrint('UnifiedDatabase: Using web Firebase options as fallback');
-                } catch (fallbackError) {
-                  debugPrint('UnifiedDatabase: Fallback also failed: $fallbackError');
-                  throw StateError('Failed to get Firebase options: $e');
+                  options = const FirebaseOptions(
+                    apiKey: 'AIzaSyAE1vchX5X70H_Ec4UIk_DLLOjx51W3kyc',
+                    appId: '1:905761269162:web:bbac95e09878d7006d37d3',
+                    messagingSenderId: '905761269162',
+                    projectId: 'chiyagadi-cf302',
+                    authDomain: 'chiyagadi-cf302.firebaseapp.com',
+                    storageBucket: 'chiyagadi-cf302.firebasestorage.app',
+                  );
+                  debugPrint('UnifiedDatabase: Using manually constructed Firebase options');
+                } catch (manualError) {
+                  debugPrint('UnifiedDatabase: Manual options construction failed: $manualError');
+                  throw StateError('Failed to get Firebase options after all attempts: $e');
                 }
               }
-              
-              if (options == null) {
-                throw StateError('Firebase options is null');
+            }
+            
+            if (options == null) {
+              throw StateError('Firebase options is null after all attempts');
+            }
+            
+            // Initialize Firebase with retries
+            bool initSuccess = false;
+            for (int attempt = 0; attempt < 3; attempt++) {
+              try {
+                if (attempt > 0) {
+                  await Future.delayed(Duration(milliseconds: 300 * (attempt + 1)));
+                  debugPrint('UnifiedDatabase: Retrying Firebase initialization (attempt ${attempt + 1})...');
+                }
+                
+                await Firebase.initializeApp(options: options);
+                debugPrint('UnifiedDatabase: Firebase App initialized successfully (web)');
+                initSuccess = true;
+                break;
+              } catch (initError) {
+                final initErrorMsg = initError.toString();
+                debugPrint('UnifiedDatabase: Firebase init attempt ${attempt + 1} failed: $initError');
+                
+                // If it's a null check error, retry
+                if (initErrorMsg.contains('Null check operator') || 
+                    initErrorMsg.contains('null value')) {
+                  if (attempt < 2) {
+                    debugPrint('UnifiedDatabase: Null check error detected, will retry...');
+                    continue;
+                  }
+                }
+                
+                // If this is the last attempt, throw
+                if (attempt == 2) {
+                  throw StateError('Failed to initialize Firebase App after 3 attempts: $initError');
+                }
               }
-              
-              await Firebase.initializeApp(options: options);
-              debugPrint('UnifiedDatabase: Firebase App initialized (web)');
-              
-              // iOS Safari: Wait a bit longer to ensure Firebase is fully ready
-              if (defaultTargetPlatform == TargetPlatform.iOS) {
-                await Future.delayed(const Duration(milliseconds: 300));
-                debugPrint('UnifiedDatabase: iOS Safari delay applied');
-              }
-            } catch (initError) {
-              debugPrint('UnifiedDatabase: Failed to initialize Firebase App: $initError');
-              throw StateError('Failed to initialize Firebase App: $initError');
+            }
+            
+            if (!initSuccess) {
+              throw StateError('Firebase App initialization failed after all retries');
+            }
+            
+            // iOS Safari: Wait a bit longer to ensure Firebase is fully ready
+            if (defaultTargetPlatform == TargetPlatform.iOS) {
+              await Future.delayed(const Duration(milliseconds: 300));
+              debugPrint('UnifiedDatabase: iOS Safari delay applied');
             }
           } else {
             debugPrint('UnifiedDatabase: Firebase App already initialized');
@@ -93,7 +155,18 @@ class UnifiedDatabaseProvider with ChangeNotifier {
         } catch (e) {
           final errorMsg = e.toString();
           debugPrint('UnifiedDatabase: Firebase App initialization error: $e');
-          // If Firebase App initialization fails, we can't continue
+          
+          // Don't throw if it's a null check error - might be transient
+          if (errorMsg.contains('Null check operator') || 
+              errorMsg.contains('null value')) {
+            debugPrint('UnifiedDatabase: Null check error in Firebase App init - marking as failed but allowing retry');
+            _initFailed = true;
+            _isInitialized = false;
+            // Don't throw - allow retry via forceInit()
+            return;
+          }
+          
+          // For other errors, still throw
           throw StateError('Firebase App initialization failed: $e');
         }
         
