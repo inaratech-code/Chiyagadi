@@ -349,11 +349,10 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         if (operationsInCurrentBatch >= maxBatchSize) {
           // Commit current batch before creating new one
           await batches[currentBatchIndex].commit();
-          debugPrint('FirestoreDatabase: Committed batch ${currentBatchIndex + 1} before creating new batch');
+          debugPrint('FirestoreDatabase: Committed batch ${currentBatchIndex + 1} (had $operationsInCurrentBatch operations)');
           currentBatchIndex++;
           batches.add(firestore.batch());
           operationsInCurrentBatch = 0;
-          debugPrint('FirestoreDatabase: Created new batch ${currentBatchIndex + 1}');
         }
 
         final docRef = firestore.collection('categories').doc();
@@ -368,10 +367,10 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         });
         operationsInCurrentBatch++;
         categoriesToAdd++;
-        debugPrint('FirestoreDatabase: Will create category "${cat.name}" (ID: $docRef) in batch ${currentBatchIndex + 1}');
+        debugPrint('FirestoreDatabase: Will create category "${cat.name}" in batch ${currentBatchIndex + 1}');
       }
       
-      debugPrint('FirestoreDatabase: Categories processed - ${categoryIdByNormName.length} total, $categoriesToAdd to add');
+      debugPrint('FirestoreDatabase: Categories processed - ${categoryIdByNormName.length} total, $categoriesToAdd to add, operations in current batch: $operationsInCurrentBatch');
 
       // Create products (menu items). Inventory is handled separately using
       // purchasable items + purchases, not menu sales.
@@ -425,18 +424,27 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       // Commit all batches that have operations
       int batchesCommitted = 0;
       
-      debugPrint('FirestoreDatabase: Committing ${currentBatchIndex + 1} batches...');
+      // Determine how many batches need to be committed
+      // If currentBatchIndex is 0 and operationsInCurrentBatch is 0, no batches need committing
+      // Otherwise, commit all batches up to currentBatchIndex
+      final batchesToCommit = (operationsInCurrentBatch > 0 || currentBatchIndex > 0) ? currentBatchIndex + 1 : 0;
       
-      // Commit all batches (including the one we're currently using if it has operations)
-      for (int i = 0; i <= currentBatchIndex; i++) {
-        try {
-          await batches[i].commit();
-          batchesCommitted++;
-          debugPrint('FirestoreDatabase: Successfully committed batch ${i + 1}/${currentBatchIndex + 1}');
-        } catch (e) {
-          debugPrint('FirestoreDatabase: Error committing batch ${i + 1}: $e');
-          rethrow; // Re-throw to show error to user
+      debugPrint('FirestoreDatabase: Committing $batchesToCommit batches (currentBatchIndex: $currentBatchIndex, operationsInCurrentBatch: $operationsInCurrentBatch)...');
+      
+      if (batchesToCommit > 0) {
+        // Commit all batches (including the one we're currently using if it has operations)
+        for (int i = 0; i < batchesToCommit; i++) {
+          try {
+            await batches[i].commit();
+            batchesCommitted++;
+            debugPrint('FirestoreDatabase: Successfully committed batch ${i + 1}/$batchesToCommit');
+          } catch (e) {
+            debugPrint('FirestoreDatabase: Error committing batch ${i + 1}: $e');
+            rethrow; // Re-throw to show error to user
+          }
         }
+      } else {
+        debugPrint('FirestoreDatabase: No batches to commit (all items may already exist)');
       }
       
       debugPrint('FirestoreDatabase: Chiyagaadi menu seed completed - Added: $productsAdded products, Skipped: $productsSkipped products, Batches committed: $batchesCommitted');
