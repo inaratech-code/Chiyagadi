@@ -109,6 +109,24 @@ class UnifiedDatabaseProvider with ChangeNotifier {
       debugPrint('UnifiedDatabase: Initialized successfully');
     } catch (e) {
       debugPrint('UnifiedDatabase: Initialization failed: $e');
+      final errorMsg = e.toString();
+      
+      // Provide more helpful error message for null check errors
+      if (errorMsg.contains('Null check operator') || errorMsg.contains('null value')) {
+        throw StateError(
+          'Database initialization failed: Null check error detected.\n\n'
+          'This is often caused by:\n'
+          '1. Firebase not fully initialized on iOS Safari\n'
+          '2. Firestore instance not available\n'
+          '3. Browser compatibility issue\n\n'
+          'Try:\n'
+          '1. Hard refresh the page (Cmd+Shift+R on Mac)\n'
+          '2. Clear browser cache\n'
+          '3. Check browser console (F12) for details\n\n'
+          'Original error: $e'
+        );
+      }
+      
       rethrow;
     }
   }

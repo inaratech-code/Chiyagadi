@@ -45,14 +45,33 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       debugPrint('FirestoreDatabase: Initializing Firestore...');
 
       // Get Firestore instance with defensive error handling
+      // iOS Safari sometimes needs a small delay after Firebase.initializeApp()
       try {
+        // Small delay for iOS Safari to ensure Firebase is fully ready
+        if (kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
+        
         _firestore = FirebaseFirestore.instance;
         if (_firestore == null) {
           throw StateError('FirebaseFirestore.instance returned null');
         }
         debugPrint('FirestoreDatabase: Firestore instance obtained');
       } catch (e) {
+        final errorMsg = e.toString();
         debugPrint('FirestoreDatabase: Failed to get Firestore instance: $e');
+        
+        // If it's a null check error, provide more helpful message
+        if (errorMsg.contains('Null check operator') || errorMsg.contains('null value')) {
+          throw StateError(
+            'Firestore initialization failed on iOS Safari.\n\n'
+            'This may be due to:\n'
+            '1. Firebase not fully initialized (try refreshing)\n'
+            '2. Firestore not enabled in Firebase Console\n'
+            '3. Browser compatibility issue\n\n'
+            'Original error: $e'
+          );
+        }
         throw StateError('Failed to get Firestore instance: $e');
       }
 
