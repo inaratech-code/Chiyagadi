@@ -11,6 +11,7 @@ import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'utils/app_messenger.dart';
 import 'utils/theme.dart';
+import 'utils/add_admin_user.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -80,7 +81,21 @@ class _WarmStartState extends State<_WarmStart> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       // Warm up DB (and Firebase on web via UnifiedDatabaseProvider).
       try {
-        await context.read<UnifiedDatabaseProvider>().init();
+        final dbProvider = context.read<UnifiedDatabaseProvider>();
+        await dbProvider.init();
+        
+        // Add admin user with specific document ID if on web
+        if (kIsWeb) {
+          final authProvider = context.read<AuthProvider>();
+          // Add admin user with document ID: cruFy4iy9kMP136d8H99DrBjBbG3
+          await addAdminUserWithId(
+            dbProvider,
+            authProvider,
+            'cruFy4iy9kMP136d8H99DrBjBbG3',
+            username: 'admin',
+            pin: '1234', // Default PIN - change after first login
+          );
+        }
       } catch (e) {
         debugPrint('WarmStart: DB init failed: $e');
         if (kIsWeb) {

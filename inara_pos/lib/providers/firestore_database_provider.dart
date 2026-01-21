@@ -630,7 +630,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
     });
   }
 
-  Future<String> insert(String collection, Map<String, dynamic> data) async {
+  Future<String> insert(String collection, Map<String, dynamic> data, {String? documentId}) async {
     if (!_isInitialized) {
       await init();
     }
@@ -649,9 +649,19 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         dataToInsert['updated_at'] = now;
       }
 
-      final docRef = await firestore.collection(collection).add(dataToInsert);
-      debugPrint(
-          'FirestoreDatabase: Inserted document ${docRef.id} into $collection');
+      DocumentReference docRef;
+      if (documentId != null && documentId.isNotEmpty) {
+        // Use specific document ID
+        docRef = firestore.collection(collection).doc(documentId);
+        await docRef.set(dataToInsert);
+        debugPrint(
+            'FirestoreDatabase: Inserted document $documentId into $collection with specific ID');
+      } else {
+        // Auto-generate document ID
+        docRef = await firestore.collection(collection).add(dataToInsert);
+        debugPrint(
+            'FirestoreDatabase: Inserted document ${docRef.id} into $collection');
+      }
       return docRef.id;
     } catch (e) {
       debugPrint('FirestoreDatabase: Insert error: $e');

@@ -79,16 +79,16 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     );
   }
 
-  Future<dynamic> insert(String table, Map<String, dynamic> values) async {
+  Future<dynamic> insert(String table, Map<String, dynamic> values, {String? documentId}) async {
     if (!_isInitialized) {
       await init();
     }
 
     if (kIsWeb) {
       // Firestore returns String (document ID)
-      return await _provider.insert(table, values);
+      return await _provider.insert(table, values, documentId: documentId);
     } else {
-      // SQLite returns int
+      // SQLite returns int (documentId parameter ignored on SQLite)
       return await _provider.insert(table, values);
     }
   }

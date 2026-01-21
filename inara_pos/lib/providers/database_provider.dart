@@ -732,7 +732,8 @@ CREATE TABLE IF NOT EXISTS expenses (
     );
   }
 
-  Future<int> insert(String table, Map<String, dynamic> values) async {
+  Future<int> insert(String table, Map<String, dynamic> values, {String? documentId}) async {
+    // documentId parameter is ignored for SQLite (only used for Firestore)
     final db = await database;
     return await db.insert(table, values);
   }

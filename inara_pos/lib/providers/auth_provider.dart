@@ -475,6 +475,64 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  /// Create a user with a specific document ID (for Firestore) or regular insert (SQLite)
+  /// Useful for migrating users or setting up specific user IDs
+  Future<bool> createUserWithId(String userId, String username, String pin, String role) async {
+    if (pin.length < 4 || pin.length > 6) {
+      return false;
+    }
+
+    if (username.isEmpty || (role != 'admin' && role != 'cashier')) {
+      return false;
+    }
+
+    try {
+      final dbProvider = _getDatabaseProvider();
+      await dbProvider.init();
+
+      // Check if username already exists
+      final existing = await dbProvider.query(
+        'users',
+        where: 'username = ?',
+        whereArgs: [username],
+      );
+
+      if (existing.isNotEmpty) {
+        return false; // Username already exists
+      }
+
+      // Check if user ID already exists (for Firestore)
+      if (kIsWeb) {
+        final existingById = await dbProvider.query(
+          'users',
+          where: 'documentId = ?',
+          whereArgs: [userId],
+        );
+        if (existingById.isNotEmpty) {
+          return false; // User ID already exists
+        }
+      }
+
+      final pinHash = _hashPin(pin);
+      final now = DateTime.now().millisecondsSinceEpoch;
+
+      await dbProvider.insert('users', {
+        'username': username,
+        'pin_hash': pinHash,
+        'role': role,
+        'is_active': 1,
+        'created_at': now,
+        'updated_at': now,
+      }, documentId: kIsWeb ? userId : null);
+
+      debugPrint('createUserWithId: User created with ID: $userId, username: $username, role: $role');
+      return true;
+    } catch (e) {
+      debugPrint('Error creating user with ID: $e');
+      return false;
+    }
+  }
+
   // Admin-only: list users
   Future<List<Map<String, dynamic>>> getAllUsers() async {
     final dbProvider = _getDatabaseProvider();
