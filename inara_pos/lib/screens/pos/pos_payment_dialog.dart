@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/order.dart';
-import '../../providers/auth_provider.dart' show InaraInaraAuthProvider;
+import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../providers/unified_database_provider.dart';
 import '../../services/order_service.dart';
 import '../../utils/number_formatter.dart';

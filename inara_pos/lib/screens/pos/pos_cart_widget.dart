@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/order.dart';
 import '../../models/order_item.dart';
 import '../../providers/unified_database_provider.dart';
-import '../../providers/auth_provider.dart' show InaraInaraAuthProvider;
+import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../services/order_service.dart';
 import '../../utils/number_formatter.dart';
 import '../../utils/theme.dart';

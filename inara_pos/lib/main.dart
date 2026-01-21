@@ -16,6 +16,21 @@ import 'utils/add_admin_user.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Global error handler to catch all unhandled errors
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint('FlutterError: ${details.exception}');
+    debugPrint('Stack: ${details.stack}');
+  };
+  
+  // Handle async errors
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('PlatformDispatcher error: $error');
+    debugPrint('Stack: $stack');
+    return true; // Prevent app from crashing
+  };
+  
   // CRITICAL: Do not block first frame on Firebase/DB init.
   // We warm these up asynchronously after the UI is on screen.
   final databaseProvider = UnifiedDatabaseProvider();
@@ -191,38 +206,46 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
       // If user is already signed in with Firebase Auth, restore session
       if (auth.currentUser != null && mounted) {
         debugPrint('AuthWrapper: Firebase Auth user already signed in: ${auth.currentUser!.email}');
-        // Restore session by calling login (which will connect to Firestore document)
+        // Restore session by checking Firestore document
         final email = auth.currentUser!.email;
-        if (email != null) {
-          // We need to get the password from somewhere or skip password check
-          // For now, just set authenticated state based on Firestore document
+        if (email != null && email.toLowerCase() == 'chiyagadi@gmail.com') {
+          // This is admin - restore session
           try {
             final dbProvider = context.read<UnifiedDatabaseProvider>();
+            // Init won't throw - it handles errors internally
             await dbProvider.init();
             
-            // Check for admin document ID: dSc8mQzHPsftOpqb200d7xPhS7K2
-            const adminDocumentId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
-            final adminUsers = await dbProvider.query(
-              'users',
-              where: 'documentId = ?',
-              whereArgs: [adminDocumentId],
-            );
-            
-            if (adminUsers.isNotEmpty) {
-              final adminUser = adminUsers.first;
-              final adminEmail = adminUser['email'] as String?;
+            // Only restore if database is available
+            if (dbProvider.isAvailable) {
+              // Check for admin document ID: dSc8mQzHPsftOpqb200d7xPhS7K2
+              const adminDocumentId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
+              final adminUsers = await dbProvider.query(
+                'users',
+                where: 'documentId = ?',
+                whereArgs: [adminDocumentId],
+              );
               
-              if (adminEmail?.toLowerCase() == email.toLowerCase()) {
-                authProvider.setContext(context);
-                // Manually set authenticated state
-                // Note: This bypasses password check, but user is already authenticated via Firebase Auth
-                debugPrint('AuthWrapper: Restoring admin session for $email');
-                // We'll let the AuthProvider handle this through its login method
-                // For now, just ensure context is set
+              if (adminUsers.isNotEmpty) {
+                final adminUser = adminUsers.first;
+                final adminEmail = adminUser['email'] as String?;
+                
+                if (adminEmail?.toLowerCase() == email.toLowerCase()) {
+                  authProvider.setContext(context);
+                  // Manually set authenticated state since Firebase Auth already verified
+                  debugPrint('AuthWrapper: Restoring admin session for $email');
+                  // Note: We can't directly set auth state here, but login will handle it
+                }
+              } else {
+                // Admin document doesn't exist but Firebase Auth succeeded
+                // Login will create it
+                debugPrint('AuthWrapper: Admin document not found, will be created on login');
               }
+            } else {
+              debugPrint('AuthWrapper: Database not available, cannot restore session');
             }
           } catch (e) {
             debugPrint('AuthWrapper: Error restoring session: $e');
+            // Don't rethrow - app should continue
           }
         }
       }
