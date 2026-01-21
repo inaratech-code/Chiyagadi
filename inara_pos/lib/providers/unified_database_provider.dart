@@ -52,6 +52,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     try {
       // Ensure Firebase is initialized before any Firestore access (web).
       if (kIsWeb) {
+        // Step 1: Initialize Firebase App (required for Firestore)
         try {
           if (Firebase.apps.isEmpty) {
             try {
@@ -75,7 +76,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
               }
               
               await Firebase.initializeApp(options: options);
-              debugPrint('UnifiedDatabase: Firebase initialized (web)');
+              debugPrint('UnifiedDatabase: Firebase App initialized (web)');
               
               // iOS Safari: Wait a bit longer to ensure Firebase is fully ready
               if (defaultTargetPlatform == TargetPlatform.iOS) {
@@ -83,130 +84,85 @@ class UnifiedDatabaseProvider with ChangeNotifier {
                 debugPrint('UnifiedDatabase: iOS Safari delay applied');
               }
             } catch (initError) {
-              debugPrint('UnifiedDatabase: Failed to initialize Firebase: $initError');
-              throw StateError('Failed to initialize Firebase: $initError');
+              debugPrint('UnifiedDatabase: Failed to initialize Firebase App: $initError');
+              throw StateError('Failed to initialize Firebase App: $initError');
             }
           } else {
-            debugPrint('UnifiedDatabase: Firebase already initialized');
-          }
-          
-          // Additional delay for iOS Safari before accessing Firestore
-          if (kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-            await Future.delayed(const Duration(milliseconds: 200));
-          }
-
-          // IMPORTANT: Sign in with Firebase Auth using admin email/password
-          // This satisfies Firestore rules that require `request.auth != null`
-          // Admin credentials: chiyagadi@gmail.com / Chiyagadi15@
-          // NOTE: We wrap this in try-catch to avoid minified JS type errors
-          // If Firebase Auth fails completely, we'll skip it and try Firestore anyway
-          bool authSkipped = false;
-          try {
-            // Defensive access to FirebaseAuth - avoid type checking in minified JS
-            dynamic authInstance;
-            try {
-              authInstance = FirebaseAuth.instance;
-            } catch (e) {
-              debugPrint('UnifiedDatabase: Error getting FirebaseAuth.instance: $e');
-              // If we can't even get the instance, skip auth entirely
-              authSkipped = true;
-              debugPrint('UnifiedDatabase: Skipping Firebase Auth - continuing with Firestore init');
-            }
-            
-            if (!authSkipped && authInstance != null) {
-              // Check if already signed in - use defensive access
-              dynamic currentUser;
-              try {
-                currentUser = authInstance.currentUser;
-              } catch (e) {
-                debugPrint('UnifiedDatabase: Error checking Firebase Auth: $e');
-                // If checking currentUser fails with minified JS error, skip auth
-                if (e.toString().contains('minified') || e.toString().contains('TypeError')) {
-                  authSkipped = true;
-                  debugPrint('UnifiedDatabase: Minified JS error in Auth check - skipping Auth');
-                } else {
-                  currentUser = null;
-                }
-              }
-              
-              if (!authSkipped && currentUser == null) {
-                // Sign in with admin Firebase Auth credentials
-                try {
-                  await authInstance.signInWithEmailAndPassword(
-                    email: 'chiyagadi@gmail.com',
-                    password: 'Chiyagadi15@',
-                  );
-                  debugPrint('UnifiedDatabase: Firebase Auth email/password sign-in ok');
-                } catch (signInError) {
-                  debugPrint('UnifiedDatabase: Firebase Auth sign-in failed: $signInError');
-                  final errorMsg = signInError.toString();
-                  
-                  // If it's a minified JS error, skip auth entirely
-                  if (errorMsg.contains('minified') || errorMsg.contains('TypeError')) {
-                    authSkipped = true;
-                    debugPrint('UnifiedDatabase: Minified JS error in Auth sign-in - skipping Auth');
-                  } else if (errorMsg.contains('user-not-found') || 
-                      errorMsg.contains('wrong-password') ||
-                      errorMsg.contains('invalid-email')) {
-                    debugPrint('UnifiedDatabase: Admin Firebase Auth user not found or invalid credentials');
-                    debugPrint('UnifiedDatabase: Please ensure admin user exists in Firebase Console');
-                    // Continue - Firestore may still work if rules are public
-                    debugPrint('UnifiedDatabase: Continuing without Firebase Auth (rules may be public)');
-                  } else {
-                    // Continue - Firestore may still work if rules are public
-                    debugPrint('UnifiedDatabase: Continuing without Firebase Auth (rules may be public)');
-                  }
-                }
-              } else if (!authSkipped) {
-                try {
-                  final email = currentUser.email;
-                  debugPrint('UnifiedDatabase: Firebase Auth already signed in as $email');
-                } catch (e) {
-                  debugPrint('UnifiedDatabase: Firebase Auth already signed in (could not get email)');
-                }
-              }
-            }
-          } catch (authError) {
-            final authErrorMsg = authError.toString();
-            debugPrint('UnifiedDatabase: Firebase Auth error: $authError');
-            
-            // If it's a minified JS error or null check, skip auth entirely
-            if (authErrorMsg.contains('minified') || 
-                authErrorMsg.contains('TypeError') ||
-                authErrorMsg.contains('Null check operator') ||
-                authErrorMsg.contains('null value')) {
-              authSkipped = true;
-              debugPrint('UnifiedDatabase: Critical Auth error - skipping Auth completely');
-            }
-            
-            // Continue - Firestore may still work if rules are public
-            debugPrint('UnifiedDatabase: Continuing without Firebase Auth (rules may be public)');
-          }
-          
-          if (authSkipped) {
-            debugPrint('UnifiedDatabase: Firebase Auth skipped due to errors - proceeding with Firestore only');
+            debugPrint('UnifiedDatabase: Firebase App already initialized');
           }
         } catch (e) {
           final errorMsg = e.toString();
-          debugPrint('UnifiedDatabase: Firebase init error (web): $e');
-          
-          // Don't fail initialization if it's a Firebase Auth error, minified JS error, or null check
-          // Firestore may still work even if Auth fails
-          if (errorMsg.contains('Firebase Auth') || 
-              errorMsg.contains('minified') ||
-              errorMsg.contains('TypeError') ||
-              errorMsg.contains('Null check operator') ||
-              errorMsg.contains('null value')) {
-            debugPrint('UnifiedDatabase: Firebase Auth/null check error detected, continuing with Firestore init');
-            debugPrint('UnifiedDatabase: Skipping Firebase Auth - Firestore will initialize without Auth');
-            // Continue - don't rethrow Auth/null check errors
-            // These are often transient or can be worked around
-          } else {
-            // For other critical errors (like Firebase app initialization failures), still rethrow
-            debugPrint('UnifiedDatabase: Critical Firebase error (not Auth-related), rethrowing');
-            rethrow;
-          }
+          debugPrint('UnifiedDatabase: Firebase App initialization error: $e');
+          // If Firebase App initialization fails, we can't continue
+          throw StateError('Firebase App initialization failed: $e');
         }
+        
+        // Additional delay for iOS Safari before accessing Firestore
+        if (kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+          await Future.delayed(const Duration(milliseconds: 200));
+        }
+
+        // Step 2: Try Firebase Auth (OPTIONAL - Firestore can work without it)
+        // This is wrapped in a separate try-catch so it doesn't block Firestore initialization
+        try {
+          // Defensive access to FirebaseAuth - avoid type checking in minified JS
+          dynamic authInstance;
+          try {
+            authInstance = FirebaseAuth.instance;
+          } catch (e) {
+            debugPrint('UnifiedDatabase: Error getting FirebaseAuth.instance: $e');
+            debugPrint('UnifiedDatabase: Skipping Firebase Auth - Firestore will work without Auth');
+            // Don't throw - continue to Firestore initialization
+          }
+          
+          if (authInstance != null) {
+            // Check if already signed in - use defensive access
+            dynamic currentUser;
+            try {
+              currentUser = authInstance.currentUser;
+            } catch (e) {
+              debugPrint('UnifiedDatabase: Error checking Firebase Auth: $e');
+              // If checking currentUser fails, skip auth but continue
+              currentUser = null;
+            }
+            
+            if (currentUser == null) {
+              // Sign in with admin Firebase Auth credentials
+              try {
+                await authInstance.signInWithEmailAndPassword(
+                  email: 'chiyagadi@gmail.com',
+                  password: 'Chiyagadi15@',
+                );
+                debugPrint('UnifiedDatabase: Firebase Auth email/password sign-in ok');
+              } catch (signInError) {
+                debugPrint('UnifiedDatabase: Firebase Auth sign-in failed: $signInError');
+                final errorMsg = signInError.toString();
+                
+                if (errorMsg.contains('user-not-found') || 
+                    errorMsg.contains('wrong-password') ||
+                    errorMsg.contains('invalid-email')) {
+                  debugPrint('UnifiedDatabase: Admin Firebase Auth user not found or invalid credentials');
+                  debugPrint('UnifiedDatabase: Firestore will work if rules allow public access');
+                }
+                // Don't throw - continue to Firestore initialization
+              }
+            } else {
+              try {
+                final email = currentUser.email;
+                debugPrint('UnifiedDatabase: Firebase Auth already signed in as $email');
+              } catch (e) {
+                debugPrint('UnifiedDatabase: Firebase Auth already signed in (could not get email)');
+              }
+            }
+          }
+        } catch (authError) {
+          final authErrorMsg = authError.toString();
+          debugPrint('UnifiedDatabase: Firebase Auth error (non-critical): $authError');
+          debugPrint('UnifiedDatabase: Continuing without Firebase Auth - Firestore will initialize anyway');
+          // Don't throw - Auth is optional, Firestore can work without it
+        }
+        
+        debugPrint('UnifiedDatabase: Firebase App initialized, proceeding to Firestore initialization');
       }
 
       // Try to initialize the provider (Firestore or SQLite)
