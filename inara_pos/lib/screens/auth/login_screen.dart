@@ -129,7 +129,14 @@ class _LoginScreenState extends State<LoginScreen>
         );
       } else {
         setState(() {
-          _errorMessage = 'Invalid email or password. Please try again.';
+          _errorMessage = 'Invalid email or password. Please try again.\n\n'
+              'Current credentials:\n'
+              'Email: chiyagadi@gmail.com\n'
+              'Password: Chiyagadi15@\n\n'
+              'Please ensure:\n'
+              '1. Firebase Auth user exists in Firebase Console\n'
+              '2. Email/Password sign-in is enabled\n'
+              '3. Check browser console (F12) for detailed errors';
           _isLoading = false;
         });
       }

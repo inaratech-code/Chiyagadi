@@ -471,10 +471,25 @@ class InaraAuthProvider with ChangeNotifier {
       
     } on FirebaseAuthException catch (e) {
       debugPrint('Login: Firebase Auth error: ${e.code} - ${e.message}');
+      debugPrint('Login: Attempted email: ${email.trim().toLowerCase()}');
+      debugPrint('Login: Password length: ${password.length}');
+      
+      // Provide more specific error information
+      if (e.code == 'user-not-found') {
+        debugPrint('Login: CRITICAL - Firebase Auth user does not exist!');
+        debugPrint('Login: Please create user in Firebase Console:');
+        debugPrint('Login:   Email: chiyagadi@gmail.com');
+        debugPrint('Login:   Password: Chiyagadi15@');
+      } else if (e.code == 'wrong-password') {
+        debugPrint('Login: Password is incorrect');
+        debugPrint('Login: Expected password: Chiyagadi15@');
+      }
+      
       return false;
     } catch (e, stackTrace) {
       debugPrint('Login: Error during login: $e');
       debugPrint('Login: Stack trace: $stackTrace');
+      debugPrint('Login: Attempted email: ${email.trim().toLowerCase()}');
       return false;
     }
   }
