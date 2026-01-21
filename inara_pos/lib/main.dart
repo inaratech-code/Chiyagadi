@@ -91,11 +91,11 @@ class _WarmStartState extends State<_WarmStart> {
         // Add admin user with specific document ID if on web
         if (kIsWeb) {
           final authProvider = context.read<InaraAuthProvider>();
-          // Add admin user with document ID: cruFy4iy9kMP136d8H99DrBjBbG3
+          // Add admin user with document ID: dSc8mQzHPsftOpqb200d7xPhS7K2
           await addAdminUserWithId(
             dbProvider,
             authProvider,
-            'cruFy4iy9kMP136d8H99DrBjBbG3',
+            'dSc8mQzHPsftOpqb200d7xPhS7K2',
             username: 'admin',
             pin: 'Chiyagadi15@', // Admin password
             email: 'chiyagadi@gmail.com', // Admin email
@@ -182,7 +182,7 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
             final dbProvider = context.read<UnifiedDatabaseProvider>();
             await dbProvider.init();
             
-            const adminDocumentId = 'cruFy4iy9kMP136d8H99DrBjBbG3';
+            const adminDocumentId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
             final adminUsers = await dbProvider.query(
               'users',
               where: 'documentId = ?',

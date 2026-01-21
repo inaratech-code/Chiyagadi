@@ -263,7 +263,7 @@ class InaraAuthProvider with ChangeNotifier {
   }
 
   /// Login using Firebase Authentication
-  /// Connects to Firestore document with ID cruFy4iy9kMP136d8H99DrBjBbG3 for admin
+  /// Connects to Firestore document with ID dSc8mQzHPsftOpqb200d7xPhS7K2 for admin
   Future<bool> login(String email, String password) async {
     if (email.isEmpty || password.isEmpty) {
       debugPrint('Login: Email and password are required');
@@ -291,8 +291,8 @@ class InaraAuthProvider with ChangeNotifier {
       final dbProvider = _getDatabaseProvider();
       await dbProvider.init();
       
-      // Connect to Firestore document with ID cruFy4iy9kMP136d8H99DrBjBbG3 for admin
-      const adminDocumentId = 'cruFy4iy9kMP136d8H99DrBjBbG3';
+      // Connect to Firestore document with ID dSc8mQzHPsftOpqb200d7xPhS7K2 for admin
+      const adminDocumentId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
       
       // Try to find admin user by document ID first
       try {
