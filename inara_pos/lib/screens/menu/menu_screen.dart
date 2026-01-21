@@ -1828,7 +1828,20 @@ class _MenuScreenState extends State<MenuScreen> {
 
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-        await dbProvider.insert('products', {
+        // Check if database is available
+        if (!dbProvider.isAvailable) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Database not available. Please check Firebase connection.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+        
+        final productId = await dbProvider.insert('products', {
           'category_id': selectedCategoryId,
           'name': newName,
           'description': descController.text.trim().isEmpty
@@ -1844,6 +1857,20 @@ class _MenuScreenState extends State<MenuScreen> {
           'created_at': now,
           'updated_at': now,
         });
+        
+        if (productId == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Failed to add product. Database may not be available.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+        
+        debugPrint('MenuScreen: Product added with ID: $productId');
         await _loadData(); // Await to ensure data is loaded
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
