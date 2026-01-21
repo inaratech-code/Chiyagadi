@@ -27,7 +27,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     debugPrint('UnifiedDatabase: Force re-initialization requested');
     _initFailed = false;
     _isInitialized = false;
-    await init();
+    await init(forceRetry: true);
   }
 
   Future<void> init({bool forceRetry = false}) async {
