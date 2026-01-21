@@ -643,11 +643,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (confirm == true) {
       authProvider.logout();
-      // No need to push a named route (we don't have '/' in routes).
-      // AuthWrapper will automatically show LoginScreen when auth changes.
-      // Still, pop back to the first route in case we're on a pushed page.
+      // Reset navigation to root so AuthWrapper shows LoginScreen.
       if (context.mounted) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/',
+          (route) => false,
+        );
       }
     }
   }

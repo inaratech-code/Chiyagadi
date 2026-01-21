@@ -245,7 +245,11 @@ class _LoginScreenState extends State<LoginScreen>
             final loginSuccess =
                 await authProvider.login(identifier, _pinController.text);
             if (loginSuccess && mounted) {
-              Navigator.of(context).pushReplacementNamed('/home');
+              // Go back to root so AuthWrapper can show HomeScreen.
+              Navigator.of(context).pushNamedAndRemoveUntil(
+                '/',
+                (route) => false,
+              );
             } else {
               setState(() {
                 _errorMessage =
@@ -272,7 +276,11 @@ class _LoginScreenState extends State<LoginScreen>
         final success =
             await authProvider.login(identifier, _pinController.text);
         if (success && mounted) {
-          Navigator.of(context).pushReplacementNamed('/home');
+          // Go back to root so AuthWrapper can show HomeScreen.
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            '/',
+            (route) => false,
+          );
         } else {
           setState(() {
             _errorMessage = 'Invalid username/email or password. Please try again.';
