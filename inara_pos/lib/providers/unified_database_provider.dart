@@ -45,10 +45,26 @@ class UnifiedDatabaseProvider with ChangeNotifier {
             if (auth.currentUser == null) {
               await auth.signInAnonymously();
               debugPrint('UnifiedDatabase: Firebase Auth anonymous sign-in ok');
+            } else {
+              debugPrint('UnifiedDatabase: Firebase Auth already signed in');
             }
-          } catch (e) {
-            debugPrint('UnifiedDatabase: Firebase Auth sign-in failed (web): $e');
-            // Continue; Firestore may still work if rules are public.
+          } catch (authError) {
+            final errorMsg = authError.toString();
+            debugPrint('UnifiedDatabase: Firebase Auth sign-in failed (web): $authError');
+            // If Anonymous auth is not enabled, this will fail with a specific error
+            if (errorMsg.contains('OPERATION_NOT_ALLOWED') || 
+                errorMsg.contains('anonymous') ||
+                errorMsg.contains('not enabled')) {
+              throw Exception(
+                'Firebase Anonymous Authentication is not enabled.\n\n'
+                'Please enable it in Firebase Console:\n'
+                '1. Go to Firebase Console → Authentication → Sign-in method\n'
+                '2. Enable "Anonymous" provider\n'
+                '3. Save and refresh the app'
+              );
+            }
+            // For other auth errors, continue - Firestore may still work if rules are public
+            debugPrint('UnifiedDatabase: Continuing without Firebase Auth (rules may be public)');
           }
         } catch (e) {
           debugPrint('UnifiedDatabase: Firebase init failed (web): $e');

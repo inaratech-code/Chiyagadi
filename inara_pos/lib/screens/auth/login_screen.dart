@@ -183,16 +183,35 @@ class _LoginScreenState extends State<LoginScreen>
                   'Database initialization failed after $maxRetries attempts.\n\n';
 
               // Provide helpful error messages based on error type
-              if (lastError.contains('permission') ||
+              if (lastError.contains('Anonymous Authentication') ||
+                  lastError.contains('OPERATION_NOT_ALLOWED') ||
+                  lastError.contains('not enabled')) {
+                errorDetails +=
+                    'Error: Firebase Anonymous Authentication is not enabled.\n\n';
+                errorDetails += 'Solution:\n';
+                errorDetails +=
+                    '1. Go to Firebase Console → Authentication → Sign-in method\n';
+                errorDetails +=
+                    '2. Enable "Anonymous" provider\n';
+                errorDetails += '3. Save and refresh the app';
+              } else if (lastError.contains('permission') ||
                   lastError.contains('PERMISSION_DENIED')) {
                 errorDetails +=
                     'Error: Firestore security rules are blocking access.\n\n';
+                errorDetails += 'Your rules require authentication (request.auth != null).\n\n';
                 errorDetails += 'Solution:\n';
+                errorDetails +=
+                    '1. Go to Firebase Console → Authentication → Sign-in method\n';
+                errorDetails +=
+                    '2. Enable "Anonymous" provider\n';
+                errorDetails += '3. Save and refresh the app\n\n';
+                errorDetails +=
+                    'OR if you want public access (less secure):\n';
                 errorDetails +=
                     '1. Go to Firebase Console → Firestore Database → Rules\n';
                 errorDetails +=
                     '2. Set rules to: allow read, write: if true;\n';
-                errorDetails += '3. Click "Publish" (not just Save)';
+                errorDetails += '3. Click "Publish"';
               } else if (lastError.contains('not enabled') ||
                   lastError.contains('database')) {
                 errorDetails += 'Error: Firestore Database is not enabled.\n\n';
