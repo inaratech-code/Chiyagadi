@@ -279,6 +279,54 @@ class AuthProvider with ChangeNotifier {
       final pinHash = _hashPin(pin);
       debugPrint('Login: PIN hashed');
 
+      // For admin login on web, first try to find by the specific admin document ID
+      if (kIsWeb) {
+        const adminDocumentId = 'cruFy4iy9kMP136d8H99DrBjBbG3';
+        try {
+          final adminUsers = await dbProvider.query(
+            'users',
+            where: 'documentId = ?',
+            whereArgs: [adminDocumentId],
+          );
+          if (adminUsers.isNotEmpty) {
+            final adminUser = adminUsers.first;
+            final adminUsername = adminUser['username'] as String?;
+            final adminEmail = adminUser['email'] as String?;
+            final adminPinHash = adminUser['pin_hash'] as String?;
+            
+            // Check if credentials match (username or email)
+            if ((adminUsername == username || adminEmail == username) &&
+                adminPinHash == pinHash) {
+              debugPrint('Login: Admin user found with document ID: $adminDocumentId');
+              final isActive = (adminUser['is_active'] as num?)?.toInt();
+              if (isActive != null && isActive == 0) {
+                debugPrint('Login: Admin user is disabled');
+                return false;
+              }
+              
+              _isAuthenticated = true;
+              _currentUserId = adminDocumentId;
+              _currentUserRole = 'admin';
+              _currentUsername = adminUser['username'] as String;
+              
+              debugPrint(
+                  'Login: Success! Admin authenticated with document ID: $_currentUserId');
+              if (_lockMode == 'timeout') {
+                _resetInactivityTimer();
+              } else {
+                _inactivityTimer?.cancel();
+                _inactivityTimer = null;
+              }
+              notifyListeners();
+              return true;
+            }
+          }
+        } catch (e) {
+          debugPrint('Login: Error checking admin document ID: $e');
+          // Fall through to regular login flow
+        }
+      }
+
       // First, let's check all users to debug
       final allUsers = await dbProvider.query('users');
       debugPrint('Login: Total users in database: ${allUsers.length}');
@@ -315,9 +363,58 @@ class AuthProvider with ChangeNotifier {
           debugPrint('Login: User is disabled');
           return false;
         }
+        
+        // For admin users, ensure we use the correct document ID
+        final userRole = user['role'] as String?;
+        final userId = user['id'].toString();
+        
+        // If this is an admin user and we're on web, verify/use the admin document ID
+        if (kIsWeb && userRole == 'admin') {
+          const adminDocumentId = 'cruFy4iy9kMP136d8H99DrBjBbG3';
+          // If the user document ID doesn't match, try to find the admin by document ID
+          if (userId != adminDocumentId) {
+            debugPrint('Login: Admin user found but ID mismatch. Looking for admin document...');
+            try {
+              final adminUsers = await dbProvider.query(
+                'users',
+                where: 'documentId = ?',
+                whereArgs: [adminDocumentId],
+              );
+              if (adminUsers.isNotEmpty) {
+                final adminUser = adminUsers.first;
+                final adminUsername = adminUser['username'] as String?;
+                final adminEmail = adminUser['email'] as String?;
+                // Verify this is the same user (by username or email)
+                if ((adminUsername == username || adminEmail == username) &&
+                    (adminUser['pin_hash'] as String?) == pinHash) {
+                  debugPrint('Login: Found admin user with correct document ID: $adminDocumentId');
+                  _isAuthenticated = true;
+                  _currentUserId = adminDocumentId;
+                  _currentUserRole = 'admin';
+                  _currentUsername = adminUser['username'] as String;
+                  
+                  debugPrint(
+                      'Login: Success! Admin authenticated with document ID: $_currentUserId');
+                  if (_lockMode == 'timeout') {
+                    _resetInactivityTimer();
+                  } else {
+                    _inactivityTimer?.cancel();
+                    _inactivityTimer = null;
+                  }
+                  notifyListeners();
+                  return true;
+                }
+              }
+            } catch (e) {
+              debugPrint('Login: Error looking up admin document: $e');
+              // Fall through to use the found user
+            }
+          }
+        }
+        
         _isAuthenticated = true;
-        _currentUserId = user['id'].toString();
-        _currentUserRole = user['role'] as String;
+        _currentUserId = userId;
+        _currentUserRole = userRole ?? 'cashier';
         _currentUsername = user['username'] as String;
 
         debugPrint(
