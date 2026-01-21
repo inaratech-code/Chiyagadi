@@ -455,12 +455,17 @@ class AuthProvider with ChangeNotifier {
   }
 
   // Create new user (admin only)
-  Future<bool> createUser(String username, String pin, String role) async {
+  Future<bool> createUser(String username, String pin, String role, {String? email}) async {
     if (!_isValidPassword(pin)) {
       return false;
     }
 
     if (username.isEmpty || (role != 'admin' && role != 'cashier')) {
+      return false;
+    }
+
+    // Email is required only for admin role
+    if (role == 'admin' && (email == null || email.trim().isEmpty)) {
       return false;
     }
 
@@ -481,10 +486,12 @@ class AuthProvider with ChangeNotifier {
 
       final pinHash = _hashPin(pin);
       final now = DateTime.now().millisecondsSinceEpoch;
+      final normalizedEmail = (email != null && email.trim().isNotEmpty) ? email.trim() : null;
 
       await dbProvider.insert('users', {
         'username': username,
         'pin_hash': pinHash,
+        if (normalizedEmail != null) 'email': normalizedEmail,
         'role': role,
         'is_active': 1,
         'created_at': now,

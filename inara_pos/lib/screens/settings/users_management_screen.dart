@@ -58,6 +58,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
   Future<void> _showAddUserDialog() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final usernameController = TextEditingController();
+    final emailController = TextEditingController();
     final pinController = TextEditingController();
     final confirmPinController = TextEditingController();
     String selectedRole = 'cashier';
@@ -98,6 +99,19 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                     }
                   },
                 ),
+                // Email field - only shown and required for admin role
+                if (selectedRole == 'admin') ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Email *',
+                      border: OutlineInputBorder(),
+                      helperText: 'Required for admin users',
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 TextField(
                   controller: pinController,
@@ -152,6 +166,7 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
     if (result != true) return;
 
     final username = usernameController.text.trim();
+    final email = emailController.text.trim();
     final pin = pinController.text.trim();
     final confirm = confirmPinController.text.trim();
 
@@ -162,6 +177,16 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
       }
       return;
     }
+    
+    // Email is required only for admin role
+    if (selectedRole == 'admin' && email.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Email is required for admin users')));
+      }
+      return;
+    }
+    
     // Validate password: 4-20 characters
     if (pin.length < 4 || pin.length > 20) {
       if (mounted) {
@@ -178,7 +203,12 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
       return;
     }
 
-    final ok = await auth.createUser(username, pin, selectedRole);
+    final ok = await auth.createUser(
+      username,
+      pin,
+      selectedRole,
+      email: selectedRole == 'admin' ? email : null,
+    );
     if (!mounted) return;
     if (ok) {
       ScaffoldMessenger.of(context).showSnackBar(
