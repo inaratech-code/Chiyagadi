@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import '../../providers/auth_provider.dart' show InaraAuthProvider;
+import '../../providers/auth_provider.dart' show InaraInaraAuthProvider;
 import '../../providers/unified_database_provider.dart';
 import '../../services/inventory_ledger_service.dart';
 import '../../widgets/responsive_wrapper.dart';
@@ -266,7 +266,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
+    final authProvider = Provider.of<InaraAuthProvider>(context);
     final width = MediaQuery.of(context).size.width;
     final horizontalPadding = width < 380 ? 14.0 : 16.0;
 
@@ -305,7 +305,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  List<Widget> _buildContent(BuildContext context, AuthProvider authProvider) {
+  List<Widget> _buildContent(BuildContext context, InaraAuthProvider authProvider) {
     if (_isLoading) {
       return _buildLoadingContent();
     }
@@ -795,7 +795,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildQuickAccessTiles(
-      BuildContext context, AuthProvider authProvider) {
+      BuildContext context, InaraAuthProvider authProvider) {
     // Reordered by daily usage: Orders, Menu, Inventory, Customers, Reports, Purchases
     // Map labels to navigation indices in HomeScreen
     final Map<String, int> navigationMap = {

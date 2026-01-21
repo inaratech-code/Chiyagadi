@@ -630,7 +630,7 @@ class _LoginScreenState extends State<LoginScreen>
 
                                                                   // Refresh first-time check
                                                                   final authProvider = Provider.of<
-                                                                          AuthProvider>(
+                                                                          InaraAuthProvider>(
                                                                       context,
                                                                       listen:
                                                                           false);

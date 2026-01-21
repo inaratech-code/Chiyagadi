@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/unified_database_provider.dart';
-import '../../providers/auth_provider.dart' show InaraInaraAuthProvider;
+import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../services/inventory_ledger_service.dart';
 import '../../models/product.dart';
 import '../../models/inventory_ledger_model.dart';

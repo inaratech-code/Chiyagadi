@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/unified_database_provider.dart';
-import '../providers/auth_provider.dart' show InaraInaraAuthProvider;
+import '../providers/auth_provider.dart' show InaraAuthProvider;
 import '../models/purchase_model.dart';
 import '../models/purchase_item_model.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;

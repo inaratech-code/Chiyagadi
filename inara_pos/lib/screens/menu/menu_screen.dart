@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../providers/unified_database_provider.dart';
-import '../../providers/auth_provider.dart' show InaraInaraAuthProvider;
+import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../models/category.dart';
 import '../../models/product.dart';
 import '../../services/order_service.dart';
