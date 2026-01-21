@@ -52,13 +52,40 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     try {
       // Ensure Firebase is initialized before any Firestore access (web).
       if (kIsWeb) {
+        // Wait a moment to ensure browser environment is fully ready
+        // This helps avoid null check errors from accessing Firebase too early
+        await Future.delayed(const Duration(milliseconds: 100));
+        
         // Step 1: Initialize Firebase App (required for Firestore)
         // Use defensive programming to handle null check errors
         try {
           // Check if Firebase is already initialized using a safe method
           bool firebaseInitialized = false;
           try {
-            firebaseInitialized = Firebase.apps.isNotEmpty;
+            // Use dynamic access to avoid type checking issues
+            dynamic firebaseApps;
+            try {
+              firebaseApps = Firebase.apps;
+            } catch (e) {
+              debugPrint('UnifiedDatabase: Error accessing Firebase.apps: $e');
+              // Wait a bit longer and try again
+              await Future.delayed(const Duration(milliseconds: 200));
+              try {
+                firebaseApps = Firebase.apps;
+              } catch (e2) {
+                debugPrint('UnifiedDatabase: Error accessing Firebase.apps on retry: $e2');
+                firebaseInitialized = false;
+              }
+            }
+            
+            if (firebaseApps != null) {
+              try {
+                firebaseInitialized = (firebaseApps as dynamic).isNotEmpty;
+              } catch (e) {
+                debugPrint('UnifiedDatabase: Error checking Firebase.apps.isNotEmpty: $e');
+                firebaseInitialized = false;
+              }
+            }
           } catch (e) {
             debugPrint('UnifiedDatabase: Error checking Firebase apps: $e');
             // If checking fails, assume not initialized and try to initialize
