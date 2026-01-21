@@ -75,34 +75,59 @@ class UnifiedDatabaseProvider with ChangeNotifier {
           // IMPORTANT: Sign in with Firebase Auth using admin email/password
           // This satisfies Firestore rules that require `request.auth != null`
           // Admin credentials: chiyagadi@gmail.com / Chiyagadi15@
+          // NOTE: We wrap this in try-catch to avoid minified JS type errors
           try {
-            final auth = FirebaseAuth.instance;
-            if (auth == null) {
-              debugPrint('UnifiedDatabase: FirebaseAuth.instance is null, skipping auth');
-            } else if (auth.currentUser == null) {
-              // Sign in with admin Firebase Auth credentials
+            // Defensive access to FirebaseAuth - avoid type checking in minified JS
+            dynamic authInstance;
+            try {
+              authInstance = FirebaseAuth.instance;
+            } catch (e) {
+              debugPrint('UnifiedDatabase: Error getting FirebaseAuth.instance: $e');
+              // Continue without auth - Firestore may still work if rules are public
+              debugPrint('UnifiedDatabase: Continuing without Firebase Auth');
+            }
+            
+            if (authInstance != null) {
+              // Check if already signed in - use defensive access
+              dynamic currentUser;
               try {
-                await auth.signInWithEmailAndPassword(
-                  email: 'chiyagadi@gmail.com',
-                  password: 'Chiyagadi15@',
-                );
-                debugPrint('UnifiedDatabase: Firebase Auth email/password sign-in ok');
-              } catch (signInError) {
-                debugPrint('UnifiedDatabase: Firebase Auth sign-in failed: $signInError');
-                // If email/password auth fails, try to continue (rules may be public)
-                // But log the error for debugging
-                final errorMsg = signInError.toString();
-                if (errorMsg.contains('user-not-found') || 
-                    errorMsg.contains('wrong-password') ||
-                    errorMsg.contains('invalid-email')) {
-                  debugPrint('UnifiedDatabase: Admin Firebase Auth user not found or invalid credentials');
-                  debugPrint('UnifiedDatabase: Please ensure admin user exists in Firebase Console');
-                }
-                // Continue - Firestore may still work if rules are public
-                debugPrint('UnifiedDatabase: Continuing without Firebase Auth (rules may be public)');
+                currentUser = authInstance.currentUser;
+              } catch (e) {
+                debugPrint('UnifiedDatabase: Error checking Firebase Auth: $e');
+                // If checking currentUser fails, try to sign in anyway
+                currentUser = null;
               }
-            } else {
-              debugPrint('UnifiedDatabase: Firebase Auth already signed in as ${auth.currentUser?.email}');
+              
+              if (currentUser == null) {
+                // Sign in with admin Firebase Auth credentials
+                try {
+                  await authInstance.signInWithEmailAndPassword(
+                    email: 'chiyagadi@gmail.com',
+                    password: 'Chiyagadi15@',
+                  );
+                  debugPrint('UnifiedDatabase: Firebase Auth email/password sign-in ok');
+                } catch (signInError) {
+                  debugPrint('UnifiedDatabase: Firebase Auth sign-in failed: $signInError');
+                  // If email/password auth fails, try to continue (rules may be public)
+                  // But log the error for debugging
+                  final errorMsg = signInError.toString();
+                  if (errorMsg.contains('user-not-found') || 
+                      errorMsg.contains('wrong-password') ||
+                      errorMsg.contains('invalid-email')) {
+                    debugPrint('UnifiedDatabase: Admin Firebase Auth user not found or invalid credentials');
+                    debugPrint('UnifiedDatabase: Please ensure admin user exists in Firebase Console');
+                  }
+                  // Continue - Firestore may still work if rules are public
+                  debugPrint('UnifiedDatabase: Continuing without Firebase Auth (rules may be public)');
+                }
+              } else {
+                try {
+                  final email = currentUser.email;
+                  debugPrint('UnifiedDatabase: Firebase Auth already signed in as $email');
+                } catch (e) {
+                  debugPrint('UnifiedDatabase: Firebase Auth already signed in (could not get email)');
+                }
+              }
             }
           } catch (authError) {
             debugPrint('UnifiedDatabase: Firebase Auth error: $authError');
@@ -110,8 +135,21 @@ class UnifiedDatabaseProvider with ChangeNotifier {
             debugPrint('UnifiedDatabase: Continuing without Firebase Auth (rules may be public)');
           }
         } catch (e) {
-          debugPrint('UnifiedDatabase: Firebase init failed (web): $e');
-          rethrow;
+          final errorMsg = e.toString();
+          debugPrint('UnifiedDatabase: Firebase init error (web): $e');
+          
+          // Don't fail initialization if it's just a Firebase Auth error
+          // Firestore may still work even if Auth fails
+          if (errorMsg.contains('Firebase Auth') || 
+              errorMsg.contains('minified') ||
+              errorMsg.contains('TypeError')) {
+            debugPrint('UnifiedDatabase: Firebase Auth error detected, continuing with Firestore init');
+            // Continue - don't rethrow Auth errors
+          } else {
+            // For other errors (like Firebase initialization failures), still rethrow
+            debugPrint('UnifiedDatabase: Critical Firebase error, rethrowing');
+            rethrow;
+          }
         }
       }
 
