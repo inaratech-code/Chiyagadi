@@ -465,46 +465,52 @@ class _MenuScreenState extends State<MenuScreen> {
       if (!dbProvider.isAvailable) {
         debugPrint('MenuScreen: Database not available, attempting to force reinitialize...');
         
-        // Try to force reinitialize
-        try {
-          await dbProvider.forceInit();
-          
-          // Check again after retry
-          if (!dbProvider.isAvailable) {
-            debugPrint('MenuScreen: Database still not available after retry');
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Database not available. Tap to retry connection.'),
-                  backgroundColor: Colors.orange,
-                  duration: const Duration(seconds: 5),
-                  action: SnackBarAction(
-                    label: 'Retry',
-                    textColor: Colors.white,
-                    onPressed: () {
-                      _loadData(); // Retry loading
-                    },
-                  ),
-                ),
-              );
+        // Try to force reinitialize with multiple attempts
+        bool initSuccess = false;
+        for (int attempt = 1; attempt <= 3; attempt++) {
+          try {
+            debugPrint('MenuScreen: Force init attempt $attempt/3...');
+            await dbProvider.forceInit();
+            
+            // Wait a moment for initialization to complete
+            await Future.delayed(const Duration(milliseconds: 500));
+            
+            // Check again after retry
+            if (dbProvider.isAvailable) {
+              debugPrint('MenuScreen: Database available after force reinitialize (attempt $attempt)');
+              initSuccess = true;
+              break;
+            } else {
+              debugPrint('MenuScreen: Database still not available after attempt $attempt');
+              if (attempt < 3) {
+                // Wait longer before next attempt
+                await Future.delayed(Duration(milliseconds: 1000 * attempt));
+              }
             }
-            return;
-          } else {
-            debugPrint('MenuScreen: Database available after force reinitialize');
-            // Continue with loading data
+          } catch (e) {
+            debugPrint('MenuScreen: Error during force reinitialize attempt $attempt: $e');
+            if (attempt < 3) {
+              await Future.delayed(Duration(milliseconds: 1000 * attempt));
+            }
           }
-        } catch (e) {
-          debugPrint('MenuScreen: Error during force reinitialize: $e');
+        }
+        
+        if (!initSuccess) {
+          debugPrint('MenuScreen: Database still not available after all retry attempts');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Database connection failed: $e'),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 5),
+                content: const Text('Database not available. Tap to retry connection.'),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 10),
                 action: SnackBarAction(
                   label: 'Retry',
                   textColor: Colors.white,
-                  onPressed: () {
+                  onPressed: () async {
+                    // Force reinitialize and reload
+                    final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+                    await dbProvider.forceInit();
+                    await Future.delayed(const Duration(milliseconds: 500));
                     _loadData(); // Retry loading
                   },
                 ),
