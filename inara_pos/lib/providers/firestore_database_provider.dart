@@ -78,9 +78,23 @@ class FirestoreDatabaseProvider with ChangeNotifier {
             throw StateError('Firebase apps became empty during initialization');
           }
           
-          // Try to get Firestore instance
+          // Try to get Firestore instance using dynamic access to avoid minified JS errors
           try {
-            firestoreInstance = FirebaseFirestore.instance;
+            dynamic firestoreInstance;
+            try {
+              firestoreInstance = FirebaseFirestore.instance;
+            } catch (e) {
+              debugPrint('FirestoreDatabase: Error accessing FirebaseFirestore.instance: $e');
+              // If it's a minified JS error, wait and retry
+              if (e.toString().contains('minified') || e.toString().contains('TypeError')) {
+                debugPrint('FirestoreDatabase: Minified JS error detected, waiting longer before retry...');
+                await Future.delayed(Duration(milliseconds: 500 * (attempt + 1)));
+                // Try again
+                firestoreInstance = FirebaseFirestore.instance;
+              } else {
+                rethrow;
+              }
+            }
             
             // Verify instance is not null
             if (firestoreInstance == null) {
@@ -93,7 +107,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
               // Just check if we can access the instance without error
               final _ = firestoreInstance.collection('_test').limit(0);
             } catch (testError) {
-              debugPrint('FirestoreDatabase: Test access failed: $testError');
+              debugPrint('FirestoreDatabase: Test access failed (non-critical): $testError');
               // Don't fail on test - might be permission issue, but instance is valid
             }
             
@@ -109,19 +123,34 @@ class FirestoreDatabaseProvider with ChangeNotifier {
             if (attempt == maxRetries - 1) {
               if (instanceErrorMsg.contains('Null check operator') || 
                   instanceErrorMsg.contains('null value') ||
-                  instanceErrorMsg.contains('NoSuchMethodError')) {
-                throw StateError(
-                  'Firestore initialization failed after $maxRetries attempts.\n\n'
-                  'This is often caused by:\n'
-                  '1. Firebase not fully initialized on iOS Safari\n'
-                  '2. Firestore Database not enabled in Firebase Console\n'
-                  '3. Browser compatibility issue\n\n'
-                  'Try:\n'
-                  '1. Hard refresh the page (Cmd+Shift+R on Mac, Ctrl+Shift+R on Windows)\n'
-                  '2. Clear browser cache\n'
-                  '3. Check Firebase Console to ensure Firestore is enabled\n\n'
-                  'Original error: $instanceError'
-                );
+                  instanceErrorMsg.contains('NoSuchMethodError') ||
+                  instanceErrorMsg.contains('minified') ||
+                  instanceErrorMsg.contains('TypeError')) {
+                // For minified JS errors, try one more time with a longer delay
+                debugPrint('FirestoreDatabase: Minified JS/null check error on final attempt, trying one more time...');
+                await Future.delayed(const Duration(milliseconds: 1000));
+                try {
+                  final lastAttempt = FirebaseFirestore.instance;
+                  _firestore = lastAttempt;
+                  debugPrint('FirestoreDatabase: Firestore instance obtained on final retry');
+                  break;
+                } catch (finalError) {
+                  throw StateError(
+                    'Firestore initialization failed after $maxRetries attempts + final retry.\n\n'
+                    'This is often caused by:\n'
+                    '1. Firebase not fully initialized on iOS Safari\n'
+                    '2. Firestore Database not enabled in Firebase Console\n'
+                    '3. Browser compatibility issue\n'
+                    '4. Firestore security rules require authentication\n\n'
+                    'Try:\n'
+                    '1. Hard refresh the page (Cmd+Shift+R on Mac, Ctrl+Shift+R on Windows)\n'
+                    '2. Clear browser cache\n'
+                    '3. Check Firebase Console to ensure Firestore is enabled\n'
+                    '4. Update Firestore rules to allow public access temporarily\n\n'
+                    'Original error: $instanceError\n'
+                    'Final retry error: $finalError'
+                  );
+                }
               }
               rethrow;
             }
