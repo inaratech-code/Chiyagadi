@@ -319,68 +319,113 @@ class FirestoreDatabaseProvider with ChangeNotifier {
     debugPrint('FirestoreDatabase: Ensuring Chiyagaadi menu seed...');
     final now = DateTime.now().millisecondsSinceEpoch;
 
-    final batch = firestore.batch();
+    try {
+      // Use multiple batches if needed (Firestore limit is 500 operations per batch)
+      final List<WriteBatch> batches = [firestore.batch()];
+      int currentBatchIndex = 0;
+      int operationsInCurrentBatch = 0;
+      const maxBatchSize = 450; // Stay under 500 limit
 
-    String norm(String s) =>
-        s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+      String norm(String s) =>
+          s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
 
-    // Ensure categories exist (by exact name match first, then normalized as fallback)
-    final Map<String, String> categoryIdByNormName = {};
-    for (final cat in chiyagaadiSeedCategories) {
-      final snap = await firestore
-          .collection('categories')
-          .where('name', isEqualTo: cat.name)
-          .limit(1)
-          .get();
-      if (snap.docs.isNotEmpty) {
-        categoryIdByNormName[norm(cat.name)] = snap.docs.first.id;
-        continue;
+      // Ensure categories exist (by exact name match first, then normalized as fallback)
+      final Map<String, String> categoryIdByNormName = {};
+      for (final cat in chiyagaadiSeedCategories) {
+        final snap = await firestore
+            .collection('categories')
+            .where('name', isEqualTo: cat.name)
+            .limit(1)
+            .get();
+        if (snap.docs.isNotEmpty) {
+          categoryIdByNormName[norm(cat.name)] = snap.docs.first.id;
+          debugPrint('FirestoreDatabase: Category "${cat.name}" already exists');
+          continue;
+        }
+
+        // Check if we need a new batch
+        if (operationsInCurrentBatch >= maxBatchSize) {
+          currentBatchIndex++;
+          batches.add(firestore.batch());
+          operationsInCurrentBatch = 0;
+        }
+
+        final docRef = firestore.collection('categories').doc();
+        categoryIdByNormName[norm(cat.name)] = docRef.id;
+        batches[currentBatchIndex].set(docRef, {
+          'name': cat.name,
+          'display_order': cat.displayOrder,
+          'is_active': 1,
+          'is_locked': cat.isLocked ? 1 : 0,
+          'created_at': now,
+          'updated_at': now,
+        });
+        operationsInCurrentBatch++;
+        debugPrint('FirestoreDatabase: Will create category "${cat.name}"');
       }
 
-      final docRef = firestore.collection('categories').doc();
-      categoryIdByNormName[norm(cat.name)] = docRef.id;
-      batch.set(docRef, {
-        'name': cat.name,
-        'display_order': cat.displayOrder,
-        'is_active': 1,
-        'is_locked': cat.isLocked ? 1 : 0,
-        'created_at': now,
-        'updated_at': now,
-      });
+      // Create products (menu items). Inventory is handled separately using
+      // purchasable items + purchases, not menu sales.
+      int productsAdded = 0;
+      int productsSkipped = 0;
+      for (final p in chiyagaadiSeedProducts) {
+        final categoryId = categoryIdByNormName[norm(p.categoryName)];
+        if (categoryId == null) {
+          debugPrint('FirestoreDatabase: Skipping product "${p.name}" - category "${p.categoryName}" not found');
+          continue;
+        }
+
+        final existing = await firestore
+            .collection('products')
+            .where('name', isEqualTo: p.name)
+            .limit(1)
+            .get();
+        if (existing.docs.isNotEmpty) {
+          productsSkipped++;
+          debugPrint('FirestoreDatabase: Product "${p.name}" already exists, skipping');
+          continue;
+        }
+
+        // Check if we need a new batch
+        if (operationsInCurrentBatch >= maxBatchSize) {
+          currentBatchIndex++;
+          batches.add(firestore.batch());
+          operationsInCurrentBatch = 0;
+        }
+
+        final productRef = firestore.collection('products').doc();
+        batches[currentBatchIndex].set(productRef, {
+          'category_id': categoryId,
+          'name': p.name,
+          'description': p.description,
+          'price': p.price,
+          'cost': 0.0,
+          'image_url': chiyagaadiImageAssetForName(p.name),
+          'is_veg': p.isVeg ? 1 : 0,
+          'is_active': p.isActive ? 1 : 0,
+          'is_purchasable': 0,
+          'is_sellable': 1,
+          'created_at': now,
+          'updated_at': now,
+        });
+        operationsInCurrentBatch++;
+        productsAdded++;
+        debugPrint('FirestoreDatabase: Will create product "${p.name}" (Rs ${p.price})');
+      }
+
+      // Commit all batches
+      for (int i = 0; i < batches.length; i++) {
+        if (operationsInCurrentBatch > 0 || i < batches.length - 1) {
+          await batches[i].commit();
+          debugPrint('FirestoreDatabase: Committed batch ${i + 1}/${batches.length}');
+        }
+      }
+      
+      debugPrint('FirestoreDatabase: Chiyagaadi menu seed completed - Added: $productsAdded products, Skipped: $productsSkipped products');
+    } catch (e) {
+      debugPrint('FirestoreDatabase: Error seeding menu: $e');
+      rethrow; // Re-throw so caller can handle it
     }
-
-    // Create products (menu items). Inventory is handled separately using
-    // purchasable items + purchases, not menu sales.
-    for (final p in chiyagaadiSeedProducts) {
-      final categoryId = categoryIdByNormName[norm(p.categoryName)];
-      if (categoryId == null) continue;
-
-      final existing = await firestore
-          .collection('products')
-          .where('name', isEqualTo: p.name)
-          .limit(1)
-          .get();
-      if (existing.docs.isNotEmpty) continue;
-
-      final productRef = firestore.collection('products').doc();
-      batch.set(productRef, {
-        'category_id': categoryId,
-        'name': p.name,
-        'description': p.description,
-        'price': p.price,
-        'cost': 0.0,
-        'image_url': chiyagaadiImageAssetForName(p.name),
-        'is_veg': p.isVeg ? 1 : 0,
-        'is_active': p.isActive ? 1 : 0,
-        'is_purchasable': 0,
-        'is_sellable': 1,
-        'created_at': now,
-        'updated_at': now,
-      });
-    }
-
-    await batch.commit();
-    debugPrint('FirestoreDatabase: Chiyagaadi menu seed ensured');
   }
 
   // Query methods compatible with DatabaseProvider interface
