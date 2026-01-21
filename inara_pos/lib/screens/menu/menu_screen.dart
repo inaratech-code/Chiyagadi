@@ -475,13 +475,15 @@ class _MenuScreenState extends State<MenuScreen> {
             // Wait a moment for initialization to complete
             await Future.delayed(const Duration(milliseconds: 500));
             
-            // Check again after retry
-            if (dbProvider.isAvailable) {
-              debugPrint('MenuScreen: Database available after force reinitialize (attempt $attempt)');
+            // Test the connection to verify it actually works
+            final connectionTest = await dbProvider.testConnection();
+            
+            if (connectionTest && dbProvider.isAvailable) {
+              debugPrint('MenuScreen: Database available and connection test passed (attempt $attempt)');
               initSuccess = true;
               break;
             } else {
-              debugPrint('MenuScreen: Database still not available after attempt $attempt');
+              debugPrint('MenuScreen: Database still not available after attempt $attempt (connection test: $connectionTest)');
               if (attempt < 3) {
                 // Wait longer before next attempt
                 await Future.delayed(Duration(milliseconds: 1000 * attempt));

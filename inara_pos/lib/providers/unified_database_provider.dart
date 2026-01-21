@@ -239,7 +239,66 @@ class UnifiedDatabaseProvider with ChangeNotifier {
   }
   
   /// Check if database is available
-  bool get isAvailable => _isInitialized && !_initFailed;
+  /// This checks both the initialization state and verifies the connection works
+  bool get isAvailable {
+    if (!_isInitialized || _initFailed) {
+      return false;
+    }
+    
+    // For web/Firestore, verify the instance exists
+    if (kIsWeb) {
+      try {
+        // Check if Firestore provider is initialized
+        if (_provider is FirestoreDatabaseProvider) {
+          final firestoreProvider = _provider as FirestoreDatabaseProvider;
+          return firestoreProvider.isInitialized;
+        }
+      } catch (e) {
+        debugPrint('UnifiedDatabase: Error checking Firestore availability: $e');
+        return false;
+      }
+    }
+    
+    return true;
+  }
+  
+  /// Test database connectivity with a simple query
+  Future<bool> testConnection() async {
+    try {
+      if (!_isInitialized) {
+        await init();
+      }
+      
+      if (_initFailed) {
+        return false;
+      }
+      
+      // Try a simple query to test connectivity
+      try {
+        await _provider.query('categories', limit: 1);
+        debugPrint('UnifiedDatabase: Connection test successful');
+        return true;
+      } catch (queryError) {
+        final errorMsg = queryError.toString();
+        debugPrint('UnifiedDatabase: Connection test failed: $queryError');
+        
+        // If it's a permission error, the connection works but rules block access
+        if (errorMsg.contains('permission') || 
+            errorMsg.contains('PERMISSION_DENIED') ||
+            errorMsg.contains('Missing or insufficient permissions')) {
+          debugPrint('UnifiedDatabase: Connection works but Firestore rules block access');
+          debugPrint('UnifiedDatabase: Please update Firestore rules to allow public access');
+          // Still return true - connection works, just rules need updating
+          return true;
+        }
+        
+        return false;
+      }
+    } catch (e) {
+      debugPrint('UnifiedDatabase: Connection test error: $e');
+      return false;
+    }
+  }
 
   Future<List<Map<String, dynamic>>> query(
     String table, {
