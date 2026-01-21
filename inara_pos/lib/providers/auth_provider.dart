@@ -94,15 +94,102 @@ class InaraAuthProvider with ChangeNotifier {
 
   /// NEW: Verify password for sensitive actions (delete orders, inventory, etc.)
   ///
-  /// SECURITY: We store only a hash in SharedPreferences (`admin_pin`).
-  /// This works offline on Android and on Web/PWA (best-effort).
+  /// SECURITY: Verifies password by attempting to sign in with Firebase Auth using the current user's email.
+  /// This works for all users (admin and cashiers) who are logged in via Firebase Auth.
+  /// FALLBACK: If Firebase Auth is unavailable, falls back to checking SharedPreferences.
   Future<bool> verifyAdminPin(String pin) async {
     if (!_isValidPassword(pin)) return false;
+    if (!_isAuthenticated || _currentUserId == null) {
+      debugPrint('verifyAdminPin: User not authenticated');
+      return false;
+    }
+
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final storedHash = prefs.getString('admin_pin');
-      if (storedHash == null || storedHash.isEmpty) return false;
-      return _hashPin(pin) == storedHash;
+      // First, try to verify with Firebase Auth
+      if (kIsWeb) {
+        try {
+          dynamic authInstance = FirebaseAuth.instance;
+          dynamic currentUser = authInstance.currentUser;
+          
+          if (currentUser != null) {
+            // Get the email from the current user
+            final email = currentUser.email;
+            if (email != null && email.isNotEmpty) {
+              // Store current user info to restore session
+              final currentEmail = email;
+              
+              // Try to sign in with the provided password to verify it
+              try {
+                await authInstance.signInWithEmailAndPassword(
+                  email: currentEmail,
+                  password: pin,
+                );
+                debugPrint('verifyAdminPin: Password verified via Firebase Auth');
+                // Session is already restored by signInWithEmailAndPassword
+                return true;
+              } catch (e) {
+                final errorStr = e.toString();
+                if (errorStr.contains('wrong-password') || 
+                    errorStr.contains('invalid-credential') ||
+                    errorStr.contains('user-not-found')) {
+                  debugPrint('verifyAdminPin: Incorrect password');
+                  return false;
+                }
+                // If it's another error, fall through to fallback
+                debugPrint('verifyAdminPin: Firebase Auth error, trying fallback: $e');
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('verifyAdminPin: Firebase Auth unavailable, trying fallback: $e');
+        }
+      }
+
+      // FALLBACK: Check against SharedPreferences (for offline/legacy support)
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final storedHash = prefs.getString('admin_pin');
+        if (storedHash != null && storedHash.isNotEmpty) {
+          final isValid = _hashPin(pin) == storedHash;
+          if (isValid) {
+            debugPrint('verifyAdminPin: Password verified via SharedPreferences fallback');
+            return true;
+          }
+        }
+      } catch (e) {
+        debugPrint('verifyAdminPin: SharedPreferences fallback error: $e');
+      }
+
+      // FALLBACK: Check against database user PIN hash (for users created via createUser)
+      try {
+        final dbProvider = _getDatabaseProvider();
+        await dbProvider.init();
+        
+        // Get current user's info from database
+        final users = await dbProvider.query(
+          'users',
+          where: kIsWeb ? 'documentId = ?' : 'id = ?',
+          whereArgs: [_currentUserId],
+          limit: 1,
+        );
+        
+        if (users.isNotEmpty) {
+          final user = users.first;
+          final storedPinHash = user['pin_hash'] as String?;
+          if (storedPinHash != null && storedPinHash.isNotEmpty) {
+            final isValid = _hashPin(pin) == storedPinHash;
+            if (isValid) {
+              debugPrint('verifyAdminPin: Password verified via database PIN hash');
+              return true;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('verifyAdminPin: Database fallback error: $e');
+      }
+
+      debugPrint('verifyAdminPin: Password verification failed');
+      return false;
     } catch (e) {
       debugPrint('verifyAdminPin: Error: $e');
       return false;
