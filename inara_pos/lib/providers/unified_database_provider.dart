@@ -32,15 +32,30 @@ class UnifiedDatabaseProvider with ChangeNotifier {
         try {
           if (Firebase.apps.isEmpty) {
             try {
-              final options = DefaultFirebaseOptions.currentPlatform;
-              if (options == null) {
-                throw StateError('DefaultFirebaseOptions.currentPlatform returned null');
+              FirebaseOptions? options;
+              try {
+                options = DefaultFirebaseOptions.currentPlatform;
+              } catch (e) {
+                debugPrint('UnifiedDatabase: Error getting Firebase options: $e');
+                // Fallback: try to use web options directly
+                try {
+                  options = DefaultFirebaseOptions.web;
+                  debugPrint('UnifiedDatabase: Using web Firebase options as fallback');
+                } catch (fallbackError) {
+                  debugPrint('UnifiedDatabase: Fallback also failed: $fallbackError');
+                  throw StateError('Failed to get Firebase options: $e');
+                }
               }
+              
+              if (options == null) {
+                throw StateError('Firebase options is null');
+              }
+              
               await Firebase.initializeApp(options: options);
               debugPrint('UnifiedDatabase: Firebase initialized (web)');
-            } catch (optionsError) {
-              debugPrint('UnifiedDatabase: Failed to get Firebase options: $optionsError');
-              throw StateError('Failed to initialize Firebase: $optionsError');
+            } catch (initError) {
+              debugPrint('UnifiedDatabase: Failed to initialize Firebase: $initError');
+              throw StateError('Failed to initialize Firebase: $initError');
             }
           } else {
             debugPrint('UnifiedDatabase: Firebase already initialized');
