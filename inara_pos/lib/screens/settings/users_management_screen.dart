@@ -672,6 +672,63 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
     }
   }
 
+  Future<void> _deleteUser(Map<String, dynamic> user) async {
+    final auth = Provider.of<InaraAuthProvider>(context, listen: false);
+    final userId = user['id'];
+    final username = user['username'] as String? ?? '';
+
+    // Don't allow deleting yourself
+    if (auth.currentUserId != null &&
+        auth.currentUserId == userId.toString()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('You cannot delete your own account'),
+              backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete User?'),
+        content: Text('Are you sure you want to delete "$username"? This action cannot be undone.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+    final ok = await auth.deleteUser(userId: userId);
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('User "$username" deleted'),
+          backgroundColor: AppTheme.successColor,
+        ),
+      );
+      await _loadUsers();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Failed to delete user'),
+            backgroundColor: Colors.red),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<InaraAuthProvider>(context);
@@ -842,6 +899,9 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                                     if (value == 'active') {
                                       await _toggleActive(u);
                                     }
+                                    if (value == 'delete') {
+                                      await _deleteUser(u);
+                                    }
                                   },
                                   itemBuilder: (context) => [
                                     const PopupMenuItem(
@@ -854,6 +914,9 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                                         child: Text(active
                                             ? 'Disable User'
                                             : 'Enable User')),
+                                    const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Text('Delete User', style: TextStyle(color: Colors.red))),
                                   ],
                                 ),
                               ),

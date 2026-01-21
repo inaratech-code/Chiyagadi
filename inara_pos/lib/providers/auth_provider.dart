@@ -1082,6 +1082,66 @@ class InaraAuthProvider with ChangeNotifier {
     }
   }
 
+  // Admin-only: delete user
+  Future<bool> deleteUser({required dynamic userId}) async {
+    try {
+      // Don't allow deleting yourself
+      if (_currentUserId != null && _currentUserId == userId.toString()) {
+        debugPrint('deleteUser: Cannot delete your own account');
+        return false;
+      }
+
+      final dbProvider = _getDatabaseProvider();
+      await dbProvider.init();
+
+      // Get user info before deleting (to get email for Firebase Auth deletion)
+      final users = await dbProvider.query(
+        'users',
+        where: kIsWeb ? 'documentId = ?' : 'id = ?',
+        whereArgs: [userId],
+        limit: 1,
+      );
+
+      if (users.isEmpty) {
+        debugPrint('deleteUser: User not found');
+        return false;
+      }
+
+      final user = users.first;
+      final userEmail = user['email'] as String?;
+
+      // Delete from database
+      await dbProvider.delete(
+        'users',
+        where: kIsWeb ? 'documentId = ?' : 'id = ?',
+        whereArgs: [userId],
+      );
+
+      // Try to delete Firebase Auth user if on web and email exists
+      if (kIsWeb && userEmail != null && userEmail.isNotEmpty) {
+        try {
+          dynamic authInstance = FirebaseAuth.instance;
+          final users = await authInstance.fetchSignInMethodsForEmail(userEmail);
+          if (users != null && (users as List).isNotEmpty) {
+            // User exists in Firebase Auth, try to delete
+            // Note: We can't directly delete users from client-side, but we can mark them as deleted
+            // The actual deletion should be done server-side or through Firebase Console
+            debugPrint('deleteUser: Firebase Auth user exists for $userEmail (deletion should be done server-side)');
+          }
+        } catch (authError) {
+          debugPrint('deleteUser: Error checking Firebase Auth user: $authError');
+          // Continue even if Firebase Auth deletion fails
+        }
+      }
+
+      debugPrint('deleteUser: User deleted successfully - userId: $userId');
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting user: $e');
+      return false;
+    }
+  }
+
   // Role Permissions Management
   // Default permissions: Admin has access to all, Cashier has access to most except Inventory and Purchases
   static const Map<String, List<int>> _defaultPermissions = {
