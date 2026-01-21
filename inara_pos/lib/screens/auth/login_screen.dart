@@ -58,20 +58,29 @@ class _LoginScreenState extends State<LoginScreen>
     );
 
     _animationController.forward();
+    // PERF: Show UI immediately, check first time status in background
     _checkFirstTime();
   }
 
   Future<void> _checkFirstTime() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    // Set context for AuthProvider to access UnifiedDatabaseProvider
-    authProvider.setContext(context);
+    // Run after first frame to avoid blocking UI
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      // Set context for AuthProvider to access UnifiedDatabaseProvider
+      authProvider.setContext(context);
 
-    final hasPin = await authProvider.checkPinExists();
+      // Load in background without blocking UI
+      final hasPin = await authProvider.checkPinExists();
 
-    setState(() {
-      _isFirstTime = !hasPin;
-      if (_isFirstTime) {
-        _usernameController.text = 'admin';
+      if (mounted) {
+        setState(() {
+          _isFirstTime = !hasPin;
+          if (_isFirstTime) {
+            _usernameController.text = 'admin';
+          }
+        });
       }
     });
   }
