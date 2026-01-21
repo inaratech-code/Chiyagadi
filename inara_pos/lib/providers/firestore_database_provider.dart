@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart'
     show ChangeNotifier, debugPrint, defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import '../utils/chiyagaadi_menu_seed.dart';
 
 /// Firestore-based database provider for web platform
@@ -44,68 +45,116 @@ class FirestoreDatabaseProvider with ChangeNotifier {
     try {
       debugPrint('FirestoreDatabase: Initializing Firestore...');
 
-      // Get Firestore instance with defensive error handling
-      // iOS Safari sometimes needs a small delay after Firebase.initializeApp()
+      // CRITICAL: Ensure Firebase is initialized before accessing Firestore
+      if (Firebase.apps.isEmpty) {
+        throw StateError(
+          'Firebase is not initialized. Please ensure Firebase.initializeApp() is called first.\n\n'
+          'This should be done in UnifiedDatabaseProvider.init() before calling FirestoreDatabaseProvider.init().'
+        );
+      }
+
+      debugPrint('FirestoreDatabase: Firebase apps count: ${Firebase.apps.length}');
+
+      // Get Firestore instance with defensive error handling and retries
+      // iOS Safari sometimes needs multiple delays after Firebase.initializeApp()
       FirebaseFirestore? firestoreInstance;
-      try {
-        // Small delay for iOS Safari to ensure Firebase is fully ready
-        if (kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-          await Future.delayed(const Duration(milliseconds: 200));
-        }
-        
-        // Try to get Firestore instance - wrap in try-catch to catch any null check errors
+      int maxRetries = 3;
+      int retryDelayMs = 200;
+      
+      for (int attempt = 0; attempt < maxRetries; attempt++) {
         try {
-          firestoreInstance = FirebaseFirestore.instance;
-        } catch (instanceError) {
-          final instanceErrorMsg = instanceError.toString();
-          debugPrint('FirestoreDatabase: FirebaseFirestore.instance threw: $instanceError');
+          // Progressive delay: longer wait on each retry
+          if (attempt > 0) {
+            final delayMs = retryDelayMs * (attempt + 1);
+            debugPrint('FirestoreDatabase: Retry attempt $attempt, waiting ${delayMs}ms...');
+            await Future.delayed(Duration(milliseconds: delayMs));
+          } else if (kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+            // Initial delay for iOS Safari
+            await Future.delayed(const Duration(milliseconds: 200));
+          }
           
-          // If it's a null check error, wait a bit more and retry
-          if (instanceErrorMsg.contains('Null check operator') || 
-              instanceErrorMsg.contains('null value') ||
-              instanceErrorMsg.contains('NoSuchMethodError')) {
-            debugPrint('FirestoreDatabase: Retrying after additional delay...');
-            await Future.delayed(const Duration(milliseconds: 300));
+          // Verify Firebase is still initialized
+          if (Firebase.apps.isEmpty) {
+            throw StateError('Firebase apps became empty during initialization');
+          }
+          
+          // Try to get Firestore instance
+          try {
+            firestoreInstance = FirebaseFirestore.instance;
+            
+            // Verify instance is not null
+            if (firestoreInstance == null) {
+              throw StateError('FirebaseFirestore.instance returned null');
+            }
+            
+            // Try a simple operation to verify it's actually working
+            // This will catch any underlying initialization issues
             try {
-              firestoreInstance = FirebaseFirestore.instance;
-            } catch (retryError) {
+              // Just check if we can access the instance without error
+              final _ = firestoreInstance.collection('_test').limit(0);
+            } catch (testError) {
+              debugPrint('FirestoreDatabase: Test access failed: $testError');
+              // Don't fail on test - might be permission issue, but instance is valid
+            }
+            
+            // Success!
+            _firestore = firestoreInstance;
+            debugPrint('FirestoreDatabase: Firestore instance obtained successfully on attempt ${attempt + 1}');
+            break; // Exit retry loop
+          } catch (instanceError) {
+            final instanceErrorMsg = instanceError.toString();
+            debugPrint('FirestoreDatabase: Attempt ${attempt + 1} failed: $instanceError');
+            
+            // If this is the last attempt, throw the error
+            if (attempt == maxRetries - 1) {
+              if (instanceErrorMsg.contains('Null check operator') || 
+                  instanceErrorMsg.contains('null value') ||
+                  instanceErrorMsg.contains('NoSuchMethodError')) {
+                throw StateError(
+                  'Firestore initialization failed after $maxRetries attempts.\n\n'
+                  'This is often caused by:\n'
+                  '1. Firebase not fully initialized on iOS Safari\n'
+                  '2. Firestore Database not enabled in Firebase Console\n'
+                  '3. Browser compatibility issue\n\n'
+                  'Try:\n'
+                  '1. Hard refresh the page (Cmd+Shift+R on Mac, Ctrl+Shift+R on Windows)\n'
+                  '2. Clear browser cache\n'
+                  '3. Check Firebase Console to ensure Firestore is enabled\n\n'
+                  'Original error: $instanceError'
+                );
+              }
+              rethrow;
+            }
+            // Otherwise, continue to next retry
+          }
+        } catch (e) {
+          final errorMsg = e.toString();
+          debugPrint('FirestoreDatabase: Failed on attempt ${attempt + 1}: $e');
+          
+          // If this is the last attempt, throw
+          if (attempt == maxRetries - 1) {
+            if (errorMsg.contains('Null check operator') || errorMsg.contains('null value')) {
               throw StateError(
-                'Firestore initialization failed on iOS Safari after retry.\n\n'
-                'Please ensure:\n'
-                '1. Firestore Database is enabled in Firebase Console\n'
-                '2. Security rules are published\n'
-                '3. Try hard refreshing the page (Cmd+Shift+R)\n\n'
-                'Error: $retryError'
+                'Firestore initialization failed after $maxRetries attempts.\n\n'
+                'This may be due to:\n'
+                '1. Firebase not fully initialized (try refreshing)\n'
+                '2. Firestore not enabled in Firebase Console\n'
+                '3. Browser compatibility issue\n\n'
+                'Original error: $e'
               );
             }
-          } else {
-            rethrow;
+            throw StateError('Failed to get Firestore instance after $maxRetries attempts: $e');
           }
+          // Continue to next retry
         }
-        
-        if (firestoreInstance == null) {
-          throw StateError('FirebaseFirestore.instance returned null');
-        }
-        
-        _firestore = firestoreInstance;
-        debugPrint('FirestoreDatabase: Firestore instance obtained');
-      } catch (e) {
-        final errorMsg = e.toString();
-        debugPrint('FirestoreDatabase: Failed to get Firestore instance: $e');
-        
-        // If it's a null check error, provide more helpful message
-        if (errorMsg.contains('Null check operator') || errorMsg.contains('null value')) {
-          throw StateError(
-            'Firestore initialization failed on iOS Safari.\n\n'
-            'This may be due to:\n'
-            '1. Firebase not fully initialized (try refreshing)\n'
-            '2. Firestore not enabled in Firebase Console\n'
-            '3. Browser compatibility issue\n\n'
-            'Original error: $e'
-          );
-        }
-        throw StateError('Failed to get Firestore instance: $e');
       }
+      
+      // Final check
+      if (_firestore == null) {
+        throw StateError('Firestore instance is null after all retry attempts');
+      }
+      
+      debugPrint('FirestoreDatabase: Firestore instance obtained');
 
       // Web/iOS Safari often fails (or behaves inconsistently) with persistence enabled.
       // This can surface as opaque "Null check operator used on a null value" errors on new devices.

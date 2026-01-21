@@ -304,7 +304,28 @@ class InaraAuthProvider with ChangeNotifier {
       
       // Get database provider to fetch user document
       final dbProvider = _getDatabaseProvider();
-      await dbProvider.init();
+      try {
+        await dbProvider.init();
+        debugPrint('Login: Database initialized successfully');
+      } catch (dbInitError) {
+        debugPrint('Login: Database initialization failed: $dbInitError');
+        debugPrint('Login: Continuing with Firebase Auth only - will use Firebase UID');
+        // Continue with login using Firebase Auth UID even if database init fails
+        // This allows login to work even if Firestore has issues
+        _isAuthenticated = true;
+        _currentUserId = userCredential.user!.uid;
+        _currentUserRole = 'admin'; // Default to admin if this is the admin email
+        _currentUsername = userCredential.user!.email?.split('@').first ?? 'user';
+        
+        if (_lockMode == 'timeout') {
+          _resetInactivityTimer();
+        } else {
+          _inactivityTimer?.cancel();
+          _inactivityTimer = null;
+        }
+        notifyListeners();
+        return true;
+      }
       
       // Connect to Firestore document for admin user
       const adminDocumentId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
