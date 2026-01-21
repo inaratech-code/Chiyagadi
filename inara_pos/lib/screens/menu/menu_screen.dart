@@ -463,17 +463,56 @@ class _MenuScreenState extends State<MenuScreen> {
 
       // Check if database is available
       if (!dbProvider.isAvailable) {
-        debugPrint('MenuScreen: Database not available, cannot load data');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Database not available. Please check Firebase connection.'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 3),
-            ),
-          );
+        debugPrint('MenuScreen: Database not available, attempting to force reinitialize...');
+        
+        // Try to force reinitialize
+        try {
+          await dbProvider.forceInit();
+          
+          // Check again after retry
+          if (!dbProvider.isAvailable) {
+            debugPrint('MenuScreen: Database still not available after retry');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Database not available. Tap to retry connection.'),
+                  backgroundColor: Colors.orange,
+                  duration: const Duration(seconds: 5),
+                  action: SnackBarAction(
+                    label: 'Retry',
+                    textColor: Colors.white,
+                    onPressed: () {
+                      _loadData(); // Retry loading
+                    },
+                  ),
+                ),
+              );
+            }
+            return;
+          } else {
+            debugPrint('MenuScreen: Database available after force reinitialize');
+            // Continue with loading data
+          }
+        } catch (e) {
+          debugPrint('MenuScreen: Error during force reinitialize: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Database connection failed: $e'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 5),
+                action: SnackBarAction(
+                  label: 'Retry',
+                  textColor: Colors.white,
+                  onPressed: () {
+                    _loadData(); // Retry loading
+                  },
+                ),
+              ),
+            );
+          }
+          return;
         }
-        return;
       }
 
       debugPrint('MenuScreen: Loading categories and products...');
