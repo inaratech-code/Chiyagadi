@@ -22,15 +22,31 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     }
   }
 
-  Future<void> init() async {
-    if (_isInitialized) {
+  /// Force re-initialization (resets failure flag)
+  Future<void> forceInit() async {
+    debugPrint('UnifiedDatabase: Force re-initialization requested');
+    _initFailed = false;
+    _isInitialized = false;
+    await init();
+  }
+
+  Future<void> init({bool forceRetry = false}) async {
+    if (_isInitialized && !forceRetry) {
       return;
     }
     
     // If init already failed, don't retry automatically (prevents infinite loops)
-    if (_initFailed) {
-      debugPrint('UnifiedDatabase: Init previously failed, skipping retry');
+    // But allow retry if forceRetry is true
+    if (_initFailed && !forceRetry) {
+      debugPrint('UnifiedDatabase: Init previously failed, skipping retry (use forceInit() to retry)');
       return;
+    }
+    
+    // Reset failure flag if we're retrying
+    if (forceRetry) {
+      _initFailed = false;
+      _isInitialized = false;
+      debugPrint('UnifiedDatabase: Retrying initialization...');
     }
 
     try {
@@ -400,11 +416,10 @@ class UnifiedDatabaseProvider with ChangeNotifier {
         await init();
       }
       
-      // If database is not available, try to reinitialize
+      // If database is not available, try to force reinitialize
       if (!isAvailable) {
-        debugPrint('UnifiedDatabase: Database not available, attempting to reinitialize...');
-        _initFailed = false; // Reset failure flag to allow retry
-        await init();
+        debugPrint('UnifiedDatabase: Database not available, attempting to force reinitialize...');
+        await forceInit();
         
         if (!isAvailable) {
           debugPrint('UnifiedDatabase: Cannot seed menu - database still not available after retry');
