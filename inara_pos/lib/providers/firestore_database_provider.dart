@@ -413,12 +413,23 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         debugPrint('FirestoreDatabase: Will create product "${p.name}" (Rs ${p.price})');
       }
 
-      // Commit all batches
-      for (int i = 0; i < batches.length; i++) {
-        if (operationsInCurrentBatch > 0 || i < batches.length - 1) {
+      // Commit all batches that have operations
+      int batchesCommitted = 0;
+      for (int i = 0; i <= currentBatchIndex; i++) {
+        // Count operations in this batch by checking if it has any
+        // We'll commit all batches up to currentBatchIndex
+        try {
           await batches[i].commit();
-          debugPrint('FirestoreDatabase: Committed batch ${i + 1}/${batches.length}');
+          batchesCommitted++;
+          debugPrint('FirestoreDatabase: Committed batch ${i + 1}/${currentBatchIndex + 1}');
+        } catch (e) {
+          debugPrint('FirestoreDatabase: Error committing batch ${i + 1}: $e');
+          // Continue with other batches
         }
+      }
+      
+      if (batchesCommitted == 0 && productsAdded == 0 && productsSkipped == 0) {
+        debugPrint('FirestoreDatabase: No operations to commit - all items may already exist');
       }
       
       debugPrint('FirestoreDatabase: Chiyagaadi menu seed completed - Added: $productsAdded products, Skipped: $productsSkipped products');
