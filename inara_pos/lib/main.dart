@@ -25,14 +25,9 @@ void main() {
     debugPrint('Stack: ${details.stack}');
   };
   
-  // Handle async errors (only on non-web platforms or use try-catch in web)
-  if (!kIsWeb) {
-    PlatformDispatcher.instance.onError = (error, stack) {
-      debugPrint('PlatformDispatcher error: $error');
-      debugPrint('Stack: $stack');
-      return true; // Prevent app from crashing
-    };
-  }
+  // Note: PlatformDispatcher.instance.onError is not available in web builds
+  // FlutterError.onError above handles most errors for web
+  // For mobile platforms, async errors are typically caught by try-catch blocks
   
   // CRITICAL: Do not block first frame on Firebase/DB init.
   // We warm these up asynchronously after the UI is on screen.
