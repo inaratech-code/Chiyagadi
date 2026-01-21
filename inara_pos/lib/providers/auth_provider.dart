@@ -29,7 +29,8 @@ class AuthProvider with ChangeNotifier {
   static bool _isValidPassword(String password) {
     if (password.length < 4 || password.length > 20) return false;
     // Allow letters, numbers, and common special characters (no spaces)
-    final passwordRegex = RegExp(r'^[a-zA-Z0-9@#$%^&*()_+\-=\[\]{};\':"\\|,.<>\/?]+$');
+    // Use regular string to properly escape $ character
+    final passwordRegex = RegExp('^[a-zA-Z0-9@#\\\$%^&*()_+\\-=\\[\\]{};\':"\\\\|,.<>\\/?]+\$');
     return passwordRegex.hasMatch(password);
   }
 
