@@ -1297,10 +1297,10 @@ class _MenuScreenState extends State<MenuScreen> {
                   ),
                 ),
 
-                // FIXED: Content area - show name and price within card frame to prevent overlap
+                // FIXED: Content area - show name and price within card frame with larger fonts for visibility
                 Container(
-                  constraints: const BoxConstraints(minHeight: 60),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                  constraints: const BoxConstraints(minHeight: 70),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
@@ -1324,20 +1324,20 @@ class _MenuScreenState extends State<MenuScreen> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 4),
-                      // Price
+                      const SizedBox(height: 6),
+                      // Price - FIXED: Larger font size for better visibility
                       Text(
                         'रू${product.price.toStringAsFixed(0)}',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: () {
                             final width = MediaQuery.of(context).size.width;
-                            if (!kIsWeb && width < 900) return 12.0; // Mobile (Android/iOS): compact
-                            if (width < 600) return 12.0; // Mobile web: compact
-                            return 14.0; // Web: standard size
+                            if (!kIsWeb && width < 900) return 15.0; // Mobile (Android/iOS): larger for visibility
+                            if (width < 600) return 15.0; // Mobile web: larger
+                            return 17.0; // Web: larger
                           }(),
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          fontWeight: FontWeight.w700, // FIXED: Bold for better visibility
+                          color: Colors.black, // FIXED: Solid black for maximum contrast
                         ),
                       ),
                     ],
