@@ -1326,24 +1326,30 @@ class _MenuScreenState extends State<MenuScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      // Price - FIXED: Visible font size that fits in the box
-                      Text(
-                        'रू${product.price.toStringAsFixed(0)}',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: () {
-                            final width = MediaQuery.of(context).size.width;
-                            if (!kIsWeb && width < 900) return 14.0; // Mobile (Android/iOS): visible size
-                            if (width < 600) return 14.0; // Mobile web: visible size
-                            return 16.0; // Web: visible size
-                          }(),
-                          fontWeight: FontWeight.w700, // Bold for visibility
-                          color: Colors.black, // Solid black for maximum contrast
-                          height: 1.1, // FIXED: Slightly reduced line height
+                      const SizedBox(height: 6),
+                      // Price - FIXED: Single price display in blue button style
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.blue,
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        child: Text(
+                          '< रू${product.price.toStringAsFixed(0)} >',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: () {
+                              final width = MediaQuery.of(context).size.width;
+                              if (!kIsWeb && width < 900) return 12.0; // Mobile (Android/iOS): compact
+                              if (width < 600) return 12.0; // Mobile web: compact
+                              return 14.0; // Web: standard size
+                            }(),
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white, // White text on blue background
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
