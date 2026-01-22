@@ -1297,82 +1297,27 @@ class _MenuScreenState extends State<MenuScreen> {
                   ),
                 ),
 
-                // UPDATED: Content area - name and price (improved spacing to prevent overlap)
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Item name (single line, clear and visible)
-                        Text(
-                          product.name,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: () {
-                              final width = MediaQuery.of(context).size.width;
-                              if (!kIsWeb && width < 900) return 12.0; // Mobile (Android/iOS): compact for 3 columns
-                              if (width < 600) return 12.0; // Mobile web: compact
-                              return 14.0; // Web: slightly larger
-                            }(),
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                            height: 1.2,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-
-                        const SizedBox(height: 6),
-
-                        // Price (prominent, single line) - with bottom margin to separate from action bar
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Text(
-                            'रू${product.price.toStringAsFixed(0)}',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: () {
-                                final width = MediaQuery.of(context).size.width;
-                                if (!kIsWeb && width < 900) return 13.0; // Mobile (Android/iOS): compact but visible
-                                if (width < 600) return 13.0; // Mobile web: compact
-                                return 15.0; // Web: standard size
-                              }(),
-                              fontWeight: FontWeight.w700,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // NEW: Action bar at bottom using app's primary color (with clear separation)
+                // FIXED: Content area - show only name, no price to prevent overlap
                 Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppTheme.logoPrimary, // Using app's golden yellow color
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(8),
-                      bottomRight: Radius.circular(8),
-                    ),
-                  ),
-                  child: Text(
-                    '< रू${product.price.toStringAsFixed(0)} >',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: () {
-                        final width = MediaQuery.of(context).size.width;
-                        if (!kIsWeb && width < 900) return 12.0; // Mobile (Android/iOS): compact
-                        if (width < 600) return 12.0; // Mobile web: compact
-                        return 14.0; // Web: standard size
-                      }(),
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                  constraints: const BoxConstraints(minHeight: 50),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                  child: Center(
+                    child: Text(
+                      product.name,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: () {
+                          final width = MediaQuery.of(context).size.width;
+                          if (!kIsWeb && width < 900) return 14.0; // Mobile (Android/iOS): larger for visibility
+                          if (width < 600) return 14.0; // Mobile web: larger
+                          return 16.0; // Web: larger
+                        }(),
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
+                        height: 1.3,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ),
