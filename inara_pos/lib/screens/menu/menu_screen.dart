@@ -1064,7 +1064,25 @@ class _MenuScreenState extends State<MenuScreen> {
                         orderId: _activeOrderId,
                         orderNumber: _activeOrderNumber ?? 'Order',
                         refreshKey: _overlayRefreshKey,
-                        onClose: () {
+                        onClose: () async {
+                          // Check if order was deleted (no longer exists)
+                          final dbProvider =
+                              Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+                          await dbProvider.init();
+                          final orders = await dbProvider.query(
+                            'orders',
+                            where: kIsWeb ? 'documentId = ?' : 'id = ?',
+                            whereArgs: [_activeOrderId],
+                          );
+                          
+                          // If order was deleted, clear active order
+                          if (orders.isEmpty && _activeOrderId != null) {
+                            setState(() {
+                              _activeOrderId = null;
+                              _activeOrderNumber = null;
+                            });
+                          }
+                          
                           setState(() => _showOrderOverlay = false);
                         },
                         onOrderUpdated: () async {
@@ -1089,7 +1107,25 @@ class _MenuScreenState extends State<MenuScreen> {
                         orderId: _activeOrderId,
                         orderNumber: _activeOrderNumber ?? 'Order',
                         refreshKey: _overlayRefreshKey,
-                        onClose: () {
+                        onClose: () async {
+                          // Check if order was deleted (no longer exists)
+                          final dbProvider =
+                              Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+                          await dbProvider.init();
+                          final orders = await dbProvider.query(
+                            'orders',
+                            where: kIsWeb ? 'documentId = ?' : 'id = ?',
+                            whereArgs: [_activeOrderId],
+                          );
+                          
+                          // If order was deleted, clear active order
+                          if (orders.isEmpty && _activeOrderId != null) {
+                            setState(() {
+                              _activeOrderId = null;
+                              _activeOrderNumber = null;
+                            });
+                          }
+                          
                           setState(() => _showOrderOverlay = false);
                         },
                         onOrderUpdated: () async {

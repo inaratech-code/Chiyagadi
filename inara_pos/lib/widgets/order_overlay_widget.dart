@@ -58,6 +58,57 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
     super.dispose();
   }
 
+  // Check if order should be deleted when cancelled (no items and pending status)
+  Future<bool> _shouldDeleteOnCancel() async {
+    try {
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      await dbProvider.init();
+      
+      final items = await _orderService.getOrderItems(dbProvider, widget.orderId);
+      final orders = await dbProvider.query(
+        'orders',
+        where: kIsWeb ? 'documentId = ?' : 'id = ?',
+        whereArgs: [widget.orderId],
+      );
+      
+      if (orders.isEmpty) return false;
+      
+      final order = orders.first;
+      final status = order['status'] as String? ?? 'pending';
+      final hasItems = items.isNotEmpty;
+      
+      // Delete if order has no items and is in pending/confirmed status (not paid)
+      return !hasItems && (status == 'pending' || status == 'confirmed');
+    } catch (e) {
+      debugPrint('OrderOverlay: Error checking if should delete: $e');
+      return false;
+    }
+  }
+
+  // Handle close with order deletion if needed
+  Future<void> _handleClose() async {
+    final shouldDelete = await _shouldDeleteOnCancel();
+    
+    if (shouldDelete) {
+      try {
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        await _orderService.deleteOrder(
+          dbProvider: dbProvider,
+          context: context,
+          orderId: widget.orderId,
+        );
+        debugPrint('OrderOverlay: Deleted empty order ${widget.orderNumber} on cancel');
+      } catch (e) {
+        debugPrint('OrderOverlay: Error deleting order on cancel: $e');
+        // Continue to close even if deletion fails
+      }
+    }
+    
+    widget.onClose?.call();
+  }
+
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
@@ -395,7 +446,7 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.close),
-                  onPressed: widget.onClose ?? () => Navigator.pop(context),
+                  onPressed: _handleClose,
                 ),
               ],
             ),
@@ -579,7 +630,7 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
                       children: [
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: widget.onClose ?? () => Navigator.pop(context),
+                            onPressed: _handleClose,
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               side: BorderSide(color: Colors.grey[400]!),
