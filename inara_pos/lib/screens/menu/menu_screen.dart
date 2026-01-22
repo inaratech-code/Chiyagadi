@@ -1297,48 +1297,53 @@ class _MenuScreenState extends State<MenuScreen> {
                   ),
                 ),
 
-                // FIXED: Content area - show name and price within card frame with larger fonts for visibility
+                // FIXED: Content area - show name and price within card frame, prevent overflow
                 Container(
-                  constraints: const BoxConstraints(minHeight: 70),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+                  constraints: const BoxConstraints(minHeight: 75),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // Item name
-                      Text(
-                        product.name,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: () {
-                            final width = MediaQuery.of(context).size.width;
-                            if (!kIsWeb && width < 900) return 13.0; // Mobile (Android/iOS): compact
-                            if (width < 600) return 13.0; // Mobile web: compact
-                            return 15.0; // Web: slightly larger
-                          }(),
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black,
-                          height: 1.2,
+                      Flexible(
+                        child: Text(
+                          product.name,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: () {
+                              final width = MediaQuery.of(context).size.width;
+                              if (!kIsWeb && width < 900) return 13.0; // Mobile (Android/iOS): compact
+                              if (width < 600) return 13.0; // Mobile web: compact
+                              return 15.0; // Web: slightly larger
+                            }(),
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black,
+                            height: 1.2,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 6),
-                      // Price - FIXED: Larger font size for better visibility
+                      const SizedBox(height: 5),
+                      // Price - FIXED: Reduced font size to prevent overflow while maintaining visibility
                       Text(
                         'रू${product.price.toStringAsFixed(0)}',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: () {
                             final width = MediaQuery.of(context).size.width;
-                            if (!kIsWeb && width < 900) return 15.0; // Mobile (Android/iOS): larger for visibility
-                            if (width < 600) return 15.0; // Mobile web: larger
-                            return 17.0; // Web: larger
+                            if (!kIsWeb && width < 900) return 13.0; // Mobile (Android/iOS): reduced to prevent overflow
+                            if (width < 600) return 13.0; // Mobile web: reduced to prevent overflow
+                            return 15.0; // Web: reduced to prevent overflow
                           }(),
-                          fontWeight: FontWeight.w700, // FIXED: Bold for better visibility
-                          color: Colors.black, // FIXED: Solid black for maximum contrast
+                          fontWeight: FontWeight.w700, // Bold for visibility
+                          color: Colors.black, // Solid black for maximum contrast
+                          height: 1.0, // FIXED: Reduced line height to prevent overflow
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.visible,
                       ),
                     ],
                   ),
