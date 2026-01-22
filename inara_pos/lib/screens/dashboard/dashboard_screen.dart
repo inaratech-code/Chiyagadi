@@ -46,12 +46,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // PERF: Show UI immediately, then load data asynchronously
     // This ensures the page appears instantly on Android/iOS
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Small delay to ensure UI is fully rendered
-      Future.delayed(const Duration(milliseconds: 50), () {
-        if (mounted) {
-          _loadDashboardData();
-        }
-      });
+      // FIXED: Remove delay for faster loading
+      if (mounted) {
+        _loadDashboardData();
+      }
     });
   }
 

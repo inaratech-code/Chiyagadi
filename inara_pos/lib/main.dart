@@ -185,9 +185,12 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
 
   Future<void> _checkAuth() async {
     // PERF: Show UI immediately, load preferences in background
-    setState(() {
-      _isLoading = false;
-    });
+    // FIXED: Set loading to false immediately without waiting
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
 
     // Check Firebase Auth state
     try {

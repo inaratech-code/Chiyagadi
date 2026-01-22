@@ -59,18 +59,18 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       // iOS Safari sometimes needs multiple delays after Firebase.initializeApp()
       FirebaseFirestore? firestoreInstance;
       int maxRetries = 3;
-      int retryDelayMs = 200;
+      int retryDelayMs = 50; // FIXED: Reduced from 200ms to 50ms for faster startup
       
       for (int attempt = 0; attempt < maxRetries; attempt++) {
         try {
-          // Progressive delay: longer wait on each retry
+          // Progressive delay: shorter wait on each retry for faster startup
           if (attempt > 0) {
             final delayMs = retryDelayMs * (attempt + 1);
             debugPrint('FirestoreDatabase: Retry attempt $attempt, waiting ${delayMs}ms...');
             await Future.delayed(Duration(milliseconds: delayMs));
           } else if (kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-            // Initial delay for iOS Safari
-            await Future.delayed(const Duration(milliseconds: 200));
+            // FIXED: Reduced initial delay for iOS Safari
+            await Future.delayed(const Duration(milliseconds: 50));
           }
           
           // Verify Firebase is still initialized
@@ -88,8 +88,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
               // If it's a minified JS error, wait and retry
               if (e.toString().contains('minified') || e.toString().contains('TypeError')) {
                 debugPrint('FirestoreDatabase: Minified JS error detected, waiting longer before retry...');
-                // Reduced delay for faster retry (was 500ms, now 100ms)
-                await Future.delayed(Duration(milliseconds: 100 * (attempt + 1)));
+                // FIXED: Reduced delay for faster retry
+                await Future.delayed(Duration(milliseconds: 50 * (attempt + 1)));
                 // Try again
                 firestoreInstance = FirebaseFirestore.instance;
               } else {
@@ -127,9 +127,9 @@ class FirestoreDatabaseProvider with ChangeNotifier {
                   instanceErrorMsg.contains('NoSuchMethodError') ||
                   instanceErrorMsg.contains('minified') ||
                   instanceErrorMsg.contains('TypeError')) {
-                // For minified JS errors, try one more time with a longer delay
+                // For minified JS errors, try one more time with a shorter delay
                 debugPrint('FirestoreDatabase: Minified JS/null check error on final attempt, trying one more time...');
-                await Future.delayed(const Duration(milliseconds: 1000));
+                await Future.delayed(const Duration(milliseconds: 200)); // FIXED: Reduced from 1000ms to 200ms
                 try {
                   final lastAttempt = FirebaseFirestore.instance;
                   _firestore = lastAttempt;

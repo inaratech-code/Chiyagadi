@@ -136,8 +136,8 @@ class UnifiedDatabaseProvider with ChangeNotifier {
             for (int attempt = 0; attempt < 5; attempt++) {
               try {
                 if (attempt > 0) {
-                  // Longer delays for retries, especially for null check errors
-                  final delayMs = attempt == 1 ? 500 : (attempt == 2 ? 1000 : 2000);
+                  // FIXED: Reduced delays for faster retries
+                  final delayMs = attempt == 1 ? 100 : (attempt == 2 ? 200 : 300);
                   await Future.delayed(Duration(milliseconds: delayMs));
                   debugPrint('UnifiedDatabase: Retrying Firebase initialization (attempt ${attempt + 1}/5)...');
                 }
@@ -157,9 +157,8 @@ class UnifiedDatabaseProvider with ChangeNotifier {
                     debugPrint('UnifiedDatabase: Null check error in Firebase.initializeApp: $initError');
                     if (attempt < 4) {
                       debugPrint('UnifiedDatabase: Waiting longer before retry...');
-                      // Wait progressively longer for null check errors
-                      // Reduced delay for faster retry (was 1000ms, now 200ms)
-                      await Future.delayed(Duration(milliseconds: 200 * (attempt + 1)));
+                      // FIXED: Reduced delay for faster retry
+                      await Future.delayed(Duration(milliseconds: 50 * (attempt + 1)));
                       continue;
                     }
                   }
@@ -191,9 +190,9 @@ class UnifiedDatabaseProvider with ChangeNotifier {
               throw StateError('Firebase App initialization failed after all retries');
             }
             
-            // iOS Safari: Wait a bit longer to ensure Firebase is fully ready
+            // iOS Safari: Minimal delay to ensure Firebase is fully ready
             if (defaultTargetPlatform == TargetPlatform.iOS) {
-              await Future.delayed(const Duration(milliseconds: 300));
+              await Future.delayed(const Duration(milliseconds: 50)); // FIXED: Reduced from 300ms to 50ms
               debugPrint('UnifiedDatabase: iOS Safari delay applied');
             }
           } else {
