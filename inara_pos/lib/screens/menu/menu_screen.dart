@@ -1503,12 +1503,13 @@ class _MenuScreenState extends State<MenuScreen> {
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         final now = DateTime.now().millisecondsSinceEpoch;
-        categoryName = result['name'] as String;
+        final categoryNameValue = result['name'] as String; // Non-null local variable
+        categoryName = categoryNameValue;
         final categoryIsActive = result['isActive'] as bool;
 
         // Get the max display_order to add new category at the end
         final existingCategories = await dbProvider.query('categories');
-        final normalizedNew = _normalizeNameKey(categoryName);
+        final normalizedNew = _normalizeNameKey(categoryNameValue);
         final isDuplicate = existingCategories.any((c) {
           final existingName = (c['name'] as String?) ?? '';
           return _normalizeNameKey(existingName) == normalizedNew;
@@ -1517,7 +1518,7 @@ class _MenuScreenState extends State<MenuScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Category "$categoryName" already exists'),
+                content: Text('Category "$categoryNameValue" already exists'),
                 backgroundColor: AppTheme.errorColor,
               ),
             );
@@ -1533,7 +1534,7 @@ class _MenuScreenState extends State<MenuScreen> {
                 1);
 
         final categoryId = await dbProvider.insert('categories', {
-          'name': categoryName,
+          'name': categoryNameValue,
           'display_order': maxOrder,
           'is_active': categoryIsActive ? 1 : 0,
           'is_locked': 0,
@@ -1546,7 +1547,7 @@ class _MenuScreenState extends State<MenuScreen> {
           _categories.add(Category(
             id: kIsWeb ? null : (categoryId is int ? categoryId : null),
             documentId: kIsWeb ? categoryId.toString() : null,
-            name: categoryName,
+            name: categoryNameValue,
             isActive: categoryIsActive,
             displayOrder: maxOrder,
             createdAt: now,
