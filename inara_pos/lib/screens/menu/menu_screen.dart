@@ -13,6 +13,8 @@ import '../../services/inventory_ledger_service.dart';
 import '../../utils/theme.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io' as io;
+import 'dart:convert';
+import 'dart:typed_data';
 
 class MenuScreen extends StatefulWidget {
   final bool hideAppBar;
@@ -228,6 +230,28 @@ class _MenuScreenState extends State<MenuScreen> {
     return 'assets/images/logo.jpeg';
   }
 
+  /// Converts an XFile image to a base64 data URL (for web) or returns the file path (for mobile)
+  Future<String?> _convertImageToDataUrl(XFile imageFile) async {
+    if (kIsWeb) {
+      try {
+        // On web, read the file as bytes and convert to base64
+        final bytes = await imageFile.readAsBytes();
+        final base64String = base64Encode(bytes);
+        // Determine MIME type from file extension or default to jpeg
+        final mimeType = imageFile.path.toLowerCase().endsWith('.png') 
+            ? 'image/png' 
+            : 'image/jpeg';
+        return 'data:$mimeType;base64,$base64String';
+      } catch (e) {
+        debugPrint('Error converting image to base64: $e');
+        return null;
+      }
+    } else {
+      // On mobile, return the file path
+      return imageFile.path;
+    }
+  }
+
   dynamic _categoryIdForName(String categoryName) {
     final target = _normalizeNameKey(categoryName);
     for (final c in _categories) {
@@ -271,6 +295,15 @@ class _MenuScreenState extends State<MenuScreen> {
         : safeUrl;
 
     Widget fallback() => const Icon(Icons.image, size: 40, color: Colors.grey);
+
+    // Handle data URLs (base64 encoded images)
+    if (effectiveUrl.startsWith('data:image/')) {
+      return Image.network(
+        effectiveUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => fallback(),
+      );
+    }
 
     if (effectiveUrl.startsWith('http')) {
       return Image.network(
@@ -2182,21 +2215,36 @@ class _MenuScreenState extends State<MenuScreen> {
             ? null
             : imageUrlController.text.trim();
 
-        // If image was uploaded, copy it to app directory and use local path
-        if (selectedImageFile != null && !kIsWeb) {
-          try {
-            final appDir = await getApplicationDocumentsDirectory();
-            final imageDir = io.Directory('${appDir.path}/product_images');
-            if (!await imageDir.exists()) {
-              await imageDir.create(recursive: true);
+        // If image was uploaded, handle it based on platform
+        if (selectedImageFile != null) {
+          if (kIsWeb) {
+            // On web, convert to base64 data URL
+            try {
+              final dataUrl = await _convertImageToDataUrl(selectedImageFile!);
+              if (dataUrl != null) {
+                finalImageUrl = dataUrl;
+              } else {
+                debugPrint('Failed to convert image to base64');
+              }
+            } catch (e) {
+              debugPrint('Error converting image to base64: $e');
             }
-            final fileName =
-                '${now}_${nameController.text.trim().replaceAll(' ', '_')}.jpg';
-            final savedImage = await io.File(selectedImageFile!.path)
-                .copy('${imageDir.path}/$fileName');
-            finalImageUrl = savedImage.path;
-          } catch (e) {
-            debugPrint('Error saving image: $e');
+          } else {
+            // On mobile, copy it to app directory and use local path
+            try {
+              final appDir = await getApplicationDocumentsDirectory();
+              final imageDir = io.Directory('${appDir.path}/product_images');
+              if (!await imageDir.exists()) {
+                await imageDir.create(recursive: true);
+              }
+              final fileName =
+                  '${now}_${nameController.text.trim().replaceAll(' ', '_')}.jpg';
+              final savedImage = await io.File(selectedImageFile!.path)
+                  .copy('${imageDir.path}/$fileName');
+              finalImageUrl = savedImage.path;
+            } catch (e) {
+              debugPrint('Error saving image: $e');
+            }
           }
         }
 
@@ -2398,8 +2446,10 @@ class _MenuScreenState extends State<MenuScreen> {
                               : imageUrlController.text.isNotEmpty
                                   ? ClipRRect(
                                       borderRadius: BorderRadius.circular(10),
-                                      child: imageUrlController.text
-                                              .startsWith('http')
+                                      child: (imageUrlController.text
+                                                  .startsWith('http') ||
+                                              imageUrlController.text
+                                                  .startsWith('data:image/'))
                                           ? Image.network(
                                               imageUrlController.text,
                                               fit: BoxFit.cover,
@@ -2954,22 +3004,37 @@ class _MenuScreenState extends State<MenuScreen> {
             ? null
             : imageUrlController.text.trim();
 
-        // If image was uploaded, copy it to app directory and use local path
-        if (selectedImageFile != null && !kIsWeb) {
-          try {
-            final appDir = await getApplicationDocumentsDirectory();
-            final imageDir = io.Directory('${appDir.path}/product_images');
-            if (!await imageDir.exists()) {
-              await imageDir.create(recursive: true);
+        // If image was uploaded, handle it based on platform
+        if (selectedImageFile != null) {
+          if (kIsWeb) {
+            // On web, convert to base64 data URL
+            try {
+              final dataUrl = await _convertImageToDataUrl(selectedImageFile!);
+              if (dataUrl != null) {
+                finalImageUrl = dataUrl;
+              } else {
+                debugPrint('Failed to convert image to base64');
+              }
+            } catch (e) {
+              debugPrint('Error converting image to base64: $e');
             }
-            final now = DateTime.now().millisecondsSinceEpoch;
-            final fileName =
-                '${now}_${nameController.text.trim().replaceAll(' ', '_')}.jpg';
-            final savedImage = await io.File(selectedImageFile!.path)
-                .copy('${imageDir.path}/$fileName');
-            finalImageUrl = savedImage.path;
-          } catch (e) {
-            debugPrint('Error saving image: $e');
+          } else {
+            // On mobile, copy it to app directory and use local path
+            try {
+              final appDir = await getApplicationDocumentsDirectory();
+              final imageDir = io.Directory('${appDir.path}/product_images');
+              if (!await imageDir.exists()) {
+                await imageDir.create(recursive: true);
+              }
+              final now = DateTime.now().millisecondsSinceEpoch;
+              final fileName =
+                  '${now}_${nameController.text.trim().replaceAll(' ', '_')}.jpg';
+              final savedImage = await io.File(selectedImageFile!.path)
+                  .copy('${imageDir.path}/$fileName');
+              finalImageUrl = savedImage.path;
+            } catch (e) {
+              debugPrint('Error saving image: $e');
+            }
           }
         }
 
