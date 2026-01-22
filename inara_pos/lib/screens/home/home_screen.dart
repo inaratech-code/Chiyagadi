@@ -306,14 +306,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
-              ListTile(
-                leading: const Icon(Icons.logout, color: Colors.red),
-                title: const Text('Logout', style: TextStyle(color: Colors.red)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showLogoutDialog(context, authProvider);
-                },
-              ),
             ],
           );
         },
@@ -620,38 +612,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _showLogoutDialog(
-      BuildContext context, InaraAuthProvider authProvider) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Logout'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      authProvider.logout();
-      // Reset navigation to root so AuthWrapper shows LoginScreen.
-      if (context.mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          '/',
-          (route) => false,
-        );
-      }
-    }
-  }
 
   void _refreshCurrentScreen() {
     // Recreate the current screen to trigger refresh.
