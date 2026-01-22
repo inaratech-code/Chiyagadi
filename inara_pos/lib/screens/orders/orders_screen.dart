@@ -266,7 +266,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       case 'cash':
         return 'Cash';
       case 'digital':
-        return 'UPI/Digital';
+        return 'QR Payment';
       case 'credit':
         return 'Credit';
       default:

@@ -81,7 +81,7 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
               segments: const [
                 ButtonSegment(value: 'cash', label: Text('Cash')),
                 ButtonSegment(value: 'card', label: Text('Card')),
-                ButtonSegment(value: 'digital', label: Text('Digital')),
+                ButtonSegment(value: 'digital', label: Text('QR Payment')),
               ],
               selected: {_selectedPaymentMethod},
               onSelectionChanged: (Set<String> newSelection) {

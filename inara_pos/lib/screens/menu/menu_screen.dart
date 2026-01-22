@@ -909,28 +909,30 @@ class _MenuScreenState extends State<MenuScreen> {
                                         ),
                                         child: Row(
                                           children: [
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 10,
-                                                      vertical: 5),
-                                              decoration: BoxDecoration(
-                                                color: _categoryColorForName(category.name)
-                                                    .withOpacity(0.15),
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                                border: Border.all(
-                                                  color: _categoryColorForName(category.name),
-                                                  width: 1.5,
+                                            Expanded(
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 10,
+                                                        vertical: 5),
+                                                decoration: BoxDecoration(
+                                                  color: _categoryColorForName(category.name)
+                                                      .withOpacity(0.15),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                  border: Border.all(
+                                                    color: _categoryColorForName(category.name),
+                                                    width: 1.5,
+                                                  ),
                                                 ),
-                                              ),
-                                              child: Text(
-                                                category.name.toUpperCase(),
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: _categoryColorForName(category.name),
-                                                  letterSpacing: 0.5,
+                                                child: Text(
+                                                  category.name.toUpperCase(),
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: _categoryColorForName(category.name),
+                                                    letterSpacing: 0.5,
+                                                  ),
                                                 ),
                                               ),
                                             ),
@@ -943,6 +945,17 @@ class _MenuScreenState extends State<MenuScreen> {
                                                 fontStyle: FontStyle.italic,
                                               ),
                                             ),
+                                            if (auth.isAdmin) ...[
+                                              const SizedBox(width: 8),
+                                              IconButton(
+                                                icon: const Icon(Icons.edit, size: 18),
+                                                onPressed: () => _showEditCategoryDialog(category),
+                                                tooltip: 'Edit Category',
+                                                padding: EdgeInsets.zero,
+                                                constraints: const BoxConstraints(),
+                                                color: Colors.grey[600],
+                                              ),
+                                            ],
                                           ],
                                         ),
                                       ),
@@ -1514,6 +1527,173 @@ class _MenuScreenState extends State<MenuScreen> {
       }
     }
     return false;
+  }
+
+  Future<void> _showEditCategoryDialog(Category category) async {
+    final nameController = TextEditingController(text: category.name);
+    bool isActive = category.isActive;
+    final originalName = category.name;
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(
+                Icons.edit,
+                color: AppTheme.logoPrimary,
+                size: 28,
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Edit Category',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Category Name',
+                    hintText: 'e.g., Beverages, Food, Snacks',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.label),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide:
+                          BorderSide(color: AppTheme.logoPrimary, width: 2),
+                    ),
+                  ),
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.words,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: isActive,
+                      onChanged: (value) {
+                        setDialogState(() => isActive = value ?? true);
+                      },
+                    ),
+                    const Text('Active'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, null),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (nameController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Please enter a category name'),
+                      backgroundColor: AppTheme.errorColor,
+                    ),
+                  );
+                  return;
+                }
+                Navigator.pop(context, {
+                  'name': nameController.text.trim(),
+                  'isActive': isActive,
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.logoPrimary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Save Changes'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != null && result['name'] != null) {
+      try {
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        await dbProvider.init();
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final categoryName = result['name'] as String;
+        final categoryIsActive = result['isActive'] as bool;
+
+        // Check for duplicate (excluding current category)
+        final existingCategories = await dbProvider.query('categories');
+        final normalizedNew = _normalizeNameKey(categoryName);
+        final categoryId = _getCategoryIdentifier(category);
+        
+        final isDuplicate = existingCategories.any((c) {
+          final existingId = kIsWeb ? c['documentId'] : c['id'];
+          // Skip current category
+          if (existingId.toString() == categoryId.toString()) return false;
+          final existingName = (c['name'] as String?) ?? '';
+          return _normalizeNameKey(existingName) == normalizedNew;
+        });
+        
+        if (isDuplicate) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Category "$categoryName" already exists'),
+                backgroundColor: AppTheme.errorColor,
+              ),
+            );
+          }
+          return;
+        }
+
+        final where = kIsWeb ? 'documentId = ?' : 'id = ?';
+        await dbProvider.update(
+          'categories',
+          values: {
+            'name': categoryName,
+            'is_active': categoryIsActive ? 1 : 0,
+            'updated_at': now,
+          },
+          where: where,
+          whereArgs: [categoryId],
+        );
+
+        await _loadData(); // Reload data to show updated category
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Category "$categoryName" updated successfully'),
+              backgroundColor: AppTheme.successColor,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error updating category: $e'),
+              backgroundColor: AppTheme.errorColor,
+            ),
+          );
+        }
+      }
+    }
   }
 
   Future<void> _showAddProductDialog() async {

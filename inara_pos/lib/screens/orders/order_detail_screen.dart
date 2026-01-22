@@ -1653,7 +1653,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   children: [
                     Icon(Icons.qr_code, color: Colors.blue),
                     SizedBox(width: 8),
-                    Text('UPI / Digital Payment'),
+                    Text('QR Payment'),
                   ],
                 ),
                 value: 'digital',
@@ -1932,7 +1932,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ? 'Payment completed via Credit'
                     : paymentMethod == 'cash'
                         ? 'Payment completed via Cash'
-                        : 'Payment completed via UPI/Digital',
+                        : 'Payment completed via QR Payment',
               ),
               backgroundColor: Colors.green,
             ),
@@ -1962,7 +1962,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       case 'cash':
         return 'Cash';
       case 'digital':
-        return 'UPI/Digital';
+        return 'QR Payment';
       case 'credit':
         return 'Credit';
       default:
@@ -2005,7 +2005,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     setDialogState(() => paymentMethod = value!),
               ),
               RadioListTile<String>(
-                title: const Text('UPI / Digital'),
+                title: const Text('QR Payment'),
                 value: 'digital',
                 groupValue: paymentMethod,
                 onChanged: (value) =>

@@ -361,7 +361,7 @@ class _SalesScreenState extends State<SalesScreen> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          paymentMethod == 'cash' ? 'Cash' : 'QR/UPI',
+                          paymentMethod == 'cash' ? 'Cash' : 'QR Payment',
                           style: TextStyle(
                             color: paymentColor,
                             fontSize: 12,
@@ -399,7 +399,7 @@ class _SalesScreenState extends State<SalesScreen> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            paymentMethod == 'cash' ? 'Cash' : 'UPI/Digital',
+                            paymentMethod == 'cash' ? 'Cash' : 'QR Payment',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,

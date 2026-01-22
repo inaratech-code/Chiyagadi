@@ -100,7 +100,7 @@ class _OrderPaymentDialogState extends State<OrderPaymentDialog> {
               segments: const [
                 ButtonSegment(value: 'cash', label: Text('Cash')),
                 ButtonSegment(value: 'card', label: Text('Card')),
-                ButtonSegment(value: 'digital', label: Text('Digital')),
+                ButtonSegment(value: 'digital', label: Text('QR Payment')),
                 ButtonSegment(value: 'credit', label: Text('Credit')),
               ],
               selected: {_selectedPaymentMethod},
