@@ -242,7 +242,7 @@ class _SalesScreenState extends State<SalesScreen> {
     if (paymentMethod == 'cash') {
       return Colors.green; // Cash = Green
     } else if (paymentMethod == 'digital') {
-      return Colors.blue; // QR/UPI/Digital = Blue
+      return Colors.blue; // QR Payment = Blue
     } else if (paymentMethod == 'credit') {
       return Colors.orange; // Credit = Orange
     }
