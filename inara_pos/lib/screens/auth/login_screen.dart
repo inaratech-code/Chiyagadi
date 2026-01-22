@@ -129,47 +129,18 @@ class _LoginScreenState extends State<LoginScreen>
         );
       } else {
         setState(() {
-          _errorMessage = 'Invalid email or password. Please try again.\n\n'
-              'Please ensure:\n'
-              '1. Firebase Auth user exists in Firebase Console\n'
-              '2. Email/Password sign-in is enabled\n'
-              '3. Check browser console (F12) for detailed errors';
+          _errorMessage = 'Invalid email or password. Please try again.';
           _isLoading = false;
         });
       }
     } on FirebaseAuthException catch (e) {
-      String errorMsg = 'Login failed. ';
-      switch (e.code) {
-        case 'user-not-found':
-          errorMsg = 'No user found with this email.\n\n'
-              'Please ensure the admin user exists in Firebase Console:\n'
-              '1. Go to Firebase Console → Authentication → Users\n'
-              '2. Add user with email: chiyagadi@gmail.com\n'
-              '3. Set password: Chiyagadi15@\n'
-              '4. Try logging in again';
-          break;
-        case 'wrong-password':
-          errorMsg += 'Incorrect password.';
-          break;
-        case 'invalid-email':
-          errorMsg += 'Invalid email address.';
-          break;
-        case 'user-disabled':
-          errorMsg += 'This account has been disabled.';
-          break;
-        case 'too-many-requests':
-          errorMsg += 'Too many failed attempts. Please try again later.';
-          break;
-        default:
-          errorMsg += e.message ?? 'Please try again.';
-      }
       setState(() {
-        _errorMessage = errorMsg;
+        _errorMessage = 'Invalid email or password. Please try again.';
         _isLoading = false;
       });
     } catch (e) {
       setState(() {
-        _errorMessage = 'Error: ${e.toString()}';
+        _errorMessage = 'Invalid email or password. Please try again.';
         _isLoading = false;
       });
     }
