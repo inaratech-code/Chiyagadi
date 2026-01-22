@@ -112,8 +112,6 @@ class PrinterService {
       buffer.writeln(
           'Discount:     ${NumberFormatter.formatCurrency(-order.discountAmount).padLeft(20)}');
     }
-    buffer.writeln(
-        'VAT (${order.taxPercent.toStringAsFixed(0)}%): ${NumberFormatter.formatCurrency(order.taxAmount).padLeft(20)}');
     buffer.writeln('=' * 42);
     buffer.writeln(
         'TOTAL:        ${NumberFormatter.formatCurrency(order.totalAmount).padLeft(20)}');
