@@ -1297,16 +1297,17 @@ class _MenuScreenState extends State<MenuScreen> {
                   ),
                 ),
 
-                // FIXED: Content area - show name and price within card frame with proper sizing
+                // FIXED: Content area - show name and price within card frame, shifted up for visibility
                 Container(
                   constraints: const BoxConstraints(minHeight: 80),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                  padding: const EdgeInsets.only(left: 6, right: 6, top: 6, bottom: 8), // FIXED: Reduced top padding to shift text up
+                  alignment: Alignment.topCenter, // FIXED: Align to top instead of center
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.start, // FIXED: Start from top
                     crossAxisAlignment: CrossAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Item name - FIXED: Decreased font size
+                      // Item name - FIXED: Decreased font size, shifted up
                       Flexible(
                         child: Text(
                           product.name,
@@ -1326,8 +1327,8 @@ class _MenuScreenState extends State<MenuScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      // Price - FIXED: Decreased font size, removed blue button
+                      const SizedBox(height: 3), // FIXED: Reduced spacing
+                      // Price - FIXED: Decreased font size, removed blue button, shifted up
                       Text(
                         'रू${product.price.toStringAsFixed(0)}',
                         textAlign: TextAlign.center,
@@ -1340,7 +1341,7 @@ class _MenuScreenState extends State<MenuScreen> {
                           }(),
                           fontWeight: FontWeight.w700,
                           color: Colors.black,
-                          height: 1.1,
+                          height: 1.0, // FIXED: Reduced line height to prevent overflow
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
