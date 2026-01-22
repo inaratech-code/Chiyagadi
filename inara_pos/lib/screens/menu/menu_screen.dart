@@ -999,8 +999,8 @@ class _MenuScreenState extends State<MenuScreen> {
                                         shrinkWrap: true,
                                         physics:
                                             const NeverScrollableScrollPhysics(),
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 8),
+                                        padding: const EdgeInsets.only(
+                                            left: 8, right: 8, bottom: 16), // FIXED: Add bottom padding to prevent overlap
                                         gridDelegate:
                                             SliverGridDelegateWithFixedCrossAxisCount(
                                           // UPDATED: 3 columns for mobile (Android/iOS) as per design reference
@@ -1029,8 +1029,8 @@ class _MenuScreenState extends State<MenuScreen> {
                                           return _buildProductCard(product);
                                         },
                                       ),
-                                      // Increased spacing between categories to prevent overlap
-                                      SizedBox(height: !kIsWeb ? 32 : 20),
+                                      // FIXED: Increased spacing between categories to prevent overlap
+                                      SizedBox(height: !kIsWeb ? 40 : 24),
                                     ],
                                   );
                                 },
@@ -1258,7 +1258,8 @@ class _MenuScreenState extends State<MenuScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
       ),
-      clipBehavior: Clip.none, // UPDATED: Don't clip so edit button is visible
+      clipBehavior: Clip.antiAlias, // FIXED: Clip to prevent overflow while keeping edit button visible
+      margin: EdgeInsets.zero, // FIXED: Remove default margin to prevent spacing issues
       child: Stack(
         children: [
           InkWell(
@@ -1379,12 +1380,13 @@ class _MenuScreenState extends State<MenuScreen> {
             ),
           ),
           // UPDATED: Edit icon button - positioned in top-right corner of card (available for all users)
+          // FIXED: Use IgnorePointer to allow clicks through, but keep button visible with proper positioning
           Positioned(
-            top: 4,
-            right: 4,
+            top: 2,
+            right: 2,
             child: Material(
-              elevation: 3,
-              color: Colors.blue,
+              elevation: 4,
+              color: Colors.transparent,
               borderRadius: BorderRadius.circular(15),
               child: InkWell(
                 onTap: () => _showEditProductDialog(product),
