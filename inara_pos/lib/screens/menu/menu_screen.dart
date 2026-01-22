@@ -1297,16 +1297,16 @@ class _MenuScreenState extends State<MenuScreen> {
                   ),
                 ),
 
-                // FIXED: Content area - show name and price within card frame, prevent overflow
+                // FIXED: Content area - show name and price within card frame with proper sizing
                 Container(
-                  constraints: const BoxConstraints(minHeight: 75),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                  constraints: const BoxConstraints(minHeight: 80),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Item name
+                      // Item name - FIXED: Smaller font to make room for price
                       Flexible(
                         child: Text(
                           product.name,
@@ -1314,9 +1314,9 @@ class _MenuScreenState extends State<MenuScreen> {
                           style: TextStyle(
                             fontSize: () {
                               final width = MediaQuery.of(context).size.width;
-                              if (!kIsWeb && width < 900) return 13.0; // Mobile (Android/iOS): compact
-                              if (width < 600) return 13.0; // Mobile web: compact
-                              return 15.0; // Web: slightly larger
+                              if (!kIsWeb && width < 900) return 12.0; // Mobile (Android/iOS): smaller to fit both
+                              if (width < 600) return 12.0; // Mobile web: smaller to fit both
+                              return 14.0; // Web: slightly larger
                             }(),
                             fontWeight: FontWeight.w700,
                             color: Colors.black,
@@ -1326,24 +1326,24 @@ class _MenuScreenState extends State<MenuScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(height: 5),
-                      // Price - FIXED: Reduced font size to prevent overflow while maintaining visibility
+                      const SizedBox(height: 4),
+                      // Price - FIXED: Visible font size that fits in the box
                       Text(
                         'रू${product.price.toStringAsFixed(0)}',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: () {
                             final width = MediaQuery.of(context).size.width;
-                            if (!kIsWeb && width < 900) return 13.0; // Mobile (Android/iOS): reduced to prevent overflow
-                            if (width < 600) return 13.0; // Mobile web: reduced to prevent overflow
-                            return 15.0; // Web: reduced to prevent overflow
+                            if (!kIsWeb && width < 900) return 14.0; // Mobile (Android/iOS): visible size
+                            if (width < 600) return 14.0; // Mobile web: visible size
+                            return 16.0; // Web: visible size
                           }(),
                           fontWeight: FontWeight.w700, // Bold for visibility
                           color: Colors.black, // Solid black for maximum contrast
-                          height: 1.0, // FIXED: Reduced line height to prevent overflow
+                          height: 1.1, // FIXED: Slightly reduced line height
                         ),
                         maxLines: 1,
-                        overflow: TextOverflow.visible,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
