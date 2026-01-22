@@ -320,11 +320,6 @@ class FirestoreDatabaseProvider with ChangeNotifier {
           'updated_at': now,
         });
 
-        await firestore.collection('settings').doc('tax_percent').set({
-          'key': 'tax_percent',
-          'value': '13',
-          'updated_at': now,
-        });
 
         await firestore.collection('settings').doc('discount_enabled').set({
           'key': 'discount_enabled',

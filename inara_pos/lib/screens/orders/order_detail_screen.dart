@@ -33,7 +33,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   List<Product> _products = [];
   List<Map<String, dynamic>> _categories = [];
   bool _isLoading = true;
-  final TextEditingController _vatController = TextEditingController();
   final TextEditingController _discountController = TextEditingController();
   bool _didAutoOpenAddItems = false;
 
@@ -59,65 +58,31 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       );
       if (orders.isNotEmpty) {
         _order = orders.first;
-        // Initialize VAT and Discount controllers
-        // FIXED: Use order's tax_percent, default to 13% if 0 or null
-        final taxPercent = (_order!['tax_percent'] as num?)?.toDouble();
-        _vatController.text =
-            (taxPercent != null && taxPercent > 0 ? taxPercent : 13.0)
-                .toStringAsFixed(1);
+        // Initialize Discount controller
         _discountController.text =
             (_order!['discount_percent'] as num? ?? 0.0).toStringAsFixed(1);
 
-        // FIXED: If tax_percent is 0 or null, set it to 13% and recalculate
-        if (taxPercent == null || taxPercent == 0) {
-          final dbProvider =
-              Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-          await _orderService.updateVATAndDiscount(
-            dbProvider: dbProvider,
-            orderId: widget.orderId,
-            vatPercent: 13.0,
-            discountPercent:
-                (_order!['discount_percent'] as num?)?.toDouble() ?? 0.0,
-          );
-          // Reload to get updated values
-          final updatedOrders = await dbProvider.query(
-            'orders',
-            where: kIsWeb ? 'documentId = ?' : 'id = ?',
-            whereArgs: [widget.orderId],
-          );
-          if (updatedOrders.isNotEmpty) {
-            setState(() {
-              _order = updatedOrders.first;
-              // Update controller with new VAT value
-              _vatController.text =
-                  ((_order!['tax_percent'] as num?)?.toDouble() ?? 13.0)
-                      .toStringAsFixed(1);
-            });
-          }
-        } else {
-          // Ensure totals are recalculated even if VAT is already set
-          // This handles cases where items were added but totals weren't updated
-          final dbProvider =
-              Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-          // Trigger recalculation by updating VAT/Discount with current values
-          await _orderService.updateVATAndDiscount(
-            dbProvider: dbProvider,
-            orderId: widget.orderId,
-            vatPercent: taxPercent,
-            discountPercent:
-                (_order!['discount_percent'] as num?)?.toDouble() ?? 0.0,
-          );
-          // Reload to get updated values
-          final updatedOrders = await dbProvider.query(
-            'orders',
-            where: kIsWeb ? 'documentId = ?' : 'id = ?',
-            whereArgs: [widget.orderId],
-          );
-          if (updatedOrders.isNotEmpty) {
-            setState(() {
-              _order = updatedOrders.first;
-            });
-          }
+        // Ensure totals are recalculated
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        // Trigger recalculation by updating Discount with current values
+        await _orderService.updateVATAndDiscount(
+          dbProvider: dbProvider,
+          orderId: widget.orderId,
+          vatPercent: 0.0,
+          discountPercent:
+              (_order!['discount_percent'] as num?)?.toDouble() ?? 0.0,
+        );
+        // Reload to get updated values
+        final updatedOrders = await dbProvider.query(
+          'orders',
+          where: kIsWeb ? 'documentId = ?' : 'id = ?',
+          whereArgs: [widget.orderId],
+        );
+        if (updatedOrders.isNotEmpty) {
+          setState(() {
+            _order = updatedOrders.first;
+          });
         }
       }
 
@@ -188,21 +153,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return (_order?['discount_amount'] as num?)?.toDouble() ?? 0.0;
   }
 
-  double get _vatAmount {
-    return (_order?['tax_amount'] as num?)?.toDouble() ?? 0.0;
-  }
-
   double get _total {
-    // FIXED: Calculate total from subtotal, discount, and VAT if order total is not available
+    // Calculate total from subtotal and discount
     final orderTotal = (_order?['total_amount'] as num?)?.toDouble();
     if (orderTotal != null && orderTotal > 0) {
       return orderTotal;
     }
-    // Calculate: Subtotal - Discount + VAT
+    // Calculate: Subtotal - Discount
     final subtotal = _subtotal;
     final discount = _discountAmount;
-    final vat = _vatAmount;
-    return subtotal - discount + vat;
+    return subtotal - discount;
   }
 
   @override
@@ -357,57 +317,29 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       children: [
                         // VAT and Discount Input Fields
                         if (_order?['payment_status'] != 'paid') ...[
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _vatController,
-                                  decoration: InputDecoration(
-                                    labelText: 'VAT %',
-                                    border: const OutlineInputBorder(),
-                                    suffixText: '%',
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 8),
-                                  ),
-                                  keyboardType: TextInputType.numberWithOptions(
-                                      decimal: true),
-                                  onChanged: (value) => _updateVATAndDiscount(),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: TextField(
-                                  controller: _discountController,
-                                  decoration: InputDecoration(
-                                    labelText: 'Discount %',
-                                    border: const OutlineInputBorder(),
-                                    suffixText: '%',
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 8),
-                                  ),
-                                  keyboardType: TextInputType.numberWithOptions(
-                                      decimal: true),
-                                  onChanged: (value) => _updateVATAndDiscount(),
-                                ),
-                              ),
-                            ],
+                          TextField(
+                            controller: _discountController,
+                            decoration: InputDecoration(
+                              labelText: 'Discount %',
+                              border: const OutlineInputBorder(),
+                              suffixText: '%',
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                            ),
+                            keyboardType: TextInputType.numberWithOptions(
+                                decimal: true),
+                            onChanged: (value) => _updateVATAndDiscount(),
                           ),
                           const SizedBox(height: 12),
                         ],
 
-                        // Breakdown - FIXED: Always show VAT and Discount in bill
+                        // Breakdown: Subtotal, Discount, Total
                         _buildTotalRow('Subtotal', _subtotal),
                         // Always show discount if percent is set (even if 0, show it)
                         if ((_order?['discount_percent'] as num?) != null)
                           _buildTotalRow(
                             'Discount (${(_order?['discount_percent'] as num? ?? 0).toStringAsFixed(1)}%)',
                             -_discountAmount,
-                          ),
-                        // Always show VAT if percent is set (even if 0, show it)
-                        if ((_order?['tax_percent'] as num?) != null)
-                          _buildTotalRow(
-                            'VAT (${(_order?['tax_percent'] as num? ?? 0).toStringAsFixed(1)}%)',
-                            _vatAmount,
                           ),
                         const Divider(),
                         _buildTotalRow('Total Payable', _total, isTotal: true),
@@ -1339,10 +1271,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _updateVATAndDiscount() async {
-    final vatPercent = double.tryParse(_vatController.text) ?? 0.0;
     final discountPercent = double.tryParse(_discountController.text) ?? 0.0;
 
-    if (vatPercent < 0 || vatPercent > 100) return;
     if (discountPercent < 0 || discountPercent > 100) return;
 
     try {
@@ -1352,15 +1282,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       // Calculate values locally for immediate UI update
       final subtotal = _subtotal;
       final discountAmount = subtotal * (discountPercent / 100);
-      final discountedSubtotal = subtotal - discountAmount;
-      final taxAmount = discountedSubtotal * (vatPercent / 100);
-      final totalAmount = discountedSubtotal + taxAmount;
+      final totalAmount = subtotal - discountAmount;
 
       // Update local state immediately (no page refresh)
       setState(() {
         if (_order != null) {
-          _order!['tax_percent'] = vatPercent;
-          _order!['tax_amount'] = taxAmount;
+          _order!['tax_percent'] = 0.0;
+          _order!['tax_amount'] = 0.0;
           _order!['discount_percent'] = discountPercent;
           _order!['discount_amount'] = discountAmount;
           _order!['total_amount'] = totalAmount;
@@ -1373,16 +1301,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           .updateVATAndDiscount(
         dbProvider: dbProvider,
         orderId: widget.orderId,
-        vatPercent: vatPercent,
+        vatPercent: 0.0,
         discountPercent: discountPercent,
       )
           .catchError((e) {
-        debugPrint('Error updating VAT/Discount in database: $e');
+        debugPrint('Error updating Discount in database: $e');
         // Reload data if update fails to sync with database
         _loadData();
       });
     } catch (e) {
-      debugPrint('Error updating VAT/Discount: $e');
+      debugPrint('Error updating Discount: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
@@ -2075,7 +2003,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   @override
   void dispose() {
-    _vatController.dispose();
     _discountController.dispose();
     super.dispose();
   }

@@ -309,8 +309,6 @@ class DatabaseProvider with ChangeNotifier {
       await insertSettingIfMissing('cafe_name', 'चिया गढी');
       await insertSettingIfMissing('cafe_name_en', 'Chiya Gadhi');
       await insertSettingIfMissing('cafe_address', 'Nepal');
-      // VAT percentage (stored as tax_percent for compatibility)
-      await insertSettingIfMissing('tax_percent', '13');
       await insertSettingIfMissing('currency', 'NPR');
       await insertSettingIfMissing('discount_enabled', '1');
       await insertSettingIfMissing('default_discount_percent', '0');

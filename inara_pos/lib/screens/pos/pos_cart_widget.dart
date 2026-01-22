@@ -235,15 +235,11 @@ class _POSCartWidgetState extends State<POSCartWidget> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // UPDATED: Bill format matching image - Subtotal, Discount (%), VAT (%), Total
+                // Bill format: Subtotal, Discount (%), Total
                 _buildTotalRow('Subtotal', widget.order!.subtotal),
                 _buildTotalRow(
                   'Discount (${widget.order!.discountPercent.toStringAsFixed(1)}%)',
                   -widget.order!.discountAmount,
-                ),
-                _buildTotalRow(
-                  'VAT (${widget.order!.taxPercent.toStringAsFixed(1)}%)',
-                  widget.order!.taxAmount,
                 ),
                 const SizedBox(height: 8),
                 Container(

@@ -35,7 +35,6 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
   Map<String, dynamic>? _order;
   List<Product> _products = [];
   bool _isLoading = true;
-  final TextEditingController _vatController = TextEditingController();
   final TextEditingController _discountController = TextEditingController();
 
   @override
@@ -55,7 +54,6 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
 
   @override
   void dispose() {
-    _vatController.dispose();
     _discountController.dispose();
     super.dispose();
   }
@@ -226,21 +224,14 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
     return _subtotal * (percent / 100.0);
   }
 
-  double get _vatAmount {
-    final percent = double.tryParse(_vatController.text) ?? 0.0;
-    final discountedSubtotal = _subtotal - _discountAmount;
-    return discountedSubtotal * (percent / 100.0);
-  }
-
   double get _total {
-    return _subtotal - _discountAmount + _vatAmount;
+    return _subtotal - _discountAmount;
   }
 
   Future<void> _updateVATAndDiscount() async {
-    final vatPercent = double.tryParse(_vatController.text) ?? 0.0;
     final discountPercent = double.tryParse(_discountController.text) ?? 0.0;
 
-    if (vatPercent < 0 || vatPercent > 100 || discountPercent < 0 || discountPercent > 100) {
+    if (discountPercent < 0 || discountPercent > 100) {
       return;
     }
 
@@ -250,7 +241,7 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
       await _orderService.updateVATAndDiscount(
         dbProvider: dbProvider,
         orderId: widget.orderId,
-        vatPercent: vatPercent,
+        vatPercent: 0.0,
         discountPercent: discountPercent,
       );
       await _loadData();
@@ -343,14 +334,12 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
       
-      final vatPercent = double.tryParse(_vatController.text) ?? 0.0;
       final discountPercent = double.tryParse(_discountController.text) ?? 0.0;
       
       // Calculate totals
       final subtotal = _subtotal;
       final discountAmount = (subtotal * discountPercent / 100);
-      final taxAmount = ((subtotal - discountAmount) * vatPercent / 100);
-      final total = subtotal - discountAmount + taxAmount;
+      final total = subtotal - discountAmount;
       
       // Update order with current totals
       await dbProvider.update(
@@ -359,8 +348,8 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
           'subtotal': subtotal,
           'discount_percent': discountPercent,
           'discount_amount': discountAmount,
-          'tax_percent': vatPercent,
-          'tax_amount': taxAmount,
+          'tax_percent': 0.0,
+          'tax_amount': 0.0,
           'total_amount': total,
           'updated_at': DateTime.now().millisecondsSinceEpoch,
         },
@@ -490,41 +479,19 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
 
                   const SizedBox(height: 12),
 
-                  // UPDATED: VAT and Discount inputs matching 2nd image
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _vatController,
-                          decoration: InputDecoration(
-                            labelText: 'VAT %',
-                            border: const OutlineInputBorder(),
-                            suffixText: '%',
-                            filled: true,
-                            fillColor: Colors.white,
-                          ),
-                          keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
-                          onChanged: (_) => _updateVATAndDiscount(),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: _discountController,
-                          decoration: InputDecoration(
-                            labelText: 'Discount %',
-                            border: const OutlineInputBorder(),
-                            suffixText: '%',
-                            filled: true,
-                            fillColor: Colors.white,
-                          ),
-                          keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
-                          onChanged: (_) => _updateVATAndDiscount(),
-                        ),
-                      ),
-                    ],
+                  // Discount input
+                  TextField(
+                    controller: _discountController,
+                    decoration: InputDecoration(
+                      labelText: 'Discount %',
+                      border: const OutlineInputBorder(),
+                      suffixText: '%',
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (_) => _updateVATAndDiscount(),
                   ),
 
                   const SizedBox(height: 16),
@@ -597,10 +564,6 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
                         _buildSummaryRow(
                           'Discount (${double.tryParse(_discountController.text)?.toStringAsFixed(1) ?? '0.0'}%)',
                           -_discountAmount,
-                        ),
-                        _buildSummaryRow(
-                          'VAT (${double.tryParse(_vatController.text)?.toStringAsFixed(1) ?? '0.0'}%)',
-                          _vatAmount,
                         ),
                         const Divider(),
                         _buildSummaryRow('Total', _total, isTotal: true),

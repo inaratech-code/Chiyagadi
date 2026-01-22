@@ -69,9 +69,6 @@ class OrderService {
     final now = DateTime.now().millisecondsSinceEpoch;
     final orderNumber = await generateOrderNumber(dbProvider);
 
-    // FIXED: Get default VAT rate from settings
-    final defaultVatPercent = await _getTaxRate(dbProvider);
-
     final orderId = await dbProvider.insert('orders', {
       'order_number': orderNumber,
       'table_id': tableId,
@@ -81,7 +78,7 @@ class OrderService {
       'discount_amount': 0,
       'discount_percent': 0,
       'tax_amount': 0,
-      'tax_percent': defaultVatPercent, // FIXED: Set default VAT percent
+      'tax_percent': 0.0, // VAT removed
       'total_amount': 0,
       'payment_status': 'unpaid',
       'created_by': createdBy,
@@ -533,14 +530,10 @@ class OrderService {
 
     // Calculate discount amount from percentage
     final discountAmount = subtotal * (discountPercent / 100);
-    final discountedSubtotal = subtotal - discountAmount;
-
-    // Calculate VAT on discounted subtotal
-    final taxAmount = discountedSubtotal * (vatPercent / 100);
-    final totalAmount = discountedSubtotal + taxAmount;
+    final totalAmount = subtotal - discountAmount;
 
     debugPrint(
-        'VAT/Discount Update - Subtotal: $subtotal, Discount %: $discountPercent, Discount Amount: $discountAmount, VAT %: $vatPercent, VAT Amount: $taxAmount, Total: $totalAmount');
+        'Discount Update - Subtotal: $subtotal, Discount %: $discountPercent, Discount Amount: $discountAmount, Total: $totalAmount');
 
     await dbProvider.update(
       'orders',
@@ -548,8 +541,8 @@ class OrderService {
         'subtotal': subtotal,
         'discount_percent': discountPercent,
         'discount_amount': discountAmount,
-        'tax_percent': vatPercent,
-        'tax_amount': taxAmount,
+        'tax_percent': 0.0,
+        'tax_amount': 0.0,
         'total_amount': totalAmount,
         'updated_at': DateTime.now().millisecondsSinceEpoch,
       },
@@ -577,29 +570,18 @@ class OrderService {
     final order = await getOrderById(dbProvider, orderId);
     final discountPercent = order?.discountPercent ?? 0;
 
-    // FIXED: Recalculate discount amount from percentage based on new subtotal
+    // Recalculate discount amount from percentage based on new subtotal
     final discountAmount = subtotal * (discountPercent / 100);
-
-    // FIXED: Use VAT percent from order, default to 13% if 0 or null
-    double vatPercent = order?.taxPercent ?? 0;
-    if (vatPercent == 0) {
-      // If VAT is 0, get default from settings
-      vatPercent = await _getTaxRate(dbProvider);
-    }
-
-    final discountedSubtotal = subtotal - discountAmount;
-    final taxAmount = discountedSubtotal * (vatPercent / 100);
-    final totalAmount = discountedSubtotal + taxAmount;
+    final totalAmount = subtotal - discountAmount;
 
     await dbProvider.update(
       'orders',
       values: {
         'subtotal': subtotal,
         'discount_percent': discountPercent,
-        'discount_amount':
-            discountAmount, // FIXED: Update discount amount when recalculating
-        'tax_percent': vatPercent, // FIXED: Update VAT percent if it was 0
-        'tax_amount': taxAmount,
+        'discount_amount': discountAmount,
+        'tax_percent': 0.0,
+        'tax_amount': 0.0,
         'total_amount': totalAmount,
         'updated_at': DateTime.now().millisecondsSinceEpoch,
       },
