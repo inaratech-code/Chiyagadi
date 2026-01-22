@@ -372,20 +372,6 @@ class _LoginScreenState extends State<LoginScreen>
                                   );
                                 },
                               ),
-                              if (_isFirstTime)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8.0),
-                                  child: Text(
-                                    'Enter a password (4-20 characters) to get started',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(
-                                          color: Colors.grey[500],
-                                        ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
                               const SizedBox(height: 32),
 
                               // Email field (required for Firebase Auth)
@@ -767,11 +753,9 @@ class _LoginScreenState extends State<LoginScreen>
                                                             Colors.white),
                                                   ),
                                                 )
-                                              : Text(
-                                                  _isFirstTime
-                                                      ? 'Setup & Login'
-                                                      : 'Login',
-                                                  style: const TextStyle(
+                                              : const Text(
+                                                  'Login',
+                                                  style: TextStyle(
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.w600,
                                                     color: Colors.white,
