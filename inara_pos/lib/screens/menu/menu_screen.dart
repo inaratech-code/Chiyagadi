@@ -1326,10 +1326,30 @@ class _MenuScreenState extends State<MenuScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      const SizedBox(height: 4),
+                      // Price - FIXED: Plain text price display
+                      Text(
+                        'रू${product.price.toStringAsFixed(0)}',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: () {
+                            final width = MediaQuery.of(context).size.width;
+                            if (!kIsWeb && width < 900) return 14.0; // Mobile (Android/iOS): visible size
+                            if (width < 600) return 14.0; // Mobile web: visible size
+                            return 16.0; // Web: visible size
+                          }(),
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black,
+                          height: 1.1,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       const SizedBox(height: 6),
-                      // Price - FIXED: Single price display in blue button style
+                      // Blue action button for add/select
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
                         decoration: BoxDecoration(
                           color: Colors.blue,
                           borderRadius: BorderRadius.circular(6),
@@ -1345,7 +1365,7 @@ class _MenuScreenState extends State<MenuScreen> {
                               return 14.0; // Web: standard size
                             }(),
                             fontWeight: FontWeight.w600,
-                            color: Colors.white, // White text on blue background
+                            color: Colors.white,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
