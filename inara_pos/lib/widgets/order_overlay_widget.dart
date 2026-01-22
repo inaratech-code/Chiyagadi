@@ -349,7 +349,7 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
         );
         
         // Navigate to Orders page
-        await Future.delayed(const Duration(milliseconds: 500)); // Small delay for smooth transition
+        // Removed delay for faster navigation
         
         if (mounted) {
           Navigator.of(context).pushReplacement(

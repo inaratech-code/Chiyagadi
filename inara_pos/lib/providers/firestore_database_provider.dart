@@ -88,7 +88,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
               // If it's a minified JS error, wait and retry
               if (e.toString().contains('minified') || e.toString().contains('TypeError')) {
                 debugPrint('FirestoreDatabase: Minified JS error detected, waiting longer before retry...');
-                await Future.delayed(Duration(milliseconds: 500 * (attempt + 1)));
+                // Reduced delay for faster retry (was 500ms, now 100ms)
+                await Future.delayed(Duration(milliseconds: 100 * (attempt + 1)));
                 // Try again
                 firestoreInstance = FirebaseFirestore.instance;
               } else {
@@ -493,7 +494,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       debugPrint('FirestoreDatabase: Chiyagaadi menu seed completed - Added: $productsAdded products, Skipped: $productsSkipped products, Batches committed: $batchesCommitted');
       
       // Wait a moment for Firestore to propagate writes
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Removed delay for faster operation
       
       // Verify data was saved by querying directly from Firestore
       try {

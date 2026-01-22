@@ -1865,12 +1865,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               backgroundColor: Colors.green,
             ),
           );
-          // Navigate back after a short delay
-          Future.delayed(const Duration(seconds: 1), () {
-            if (mounted) {
-              Navigator.pop(context);
-            }
-          });
+          // Navigate back immediately
+          if (mounted) {
+            Navigator.pop(context);
+          }
         }
       } catch (e) {
         if (mounted) {

@@ -52,9 +52,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     try {
       // Ensure Firebase is initialized before any Firestore access (web).
       if (kIsWeb) {
-        // Wait a moment to ensure browser environment is fully ready
-        // This helps avoid null check errors from accessing Firebase too early
-        await Future.delayed(const Duration(milliseconds: 100));
+        // Removed delay - check immediately for faster initialization
         
         // Step 1: Initialize Firebase App (required for Firestore)
         // Use defensive programming to handle null check errors
@@ -68,8 +66,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
               firebaseApps = Firebase.apps;
             } catch (e) {
               debugPrint('UnifiedDatabase: Error accessing Firebase.apps: $e');
-              // Wait a bit longer and try again
-              await Future.delayed(const Duration(milliseconds: 200));
+              // Retry immediately without delay for faster initialization
               try {
                 firebaseApps = Firebase.apps;
               } catch (e2) {
@@ -161,7 +158,8 @@ class UnifiedDatabaseProvider with ChangeNotifier {
                     if (attempt < 4) {
                       debugPrint('UnifiedDatabase: Waiting longer before retry...');
                       // Wait progressively longer for null check errors
-                      await Future.delayed(Duration(milliseconds: 1000 * (attempt + 1)));
+                      // Reduced delay for faster retry (was 1000ms, now 200ms)
+                      await Future.delayed(Duration(milliseconds: 200 * (attempt + 1)));
                       continue;
                     }
                   }
@@ -221,7 +219,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
         
         // Additional delay for iOS Safari before accessing Firestore
         if (kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-          await Future.delayed(const Duration(milliseconds: 200));
+          // Removed delay - check immediately
         }
 
         // Step 2: Try Firebase Auth (OPTIONAL - Firestore can work without it)
@@ -306,7 +304,8 @@ class UnifiedDatabaseProvider with ChangeNotifier {
             providerErrorMsg.contains('minified') ||
             providerErrorMsg.contains('TypeError')) {
           debugPrint('UnifiedDatabase: Transient error detected, retrying after delay...');
-          await Future.delayed(const Duration(milliseconds: 1000));
+          // Reduced delay for faster retry (was 1000ms, now 100ms)
+          await Future.delayed(const Duration(milliseconds: 100));
           
           try {
             debugPrint('UnifiedDatabase: Retrying provider initialization...');

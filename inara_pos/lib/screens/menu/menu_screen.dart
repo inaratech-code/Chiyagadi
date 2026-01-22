@@ -169,7 +169,7 @@ class _MenuScreenState extends State<MenuScreen> {
         debugPrint('MenuScreen: Seed completed successfully, reloading data...');
         
         // Wait a moment for Firestore to propagate
-        await Future.delayed(const Duration(milliseconds: 500));
+        // Removed delay for faster operation
         
         // Reload menu data
         await _loadData();
@@ -480,8 +480,7 @@ class _MenuScreenState extends State<MenuScreen> {
             debugPrint('MenuScreen: Force init attempt $attempt/3...');
             await dbProvider.forceInit();
             
-            // Wait a moment for initialization to complete
-            await Future.delayed(const Duration(milliseconds: 500));
+            // Check immediately without delay
             
             // Test the connection to verify it actually works
             final connectionTest = await dbProvider.testConnection();
@@ -492,16 +491,11 @@ class _MenuScreenState extends State<MenuScreen> {
               break;
             } else {
               debugPrint('MenuScreen: Database still not available after attempt $attempt (connection test: $connectionTest)');
-              if (attempt < 3) {
-                // Wait longer before next attempt
-                await Future.delayed(Duration(milliseconds: 1000 * attempt));
-              }
+              // Removed delay - retry immediately
             }
           } catch (e) {
             debugPrint('MenuScreen: Error during force reinitialize attempt $attempt: $e');
-            if (attempt < 3) {
-              await Future.delayed(Duration(milliseconds: 1000 * attempt));
-            }
+            // Removed delay - retry immediately
           }
         }
         
@@ -520,8 +514,7 @@ class _MenuScreenState extends State<MenuScreen> {
                     // Force reinitialize and reload
                     final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
                     await dbProvider.forceInit();
-                    await Future.delayed(const Duration(milliseconds: 500));
-                    _loadData(); // Retry loading
+                    _loadData(); // Retry loading immediately
                   },
                 ),
               ),
@@ -1548,7 +1541,21 @@ class _MenuScreenState extends State<MenuScreen> {
           'updated_at': now,
         });
 
-        await _loadData(); // Reload data to show new category
+        // Update state optimistically for instant UI update
+        setState(() {
+          _categories.add(Category(
+            id: kIsWeb ? null : categoryId as int?,
+            documentId: kIsWeb ? categoryId.toString() : null,
+            name: categoryName,
+            isActive: true,
+            displayOrder: _categories.length,
+            createdAt: now,
+            updatedAt: now,
+          ));
+        });
+        
+        // Reload in background without blocking
+        _loadData();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1718,7 +1725,25 @@ class _MenuScreenState extends State<MenuScreen> {
           whereArgs: [categoryId],
         );
 
-        await _loadData(); // Reload data to show updated category
+        // Update state optimistically for instant UI update
+        setState(() {
+          final index = _categories.indexWhere((c) => 
+            (kIsWeb ? c.documentId : c.id?.toString()) == categoryId.toString());
+          if (index != -1) {
+            _categories[index] = Category(
+              id: _categories[index].id,
+              documentId: _categories[index].documentId,
+              name: categoryName,
+              isActive: isActive,
+              displayOrder: _categories[index].displayOrder,
+              createdAt: _categories[index].createdAt,
+              updatedAt: now,
+            );
+          }
+        });
+        
+        // Reload in background without blocking
+        _loadData();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1746,8 +1771,8 @@ class _MenuScreenState extends State<MenuScreen> {
       // Show dialog to add a category first
       final categoryAdded = await _showAddCategoryDialog();
       if (categoryAdded == true) {
-        // Reload categories and then show add product dialog
-        await _loadData();
+        // Reload categories in background (non-blocking)
+        _loadData();
         // Retry showing add product dialog if categories are now available
         if (_categories.isNotEmpty) {
           await _showAddProductDialog();
