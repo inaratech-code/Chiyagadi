@@ -825,7 +825,7 @@ class _MenuScreenState extends State<MenuScreen> {
             ),
             child: TextField(
               decoration: InputDecoration(
-                hintText: 'Search menu items...',
+                hintText: 'I want to sell...',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
@@ -836,7 +836,7 @@ class _MenuScreenState extends State<MenuScreen> {
                           });
                         },
                       )
-                    : null,
+                    : Icon(Icons.view_list, color: Colors.blue),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: Colors.grey[300]!),
