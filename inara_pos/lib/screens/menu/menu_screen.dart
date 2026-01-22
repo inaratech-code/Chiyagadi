@@ -1325,19 +1325,14 @@ class _MenuScreenState extends State<MenuScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 6),
-                      // Price - FIXED: Larger font size for better visibility
+                      // Price - FIXED: Smaller font size to ensure all prices are visible
                       Text(
                         'रू${product.price.toStringAsFixed(0)}',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: () {
-                            final width = MediaQuery.of(context).size.width;
-                            if (!kIsWeb && width < 900) return 15.0; // Mobile (Android/iOS): larger for visibility
-                            if (width < 600) return 15.0; // Mobile web: larger
-                            return 17.0; // Web: larger
-                          }(),
-                          fontWeight: FontWeight.w700, // FIXED: Bold for better visibility
-                          color: Colors.black, // FIXED: Solid black for maximum contrast
+                          fontSize: 10.0, // FIXED: Fixed size 10 for all platforms to ensure visibility
+                          fontWeight: FontWeight.w700, // Bold for visibility
+                          color: Colors.black, // Solid black for maximum contrast
                         ),
                       ),
                     ],
