@@ -19,7 +19,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _cafeNameController = TextEditingController();
   final _cafeNameEnController = TextEditingController();
   final _addressController = TextEditingController();
-  final _vatPercentController = TextEditingController();
   String? _selectedDefaultDiscount;
   String? _selectedMaxDiscount;
   bool _discountEnabled = true;
@@ -66,10 +65,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           case 'cafe_address':
             _addressController.text = value;
             break;
-          case 'tax_percent':
-          case 'vat_percent':
-            _vatPercentController.text = value;
-            break;
           case 'default_discount_percent':
             _selectedDefaultDiscount = value;
             break;
@@ -105,20 +100,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
       final now = DateTime.now().millisecondsSinceEpoch;
 
-      // Validate VAT percent (admin only can modify, but we still validate on save)
-      final vatRaw = _vatPercentController.text.trim();
-      final vatParsed = double.tryParse(vatRaw);
-      if (vatParsed == null || vatParsed < 0 || vatParsed > 100) {
-        AppMessenger.showSnackBar('Please enter a valid VAT % (0 to 100)');
-        return;
-      }
-
       // Update or insert settings
       final settings = [
         'cafe_name',
         'cafe_name_en',
         'cafe_address',
-        'tax_percent',
         if (authProvider.isAdmin) 'default_discount_percent',
         if (authProvider.isAdmin) 'max_discount_percent',
         if (authProvider.isAdmin) 'discount_enabled',
@@ -127,8 +113,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _cafeNameController.text.trim(),
         _cafeNameEnController.text.trim(),
         _addressController.text.trim(),
-        // Store as string (works for SQLite + Firestore) and allow decimals
-        vatParsed.toString(),
         if (authProvider.isAdmin) _selectedDefaultDiscount ?? '0',
         if (authProvider.isAdmin) _selectedMaxDiscount ?? '50',
         if (authProvider.isAdmin) _discountEnabled ? '1' : '0',
@@ -261,58 +245,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                             maxLines: 2,
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // VAT Settings (Visible to All, Editable by Admin Only)
-                  Card(
-                    color: AppTheme.logoPrimary.withOpacity(0.1),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.receipt_long,
-                                  color: AppTheme.logoPrimary),
-                              const SizedBox(width: 8),
-                              Text(
-                                'VAT Settings',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleLarge
-                                    ?.copyWith(
-                                      color: AppTheme.logoAccent,
-                                    ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Configure Value Added Tax (VAT) percentage',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          TextField(
-                            controller: _vatPercentController,
-                            // Allow VAT editing for all users (requested).
-                            enabled: true,
-                            keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true),
-                            decoration: const InputDecoration(
-                              labelText: 'VAT % (manual)',
-                              border: OutlineInputBorder(),
-                              helperText:
-                                  'Example: 13 (Nepal default). You can set 0–100 and decimals (e.g., 13.5).',
-                            ),
-                          ),
-                          // Discounts remain admin-only below.
                         ],
                       ),
                     ),
@@ -861,7 +793,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _cafeNameController.dispose();
     _cafeNameEnController.dispose();
     _addressController.dispose();
-    _vatPercentController.dispose();
     super.dispose();
   }
 }

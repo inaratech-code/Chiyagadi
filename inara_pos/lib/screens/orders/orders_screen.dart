@@ -33,22 +33,35 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Future<bool> _confirmAdminPin() async {
     final auth = Provider.of<InaraAuthProvider>(context, listen: false);
     final pinController = TextEditingController();
+    bool obscurePassword = true;
 
     final ok = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Password Required'),
-        content: TextField(
-          controller: pinController,
-          keyboardType: TextInputType.text,
-          obscureText: true,
-          maxLength: 20,
-          decoration: const InputDecoration(
-            labelText: 'Password',
-            helperText: '4-20 characters',
-            border: OutlineInputBorder(),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Password Required'),
+          content: TextField(
+            controller: pinController,
+            keyboardType: TextInputType.text,
+            obscureText: obscurePassword,
+            maxLength: 20,
+            decoration: InputDecoration(
+              labelText: 'Password',
+              helperText: '4-20 characters',
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  obscurePassword ? Icons.visibility : Icons.visibility_off,
+                ),
+                onPressed: () {
+                  setDialogState(() {
+                    obscurePassword = !obscurePassword;
+                  });
+                },
+                tooltip: obscurePassword ? 'Show password' : 'Hide password',
+              ),
+            ),
           ),
-        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -73,6 +86,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             child: const Text('Continue'),
           ),
         ],
+      ),
       ),
     );
     return ok == true;
@@ -713,8 +727,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
     // Dialog state
     String orderType = 'takeaway';
     dynamic selectedTableId;
-    // Default VAT from settings (admin can adjust in Settings)
-    double vatPercent = 13.0;
     double discountPercent = 0.0;
     final searchController = TextEditingController();
     final Map<dynamic, int> qty = {};
@@ -722,16 +734,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
     // Load tables
     final tables = await dbProvider
         .query('tables', where: 'status = ?', whereArgs: ['available']);
-
-    // Load VAT from settings if present
-    try {
-      final vatSetting = await dbProvider
-          .query('settings', where: 'key = ?', whereArgs: ['tax_percent']);
-      if (vatSetting.isNotEmpty) {
-        final raw = vatSetting.first['value']?.toString() ?? '';
-        vatPercent = double.tryParse(raw) ?? vatPercent;
-      }
-    } catch (_) {}
 
     // Load sellable products (no category selection needed here)
     List<Map<String, dynamic>> productMaps;
@@ -775,8 +777,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
     double calcDiscountAmount(double subtotal) =>
         subtotal * (discountPercent / 100.0);
-    double calcVatAmount(double discountedSubtotal) =>
-        discountedSubtotal * (vatPercent / 100.0);
 
     final result = await showDialog<bool>(
       context: context,
@@ -790,9 +790,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
           final subtotal = calcSubtotal();
           final discountAmount = calcDiscountAmount(subtotal);
-          final discountedSubtotal = subtotal - discountAmount;
-          final vatAmount = calcVatAmount(discountedSubtotal);
-          final total = discountedSubtotal + vatAmount;
+          final total = subtotal - discountAmount;
           final hasItems = qty.values.any((v) => v > 0);
 
           return Dialog(
@@ -883,46 +881,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
                     const SizedBox(height: 12),
 
-                    // VAT + Discount
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            initialValue: vatPercent.toStringAsFixed(1),
-                            decoration: const InputDecoration(
-                              labelText: 'VAT %',
-                              border: OutlineInputBorder(),
-                              suffixText: '%',
-                            ),
-                            keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true),
-                            onChanged: (v) {
-                              final parsed = double.tryParse(v) ?? vatPercent;
-                              setDialogState(
-                                  () => vatPercent = parsed.clamp(0, 100));
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            initialValue: discountPercent.toStringAsFixed(1),
-                            decoration: const InputDecoration(
-                              labelText: 'Discount %',
-                              border: OutlineInputBorder(),
-                              suffixText: '%',
-                            ),
-                            keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true),
-                            onChanged: (v) {
-                              final parsed =
-                                  double.tryParse(v) ?? discountPercent;
-                              setDialogState(
-                                  () => discountPercent = parsed.clamp(0, 100));
-                            },
-                          ),
-                        ),
-                      ],
+                    // Discount
+                    TextFormField(
+                      initialValue: discountPercent.toStringAsFixed(1),
+                      decoration: const InputDecoration(
+                        labelText: 'Discount %',
+                        border: OutlineInputBorder(),
+                        suffixText: '%',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      onChanged: (v) {
+                        final parsed =
+                            double.tryParse(v) ?? discountPercent;
+                        setDialogState(
+                            () => discountPercent = parsed.clamp(0, 100));
+                      },
                     ),
 
                     const SizedBox(height: 12),
@@ -1019,8 +993,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           _totalRow(
                               'Discount (${discountPercent.toStringAsFixed(1)}%)',
                               -discountAmount),
-                          _totalRow('VAT (${vatPercent.toStringAsFixed(1)}%)',
-                              vatAmount),
                           const Divider(),
                           _totalRow('Total', total, isTotal: true),
                         ],
@@ -1110,11 +1082,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
           );
         }
 
-        // Apply VAT/Discount and force totals update
+        // Apply Discount and force totals update
         await _orderService.updateVATAndDiscount(
           dbProvider: dbProvider,
           orderId: orderId,
-          vatPercent: vatPercent,
+          vatPercent: 0.0,
           discountPercent: discountPercent,
         );
 

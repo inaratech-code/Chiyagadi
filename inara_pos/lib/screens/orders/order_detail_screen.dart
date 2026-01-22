@@ -1445,30 +1445,43 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     // NEW: Role-based + password-protected deletion
     final auth = Provider.of<InaraAuthProvider>(context, listen: false);
     final pinController = TextEditingController();
+    bool obscurePassword = true;
 
     final ok = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Order (Password Required)'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-                'Deleting an order is a sensitive action and requires password confirmation.'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: pinController,
-              keyboardType: TextInputType.text,
-              obscureText: true,
-              maxLength: 20,
-              decoration: const InputDecoration(
-                labelText: 'Password',
-                helperText: '4-20 characters',
-                border: OutlineInputBorder(),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Delete Order (Password Required)'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                  'Deleting an order is a sensitive action and requires password confirmation.'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: pinController,
+                keyboardType: TextInputType.text,
+                obscureText: obscurePassword,
+                maxLength: 20,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  helperText: '4-20 characters',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      obscurePassword ? Icons.visibility : Icons.visibility_off,
+                    ),
+                    onPressed: () {
+                      setDialogState(() {
+                        obscurePassword = !obscurePassword;
+                      });
+                    },
+                    tooltip: obscurePassword ? 'Show password' : 'Hide password',
+                  ),
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1495,6 +1508,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             child: const Text('Continue'),
           ),
         ],
+      ),
       ),
     );
 
