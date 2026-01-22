@@ -1297,28 +1297,50 @@ class _MenuScreenState extends State<MenuScreen> {
                   ),
                 ),
 
-                // FIXED: Content area - show only name, no price to prevent overlap
+                // FIXED: Content area - show name and price within card frame to prevent overlap
                 Container(
-                  constraints: const BoxConstraints(minHeight: 50),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                  child: Center(
-                    child: Text(
-                      product.name,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: () {
-                          final width = MediaQuery.of(context).size.width;
-                          if (!kIsWeb && width < 900) return 14.0; // Mobile (Android/iOS): larger for visibility
-                          if (width < 600) return 14.0; // Mobile web: larger
-                          return 16.0; // Web: larger
-                        }(),
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black,
-                        height: 1.3,
+                  constraints: const BoxConstraints(minHeight: 60),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Item name
+                      Text(
+                        product.name,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: () {
+                            final width = MediaQuery.of(context).size.width;
+                            if (!kIsWeb && width < 900) return 13.0; // Mobile (Android/iOS): compact
+                            if (width < 600) return 13.0; // Mobile web: compact
+                            return 15.0; // Web: slightly larger
+                          }(),
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black,
+                          height: 1.2,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                      const SizedBox(height: 4),
+                      // Price
+                      Text(
+                        'रू${product.price.toStringAsFixed(0)}',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: () {
+                            final width = MediaQuery.of(context).size.width;
+                            if (!kIsWeb && width < 900) return 12.0; // Mobile (Android/iOS): compact
+                            if (width < 600) return 12.0; // Mobile web: compact
+                            return 14.0; // Web: standard size
+                          }(),
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
