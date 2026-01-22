@@ -75,10 +75,6 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
       );
       if (orders.isNotEmpty) {
         _order = orders.first;
-        final taxPercent = (_order!['tax_percent'] as num?)?.toDouble();
-        _vatController.text =
-            (taxPercent != null && taxPercent > 0 ? taxPercent : 0.0)
-                .toStringAsFixed(1);
         _discountController.text =
             (_order!['discount_percent'] as num? ?? 0.0).toStringAsFixed(1);
         debugPrint('OrderOverlay: Loaded order: ${_order!['order_number']}');
