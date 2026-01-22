@@ -1532,7 +1532,7 @@ class _MenuScreenState extends State<MenuScreen> {
                     .reduce((a, b) => a > b ? a : b) +
                 1);
 
-        await dbProvider.insert('categories', {
+        final categoryId = await dbProvider.insert('categories', {
           'name': categoryName,
           'display_order': maxOrder,
           'is_active': categoryIsActive ? 1 : 0,
@@ -1544,17 +1544,17 @@ class _MenuScreenState extends State<MenuScreen> {
         // Update state optimistically for instant UI update
         setState(() {
           _categories.add(Category(
-            id: kIsWeb ? null : categoryId as int?,
+            id: kIsWeb ? null : (categoryId is int ? categoryId : null),
             documentId: kIsWeb ? categoryId.toString() : null,
             name: categoryName,
-            isActive: true,
-            displayOrder: _categories.length,
+            isActive: categoryIsActive,
+            displayOrder: maxOrder,
             createdAt: now,
             updatedAt: now,
           ));
         });
         
-        // Reload in background without blocking
+        // Reload in background without blocking to sync with database
         _loadData();
 
         if (mounted) {
@@ -1734,7 +1734,7 @@ class _MenuScreenState extends State<MenuScreen> {
               id: _categories[index].id,
               documentId: _categories[index].documentId,
               name: categoryName,
-              isActive: isActive,
+              isActive: categoryIsActive,
               displayOrder: _categories[index].displayOrder,
               createdAt: _categories[index].createdAt,
               updatedAt: now,
