@@ -945,17 +945,26 @@ class _MenuScreenState extends State<MenuScreen> {
                                                 fontStyle: FontStyle.italic,
                                               ),
                                             ),
-                                            if (auth.isAdmin) ...[
-                                              const SizedBox(width: 8),
-                                              IconButton(
-                                                icon: const Icon(Icons.edit, size: 18),
-                                                onPressed: () => _showEditCategoryDialog(category),
-                                                tooltip: 'Edit Category',
-                                                padding: EdgeInsets.zero,
-                                                constraints: const BoxConstraints(),
-                                                color: Colors.grey[600],
-                                              ),
-                                            ],
+                                            Builder(
+                                              builder: (context) {
+                                                final auth = Provider.of<InaraAuthProvider>(context, listen: false);
+                                                if (!auth.isAdmin) return const SizedBox.shrink();
+                                                return Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const SizedBox(width: 8),
+                                                    IconButton(
+                                                      icon: const Icon(Icons.edit, size: 18),
+                                                      onPressed: () => _showEditCategoryDialog(category),
+                                                      tooltip: 'Edit Category',
+                                                      padding: EdgeInsets.zero,
+                                                      constraints: const BoxConstraints(),
+                                                      color: Colors.grey[600],
+                                                    ),
+                                                  ],
+                                                );
+                                              },
+                                            ),
                                           ],
                                         ),
                                       ),

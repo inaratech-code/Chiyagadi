@@ -78,9 +78,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
 
       // Set defaults if not found
-      if (_vatPercentController.text.trim().isEmpty) {
-        _vatPercentController.text = '13';
-      }
       if (_selectedDefaultDiscount == null) _selectedDefaultDiscount = '0';
       if (_selectedMaxDiscount == null) _selectedMaxDiscount = '50';
 
