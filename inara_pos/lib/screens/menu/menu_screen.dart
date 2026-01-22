@@ -1306,7 +1306,7 @@ class _MenuScreenState extends State<MenuScreen> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Item name - FIXED: Smaller font to make room for price
+                      // Item name - FIXED: Decreased font size
                       Flexible(
                         child: Text(
                           product.name,
@@ -1314,9 +1314,9 @@ class _MenuScreenState extends State<MenuScreen> {
                           style: TextStyle(
                             fontSize: () {
                               final width = MediaQuery.of(context).size.width;
-                              if (!kIsWeb && width < 900) return 12.0; // Mobile (Android/iOS): smaller to fit both
-                              if (width < 600) return 12.0; // Mobile web: smaller to fit both
-                              return 14.0; // Web: slightly larger
+                              if (!kIsWeb && width < 900) return 11.0; // Mobile (Android/iOS): decreased
+                              if (width < 600) return 11.0; // Mobile web: decreased
+                              return 13.0; // Web: decreased
                             }(),
                             fontWeight: FontWeight.w700,
                             color: Colors.black,
@@ -1327,16 +1327,16 @@ class _MenuScreenState extends State<MenuScreen> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      // Price - FIXED: Plain text price display
+                      // Price - FIXED: Decreased font size, removed blue button
                       Text(
                         'रू${product.price.toStringAsFixed(0)}',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: () {
                             final width = MediaQuery.of(context).size.width;
-                            if (!kIsWeb && width < 900) return 14.0; // Mobile (Android/iOS): visible size
-                            if (width < 600) return 14.0; // Mobile web: visible size
-                            return 16.0; // Web: visible size
+                            if (!kIsWeb && width < 900) return 12.0; // Mobile (Android/iOS): decreased
+                            if (width < 600) return 12.0; // Mobile web: decreased
+                            return 14.0; // Web: decreased
                           }(),
                           fontWeight: FontWeight.w700,
                           color: Colors.black,
@@ -1344,32 +1344,6 @@ class _MenuScreenState extends State<MenuScreen> {
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 6),
-                      // Blue action button for add/select
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.blue,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '< रू${product.price.toStringAsFixed(0)} >',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: () {
-                              final width = MediaQuery.of(context).size.width;
-                              if (!kIsWeb && width < 900) return 12.0; // Mobile (Android/iOS): compact
-                              if (width < 600) return 12.0; // Mobile web: compact
-                              return 14.0; // Web: standard size
-                            }(),
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
                       ),
                     ],
                   ),
