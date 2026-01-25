@@ -503,13 +503,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                     ),
                                     // UPDATED: Manual stock editing is not allowed.
                                     // Stock must change only via Purchases (inventory_ledger entries).
+                                    // Removed dialog - no action on tap
                                     onTap: () {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                              'Manual stock editing is disabled. Use Purchases to increase stock.'),
-                                        ),
-                                      );
+                                      // No action - stock editing is done through Purchases
                                     },
                                   ),
                                 );
