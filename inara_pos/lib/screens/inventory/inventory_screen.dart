@@ -501,11 +501,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                           ),
                                       ],
                                     ),
-                                    // UPDATED: Manual stock editing is not allowed.
-                                    // Stock must change only via Purchases (inventory_ledger entries).
-                                    // Removed dialog - no action on tap
+                                    // ENABLED: Manual stock editing is now allowed
                                     onTap: () {
-                                      // No action - stock editing is done through Purchases
+                                      _showAdjustInventoryDialog(item);
                                     },
                                   ),
                                 );
@@ -528,7 +526,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     String transactionType = 'adjustment';
     final notesController = TextEditingController();
 
-    final result = await showDialog<bool>(
+    final result = await showDialog<String?>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
@@ -574,11 +572,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(context, null),
               child: const Text('Cancel'),
             ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'delete'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('Delete Stock'),
+            ),
             ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () => Navigator.pop(context, 'update'),
               child: const Text('Update'),
             ),
           ],
@@ -586,7 +591,75 @@ class _InventoryScreenState extends State<InventoryScreen> {
       ),
     );
 
-    if (result == true) {
+    if (result == 'delete') {
+      // Delete stock - set to 0
+      try {
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
+        await dbProvider.init();
+
+        final productId = item['product_id'];
+        final productName = item['product_name'] as String;
+
+        // Get current stock from ledger
+        final currentStock = await _ledgerService.getCurrentStock(
+          context: context,
+          productId: productId,
+        );
+
+        if (currentStock <= 0) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Stock is already zero')),
+            );
+          }
+          return;
+        }
+
+        // Create ledger entry to remove all stock
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final createdBy = authProvider.currentUserId != null
+            ? int.tryParse(authProvider.currentUserId!)
+            : null;
+
+        await _ledgerService.addLedgerEntry(
+          context: context,
+          ledgerEntry: InventoryLedger(
+            productId: productId,
+            productName: productName,
+            transactionType: 'adjustment',
+            quantityIn: 0.0,
+            quantityOut: currentStock,
+            unitPrice: 0.0,
+            referenceType: 'adjustment',
+            referenceId: null,
+            notes: 'Manual stock deletion - removed all stock',
+            createdBy: createdBy,
+            createdAt: now,
+          ),
+        );
+
+        await _loadInventory();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Stock deleted successfully'),
+              backgroundColor: AppTheme.successColor,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting stock: $e')),
+          );
+        }
+      }
+      return;
+    }
+
+    if (result == 'update') {
       try {
         final newQuantity = double.tryParse(quantityController.text) ?? 0;
 

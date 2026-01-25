@@ -2739,6 +2739,58 @@ class _MenuScreenState extends State<MenuScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
+                  // NEW: Show current stock quantity
+                  FutureBuilder<double>(
+                    future: _getProductStock(product),
+                    builder: (context, snapshot) {
+                      final currentStock = snapshot.data ?? 0.0;
+                      return Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Current Stock',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  snapshot.hasData
+                                      ? '${currentStock.toStringAsFixed(currentStock.truncateToDouble() == currentStock ? 0 : 1)} pcs'
+                                      : 'Loading...',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: currentStock > 0 
+                                        ? Colors.green[700] 
+                                        : Colors.red[700],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (currentStock > 0)
+                              Icon(
+                                Icons.check_circle,
+                                color: Colors.green[700],
+                                size: 24,
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: inventoryQuantityController,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
