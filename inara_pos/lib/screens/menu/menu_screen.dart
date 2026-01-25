@@ -775,43 +775,37 @@ class _MenuScreenState extends State<MenuScreen> {
         children: [
           Column(
         children: [
-          // Category Section
+          // Category Section - Compact with small button
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: AppTheme.logoLight.withOpacity(0.22),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 2,
-                  offset: const Offset(0, 1),
-                ),
-              ],
+              color: AppTheme.logoLight.withOpacity(0.15),
               border: Border(
                 bottom: BorderSide(
-                  color: AppTheme.logoSecondary.withOpacity(0.25),
+                  color: AppTheme.logoSecondary.withOpacity(0.2),
                   width: 1,
                 ),
               ),
             ),
             child: Row(
               children: [
-                Icon(Icons.category, color: AppTheme.logoPrimary, size: 20),
-                const SizedBox(width: 8),
+                Icon(Icons.category, color: AppTheme.logoPrimary, size: 16),
+                const SizedBox(width: 6),
                 const Text(
                   'Categories',
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const Spacer(),
-                TextButton.icon(
+                IconButton(
                   onPressed: () => _showAddCategoryDialog(),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Add Category'),
-                  style: TextButton.styleFrom(
+                  icon: const Icon(Icons.add_circle_outline, size: 20),
+                  tooltip: 'Add Category',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  style: IconButton.styleFrom(
                     foregroundColor: AppTheme.logoPrimary,
                   ),
                 ),
@@ -2280,6 +2274,17 @@ class _MenuScreenState extends State<MenuScreen> {
           return;
         }
         
+        // Determine if this category allows inventory tracking
+        final selectedCategory = _categories.firstWhere(
+          (c) => _getCategoryIdentifier(c) == selectedCategoryId,
+          orElse: () => _categories.isNotEmpty ? _categories.first : Category(
+            name: 'Unknown',
+            createdAt: 0,
+            updatedAt: 0,
+          ),
+        );
+        final trackInventory = canTrackInventoryForCategory(selectedCategory.name);
+        
         final productId = await dbProvider.insert('products', {
           'category_id': selectedCategoryId,
           'name': newName,
@@ -2293,6 +2298,8 @@ class _MenuScreenState extends State<MenuScreen> {
           'is_active': isActive ? 1 : 0,
           'is_purchasable': 0, // Menu items are not purchasable by default
           'is_sellable': 1, // Menu items are sellable
+          'track_inventory': trackInventory ? 1 : 0, // Set based on category
+          'stock_quantity': trackInventory ? 0.0 : null, // Initialize to 0 if tracking enabled
           'created_at': now,
           'updated_at': now,
         });
@@ -2936,20 +2943,54 @@ class _MenuScreenState extends State<MenuScreen> {
         // Auto-assign image by name if none provided.
         finalImageUrl ??= _defaultMenuImageForName(newName);
 
+        // Determine if the new category allows inventory tracking
+        final selectedCategory = _categories.firstWhere(
+          (c) => _getCategoryIdentifier(c) == selectedCategoryId,
+          orElse: () => _categories.isNotEmpty ? _categories.first : Category(
+            name: 'Unknown',
+            createdAt: 0,
+            updatedAt: 0,
+          ),
+        );
+        final trackInventory = canTrackInventoryForCategory(selectedCategory.name);
+        
+        // Get current product data to preserve stock_quantity if category doesn't change tracking
+        final currentProduct = await dbProvider.query(
+          'products',
+          where: kIsWeb ? 'documentId = ?' : 'id = ?',
+          whereArgs: [kIsWeb ? product.documentId : product.id],
+        );
+        
+        final currentStock = currentProduct.isNotEmpty
+            ? (currentProduct.first['stock_quantity'] as num?)?.toDouble()
+            : null;
+        
+        // Prepare update values
+        final updateValues = <String, dynamic>{
+          'category_id': selectedCategoryId,
+          'name': newName,
+          'description': descController.text.trim().isEmpty
+              ? null
+              : descController.text.trim(),
+          'price': double.parse(priceController.text),
+          'image_url': finalImageUrl,
+          'is_veg': isVeg ? 1 : 0,
+          'is_active': isActive ? 1 : 0,
+          'track_inventory': trackInventory ? 1 : 0,
+          'updated_at': DateTime.now().millisecondsSinceEpoch,
+        };
+        
+        // Handle stock_quantity: if tracking is enabled, ensure it's set (preserve existing or set to 0)
+        // If tracking is disabled, set to null
+        if (trackInventory) {
+          updateValues['stock_quantity'] = currentStock ?? 0.0;
+        } else {
+          updateValues['stock_quantity'] = null;
+        }
+        
         await dbProvider.update(
           'products',
-          values: {
-            'category_id': selectedCategoryId,
-            'name': newName,
-            'description': descController.text.trim().isEmpty
-                ? null
-                : descController.text.trim(),
-            'price': double.parse(priceController.text),
-            'image_url': finalImageUrl,
-            'is_veg': isVeg ? 1 : 0,
-            'is_active': isActive ? 1 : 0,
-            'updated_at': DateTime.now().millisecondsSinceEpoch,
-          },
+          values: updateValues,
           where: kIsWeb ? 'documentId = ?' : 'id = ?',
           whereArgs: [kIsWeb ? product.documentId : product.id],
         );
