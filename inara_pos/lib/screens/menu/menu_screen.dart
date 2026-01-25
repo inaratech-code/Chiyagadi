@@ -396,76 +396,7 @@ class _MenuScreenState extends State<MenuScreen> {
       return;
     }
     
-    // NEW: Show quantity input dialog
-    final quantityController = TextEditingController(text: '1');
-    final quantityResult = await showDialog<double>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Add ${product.name}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: quantityController,
-              decoration: const InputDecoration(
-                labelText: 'Quantity',
-                hintText: 'Enter quantity',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              autofocus: true,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Price: रू${product.price.toStringAsFixed(0)}',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[700],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, null),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final quantityText = quantityController.text.trim();
-              if (quantityText.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please enter a quantity'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-              final quantity = double.tryParse(quantityText);
-              if (quantity == null || quantity <= 0) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please enter a valid quantity'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-              Navigator.pop(context, quantity);
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-
-    if (quantityResult == null || quantityResult <= 0) {
-      return; // User cancelled or entered invalid quantity
-    }
-
-    debugPrint('Adding ${product.name} to order with quantity $quantityResult...');
+    debugPrint('Adding ${product.name} to order...');
     setState(() => _isAddingToOrder = true);
 
     try {
@@ -521,7 +452,7 @@ class _MenuScreenState extends State<MenuScreen> {
         context: context,
         orderId: _activeOrderId,
         product: product,
-        quantity: quantityResult.toInt(), // NEW: Use the quantity from dialog (convert to int)
+        quantity: 1, // Add with default quantity of 1
         createdBy: createdBy,
       );
 
@@ -543,7 +474,7 @@ class _MenuScreenState extends State<MenuScreen> {
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Added ${quantityResult.toStringAsFixed(quantityResult.truncateToDouble() == quantityResult ? 0 : 2)}x ${product.name}'),
+            content: Text('Added ${product.name}'),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 1),
           ),
@@ -2368,6 +2299,7 @@ class _MenuScreenState extends State<MenuScreen> {
         TextEditingController(text: product.price.toString());
     final imageUrlController =
         TextEditingController(text: product.imageUrl ?? '');
+    final inventoryQuantityController = TextEditingController(); // NEW: For inventory quantity
     // Find the category that matches this product's categoryId
     final matchingCategory = _categories.firstWhere(
       (c) {
@@ -2752,223 +2684,34 @@ class _MenuScreenState extends State<MenuScreen> {
 
                   const SizedBox(height: 16),
 
-                  // Inventory Management Section
-                  FutureBuilder<double>(
-                    future: _getProductStock(product),
-                    builder: (context, snapshot) {
-                      final currentStock = snapshot.data ?? 0.0;
-                      final stockController = TextEditingController();
-                      
-                      return StatefulBuilder(
-                        builder: (context, setState) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Divider(),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  const Icon(Icons.inventory_2, size: 20, color: Colors.blue),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Inventory Management',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey[800],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[100],
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.grey[300]!),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Current Stock',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          currentStock.toStringAsFixed(2),
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                            color: currentStock > 0 
-                                                ? Colors.green[700] 
-                                                : Colors.red[700],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    if (currentStock > 0)
-                                      Icon(
-                                        Icons.check_circle,
-                                        color: Colors.green[700],
-                                        size: 24,
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: stockController,
-                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                      decoration: InputDecoration(
-                                        labelText: 'Quantity to Add',
-                                        hintText: 'Enter quantity',
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        contentPadding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ElevatedButton.icon(
-                                    onPressed: () async {
-                                      final quantityText = stockController.text.trim();
-                                      if (quantityText.isEmpty) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Please enter a quantity'),
-                                          ),
-                                        );
-                                        return;
-                                      }
-                                      
-                                      final quantity = double.tryParse(quantityText);
-                                      if (quantity == null || quantity <= 0) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Please enter a valid quantity'),
-                                          ),
-                                        );
-                                        return;
-                                      }
-                                      
-                                      try {
-                                        final dbProvider = Provider.of<UnifiedDatabaseProvider>(
-                                          context,
-                                          listen: false,
-                                        );
-                                        await dbProvider.init();
-                                        
-                                        final productId = kIsWeb ? product.documentId : product.id;
-                                        if (productId == null) {
-                                          throw Exception('Product ID is required');
-                                        }
-                                        
-                                        // Ensure product is marked as purchasable
-                                        if (!product.isPurchasable) {
-                                          final now = DateTime.now().millisecondsSinceEpoch;
-                                          await dbProvider.update(
-                                            'products',
-                                            values: {
-                                              'is_purchasable': 1,
-                                              'updated_at': now,
-                                            },
-                                            where: kIsWeb ? 'documentId = ?' : 'id = ?',
-                                            whereArgs: [productId],
-                                          );
-                                        }
-                                        
-                                        // Create inventory ledger entry
-                                        final auth = Provider.of<InaraAuthProvider>(context, listen: false);
-                                        // createdBy must be int? for InventoryLedger
-                                        // For Firestore (web), try to parse string user ID as int
-                                        int? createdBy;
-                                        if (auth.currentUserId != null) {
-                                          if (kIsWeb) {
-                                            // Firestore: try to parse string user ID as int
-                                            createdBy = int.tryParse(auth.currentUserId!);
-                                          } else {
-                                            // SQLite: parse string user ID as int
-                                            createdBy = int.tryParse(auth.currentUserId!);
-                                          }
-                                        }
-                                        
-                                        final ledgerEntry = InventoryLedger(
-                                          productId: productId,
-                                          productName: product.name,
-                                          quantityIn: quantity,
-                                          quantityOut: 0.0,
-                                          unitPrice: product.cost ?? 0.0,
-                                          transactionType: 'manual_adjustment',
-                                          referenceType: 'manual',
-                                          referenceId: null,
-                                          notes: 'Manual stock addition from menu',
-                                          createdBy: createdBy,
-                                          createdAt: DateTime.now().millisecondsSinceEpoch,
-                                        );
-                                        
-                                        final ledgerService = InventoryLedgerService();
-                                        await ledgerService.addLedgerEntry(
-                                          context: context,
-                                          ledgerEntry: ledgerEntry,
-                                        );
-                                        
-                                        // Refresh stock display
-                                        setState(() {
-                                          stockController.clear();
-                                        });
-                                        
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'Added ${quantity.toStringAsFixed(2)} to stock',
-                                            ),
-                                            backgroundColor: Colors.green,
-                                          ),
-                                        );
-                                        
-                                        // Refresh the stock value
-                                        setState(() {});
-                                      } catch (e) {
-                                        debugPrint('Error adding stock: $e');
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Error: ${e.toString()}'),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    icon: const Icon(Icons.add, size: 18),
-                                    label: const Text('Add Stock'),
-                                    style: ElevatedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 12,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          );
-                        },
-                      );
-                    },
+                  // NEW: Simple Inventory Management Section
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.inventory_2, size: 20, color: Colors.blue),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Inventory Management',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: inventoryQuantityController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Add Inventory Quantity',
+                      hintText: 'Enter quantity to add (optional)',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.add_box),
+                      helperText: 'Leave empty if no inventory change needed',
+                    ),
                   ),
 
                   const SizedBox(height: 16),
@@ -3106,11 +2849,73 @@ class _MenuScreenState extends State<MenuScreen> {
           where: kIsWeb ? 'documentId = ?' : 'id = ?',
           whereArgs: [kIsWeb ? product.documentId : product.id],
         );
+        
+        // NEW: Handle inventory quantity if provided
+        final inventoryQuantityText = inventoryQuantityController.text.trim();
+        if (inventoryQuantityText.isNotEmpty) {
+          final inventoryQuantity = double.tryParse(inventoryQuantityText);
+          if (inventoryQuantity != null && inventoryQuantity > 0) {
+            try {
+              final productId = kIsWeb ? product.documentId : product.id;
+              if (productId != null) {
+                // Ensure product is marked as purchasable
+                if (!product.isPurchasable) {
+                  final now = DateTime.now().millisecondsSinceEpoch;
+                  await dbProvider.update(
+                    'products',
+                    values: {
+                      'is_purchasable': 1,
+                      'updated_at': now,
+                    },
+                    where: kIsWeb ? 'documentId = ?' : 'id = ?',
+                    whereArgs: [productId],
+                  );
+                }
+                
+                // Create inventory ledger entry
+                final auth = Provider.of<InaraAuthProvider>(context, listen: false);
+                int? createdBy;
+                if (auth.currentUserId != null) {
+                  createdBy = int.tryParse(auth.currentUserId!);
+                }
+                
+                final ledgerEntry = InventoryLedger(
+                  productId: productId,
+                  productName: newName,
+                  quantityIn: inventoryQuantity,
+                  quantityOut: 0.0,
+                  unitPrice: product.cost ?? 0.0,
+                  transactionType: 'manual_adjustment',
+                  referenceType: 'manual',
+                  referenceId: null,
+                  notes: 'Manual stock addition from menu edit',
+                  createdBy: createdBy,
+                  createdAt: DateTime.now().millisecondsSinceEpoch,
+                );
+                
+                final ledgerService = InventoryLedgerService();
+                await ledgerService.addLedgerEntry(
+                  context: context,
+                  ledgerEntry: ledgerEntry,
+                );
+                
+                debugPrint('MenuScreen: Added ${inventoryQuantity} to inventory for ${newName}');
+              }
+            } catch (e) {
+              debugPrint('Error adding inventory: $e');
+              // Don't fail the whole save if inventory add fails
+            }
+          }
+        }
+        
         await _loadData(); // Await to ensure data is loaded
         if (mounted) {
+          final inventoryMsg = inventoryQuantityText.isNotEmpty
+              ? 'Product updated and inventory added'
+              : 'Product updated';
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Product updated'),
+            SnackBar(
+              content: Text(inventoryMsg),
               backgroundColor: AppTheme.successColor,
             ),
           );
