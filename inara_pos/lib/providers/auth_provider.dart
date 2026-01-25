@@ -349,10 +349,97 @@ class InaraAuthProvider with ChangeNotifier {
     }
   }
 
+  /// NEW: Check if user can auto-login within 1 hour of logout
+  Future<bool> canAutoLogin() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastLogoutTimestamp = prefs.getInt('last_logout_timestamp');
+      
+      if (lastLogoutTimestamp == null) {
+        return false; // No previous session
+      }
+      
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final oneHourInMs = 60 * 60 * 1000; // 1 hour in milliseconds
+      final timeSinceLogout = now - lastLogoutTimestamp;
+      
+      if (timeSinceLogout > oneHourInMs) {
+        // Session expired, clear stored info
+        await prefs.remove('last_logout_user_id');
+        await prefs.remove('last_logout_user_role');
+        await prefs.remove('last_logout_username');
+        await prefs.remove('last_logout_timestamp');
+        return false;
+      }
+      
+      // Session is still valid (within 1 hour)
+      return true;
+    } catch (e) {
+      debugPrint('AuthProvider: Error checking auto-login: $e');
+      return false;
+    }
+  }
+  
+  /// NEW: Auto-login using stored session info
+  Future<bool> autoLogin() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('last_logout_user_id');
+      final userRole = prefs.getString('last_logout_user_role');
+      final username = prefs.getString('last_logout_username');
+      
+      if (userId == null || userId.isEmpty) {
+        return false;
+      }
+      
+      // Restore session
+      _isAuthenticated = true;
+      _currentUserId = userId;
+      _currentUserRole = userRole;
+      _currentUsername = username;
+      
+      if (_lockMode == 'timeout') {
+        _resetInactivityTimer();
+      } else {
+        _inactivityTimer?.cancel();
+        _inactivityTimer = null;
+      }
+      
+      notifyListeners();
+      debugPrint('AuthProvider: Auto-login successful for user: $username');
+      return true;
+    } catch (e) {
+      debugPrint('AuthProvider: Error during auto-login: $e');
+      return false;
+    }
+  }
+  
+  /// NEW: Clear stored session info (called after successful login with credentials)
+  Future<void> _clearStoredSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('last_logout_user_id');
+      await prefs.remove('last_logout_user_role');
+      await prefs.remove('last_logout_username');
+      await prefs.remove('last_logout_timestamp');
+      debugPrint('AuthProvider: Cleared stored session info');
+    } catch (e) {
+      debugPrint('AuthProvider: Error clearing stored session: $e');
+    }
+  }
+
   /// Login using Firebase Authentication
   /// Connects to Firestore document with ID dSc8mQzHPsftOpqb200d7xPhS7K2 for admin
   /// FALLBACK: If Firebase Auth fails but credentials match admin, allow login anyway
   Future<bool> login(String email, String password) async {
+    // NEW: Check for auto-login first (within 1 hour of logout)
+    if (email.isEmpty && password.isEmpty) {
+      final canAuto = await canAutoLogin();
+      if (canAuto) {
+        return await autoLogin();
+      }
+    }
+    
     if (email.isEmpty || password.isEmpty) {
       debugPrint('Login: Email and password are required');
       return false;
@@ -649,6 +736,8 @@ class InaraAuthProvider with ChangeNotifier {
             _currentUsername = adminUser['username'] as String? ?? 'admin';
             
             debugPrint('Login: Success! Admin authenticated with document ID: $_currentUserId');
+            // NEW: Clear old session info on successful login
+            await _clearStoredSession();
             if (_lockMode == 'timeout') {
               _resetInactivityTimer();
             } else {
@@ -690,6 +779,8 @@ class InaraAuthProvider with ChangeNotifier {
           _currentUsername = user['username'] as String? ?? email;
           
           debugPrint('Login: Success! User authenticated - ID: $_currentUserId, Role: $_currentUserRole');
+          // NEW: Clear old session info on successful login
+          await _clearStoredSession();
           if (_lockMode == 'timeout') {
             _resetInactivityTimer();
           } else {
@@ -741,6 +832,8 @@ class InaraAuthProvider with ChangeNotifier {
           _currentUsername = 'admin';
           
           debugPrint('Login: Success! Admin authenticated with document ID: $_currentUserId');
+          // NEW: Clear old session info on successful login
+          await _clearStoredSession();
           if (_lockMode == 'timeout') {
             _resetInactivityTimer();
           } else {
@@ -788,6 +881,8 @@ class InaraAuthProvider with ChangeNotifier {
         _currentUsername = 'user';
       }
       
+      // NEW: Clear old session info on successful login
+      await _clearStoredSession();
       if (_lockMode == 'timeout') {
         _resetInactivityTimer();
       } else {
@@ -823,6 +918,22 @@ class InaraAuthProvider with ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // NEW: Store session info for 1-hour persistence
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final now = DateTime.now().millisecondsSinceEpoch;
+      
+      // Store user info and logout timestamp
+      await prefs.setString('last_logout_user_id', _currentUserId ?? '');
+      await prefs.setString('last_logout_user_role', _currentUserRole ?? '');
+      await prefs.setString('last_logout_username', _currentUsername ?? '');
+      await prefs.setInt('last_logout_timestamp', now);
+      
+      debugPrint('AuthProvider: Stored session info for 1-hour persistence');
+    } catch (e) {
+      debugPrint('AuthProvider: Error storing session info: $e');
+    }
+    
     // Sign out from Firebase Auth
     try {
       await FirebaseAuth.instance.signOut();

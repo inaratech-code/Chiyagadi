@@ -16,6 +16,7 @@ import '../purchases/suppliers_screen.dart';
 import '../orders/orders_screen.dart';
 import '../menu/menu_screen.dart';
 import '../expenses/expenses_screen.dart';
+import 'recent_activity_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Function(int)? onNavigate;
@@ -29,6 +30,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _todaySales = 0.0;
   double _todayCredit = 0.0;
   int _lowStockCount = 0;
+  List<_LowStockItem> _lowStockItems = []; // NEW: Store specific low stock items
   String _shopName = 'Shop';
   List<_ActivityItem> _recentActivity = const [];
   bool _isLoading = true; // Add loading state
@@ -175,12 +177,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ).then((stockMap) {
           if (!mounted) return;
           int lowStockCount = 0;
-          for (final pid in productIds) {
+          List<_LowStockItem> lowStockItems = [];
+          
+          // NEW: Track specific low stock items
+          for (final product in products) {
+            final pid = product['id'];
+            if (pid == null) continue;
             final currentStock = stockMap[pid] ?? 0.0;
-            if (currentStock <= 0) lowStockCount++;
+            if (currentStock <= 0) {
+              lowStockCount++;
+              final productName = product['name'] as String? ?? 'Unknown';
+              lowStockItems.add(_LowStockItem(
+                productId: pid,
+                productName: productName,
+                stock: currentStock,
+              ));
+            }
           }
+          
           if (mounted) {
-            setState(() => _lowStockCount = lowStockCount);
+            setState(() {
+              _lowStockCount = lowStockCount;
+              _lowStockItems = lowStockItems; // NEW: Store low stock items
+            });
           }
         }).catchError((e) {
           debugPrint('Error loading stock: $e');
@@ -194,6 +213,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final orderNumber = (o['order_number'] as String?) ?? 'Order';
         final paymentStatus = (o['payment_status'] as String?) ?? 'unpaid';
         final total = (o['total_amount'] as num?)?.toDouble() ?? 0.0;
+        final orderId = o['id']?.toString() ?? o['documentId']?.toString();
         nextRecent.add(
           _ActivityItem(
             createdAt: createdAt,
@@ -202,6 +222,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             title: orderNumber,
             subtitle: 'Order • ${paymentStatus.toUpperCase()}',
             amount: total,
+            orderId: orderId, // NEW: Store order ID for navigation
           ),
         );
       }
@@ -451,8 +472,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           TextButton.icon(
-            onPressed: _loadDashboardData,
-            icon: const Icon(Icons.refresh, size: 18),
+            onPressed: () {
+              // Navigate to full recent activity screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const RecentActivityScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.arrow_forward, size: 18),
             label: const Text('See All'),
             style: TextButton.styleFrom(
               foregroundColor: Colors.grey[700],
@@ -761,33 +790,88 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
-      color: Colors.red[50],
-      child: Row(
+      decoration: BoxDecoration(
+        color: Colors.red[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.red[200]!, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.warning, color: Colors.red[700]),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '$_lowStockCount item(s) are low on stock!',
-              style: TextStyle(
-                color: Colors.red[900],
-                fontWeight: FontWeight.bold,
+          Row(
+            children: [
+              Icon(Icons.warning, color: Colors.red[700]),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '$_lowStockCount item(s) are low on stock!',
+                  style: TextStyle(
+                    color: Colors.red[900],
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
               ),
-            ),
+              TextButton(
+                onPressed: () {
+                  if (widget.onNavigate != null) {
+                    widget.onNavigate!(6); // Inventory screen index
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const InventoryScreen()),
+                    );
+                  }
+                },
+                child: const Text('View All'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              if (widget.onNavigate != null) {
-                widget.onNavigate!(6); // Inventory screen index
-              } else {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const InventoryScreen()),
-                );
-              }
-            },
-            child: const Text('View'),
-          ),
+          // NEW: Display specific low stock items
+          if (_lowStockItems.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Divider(color: Colors.red, height: 1),
+            const SizedBox(height: 8),
+            ..._lowStockItems.take(5).map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Icon(Icons.inventory_2, size: 16, color: Colors.red[700]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      item.productName,
+                      style: TextStyle(
+                        color: Colors.red[800],
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    'Stock: ${item.stock.toStringAsFixed(item.stock.truncateToDouble() == item.stock ? 0 : 2)}',
+                    style: TextStyle(
+                      color: Colors.red[700],
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            )),
+            if (_lowStockItems.length > 5)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  '... and ${_lowStockItems.length - 5} more',
+                  style: TextStyle(
+                    color: Colors.red[600],
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -1019,52 +1103,84 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 final dt = a.createdAt > 0
                     ? DateTime.fromMillisecondsSinceEpoch(a.createdAt)
                     : null;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: a.color.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(10),
+                // NEW: Make order items clickable to navigate to orders section
+                final isOrder = a.icon == Icons.receipt_long && a.orderId != null;
+                return InkWell(
+                  onTap: isOrder
+                      ? () {
+                          // Navigate to orders section
+                          if (widget.onNavigate != null) {
+                            widget.onNavigate!(1); // Orders screen index
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const OrdersScreen(),
+                              ),
+                            );
+                          }
+                        }
+                      : null,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: a.color.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(a.icon, color: a.color, size: 20),
                         ),
-                        child: Icon(a.icon, color: a.color, size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              a.title,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w700),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              [
-                                a.subtitle,
-                                if (dt != null) timeFmt.format(dt),
-                              ].join(' • '),
-                              style: TextStyle(
-                                  color: Colors.grey[600], fontSize: 12),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                a.title,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: isOrder
+                                      ? Theme.of(context).primaryColor
+                                      : null,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                [
+                                  a.subtitle,
+                                  if (dt != null) timeFmt.format(dt),
+                                ].join(' • '),
+                                style: TextStyle(
+                                    color: Colors.grey[600], fontSize: 12),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        currency.format(a.amount),
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ],
+                        const SizedBox(width: 10),
+                        Text(
+                          currency.format(a.amount),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        if (isOrder) ...[
+                          const SizedBox(width: 8),
+                          Icon(
+                            Icons.arrow_forward_ios,
+                            size: 14,
+                            color: Colors.grey[400],
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 );
               }).toList(),
@@ -1082,6 +1198,7 @@ class _ActivityItem {
   final String title;
   final String subtitle;
   final double amount;
+  final String? orderId; // NEW: Store order ID for navigation
 
   const _ActivityItem({
     required this.createdAt,
@@ -1090,5 +1207,19 @@ class _ActivityItem {
     required this.title,
     required this.subtitle,
     required this.amount,
+    this.orderId, // NEW: Optional order ID
+  });
+}
+
+// NEW: Class to represent low stock items
+class _LowStockItem {
+  final dynamic productId;
+  final String productName;
+  final double stock;
+
+  const _LowStockItem({
+    required this.productId,
+    required this.productName,
+    required this.stock,
   });
 }

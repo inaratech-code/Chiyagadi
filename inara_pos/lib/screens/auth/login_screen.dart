@@ -71,6 +71,20 @@ class _LoginScreenState extends State<LoginScreen>
       // Set context for AuthProvider to access UnifiedDatabaseProvider
       authProvider.setContext(context);
 
+      // NEW: Check for auto-login (within 1 hour of logout)
+      final canAuto = await authProvider.canAutoLogin();
+      if (canAuto) {
+        final autoLoginSuccess = await authProvider.autoLogin();
+        if (autoLoginSuccess && mounted) {
+          // Auto-login successful, navigate to home
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            '/',
+            (route) => false,
+          );
+          return;
+        }
+      }
+
       // Load in background without blocking UI
       final hasPin = await authProvider.checkPinExists();
 

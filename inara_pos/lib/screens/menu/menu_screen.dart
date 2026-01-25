@@ -395,7 +395,77 @@ class _MenuScreenState extends State<MenuScreen> {
       debugPrint('Already adding item, skipping...');
       return;
     }
-    debugPrint('Adding ${product.name} to order...');
+    
+    // NEW: Show quantity input dialog
+    final quantityController = TextEditingController(text: '1');
+    final quantityResult = await showDialog<double>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Add ${product.name}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: quantityController,
+              decoration: const InputDecoration(
+                labelText: 'Quantity',
+                hintText: 'Enter quantity',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Price: रू${product.price.toStringAsFixed(0)}',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[700],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, null),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final quantityText = quantityController.text.trim();
+              if (quantityText.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter a quantity'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+              final quantity = double.tryParse(quantityText);
+              if (quantity == null || quantity <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter a valid quantity'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+              Navigator.pop(context, quantity);
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+
+    if (quantityResult == null || quantityResult <= 0) {
+      return; // User cancelled or entered invalid quantity
+    }
+
+    debugPrint('Adding ${product.name} to order with quantity $quantityResult...');
     setState(() => _isAddingToOrder = true);
 
     try {
@@ -451,7 +521,7 @@ class _MenuScreenState extends State<MenuScreen> {
         context: context,
         orderId: _activeOrderId,
         product: product,
-        quantity: 1,
+        quantity: quantityResult, // NEW: Use the quantity from dialog
         createdBy: createdBy,
       );
 
@@ -473,7 +543,7 @@ class _MenuScreenState extends State<MenuScreen> {
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Added ${product.name}'),
+            content: Text('Added ${quantityResult.toStringAsFixed(quantityResult.truncateToDouble() == quantityResult ? 0 : 2)}x ${product.name}'),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 1),
           ),
