@@ -155,13 +155,14 @@ class AuthWrapper extends StatefulWidget {
 }
 
 class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _checkAuth();
+    // PERF: Check auth in background without blocking UI
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAuth();
+    });
   }
 
   @override
@@ -184,25 +185,15 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   }
 
   Future<void> _checkAuth() async {
-    // PERF: Show UI immediately, load preferences in background
-    // FIXED: Set loading to false immediately without waiting
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-
-    // Check Firebase Auth state
+    // PERF: All auth checks run in background, UI shows immediately
     try {
       final auth = FirebaseAuth.instance;
-          final authProvider = context.read<InaraAuthProvider>();
+      final authProvider = context.read<InaraAuthProvider>();
       
       // Load lock mode preference (non-blocking)
-      if (mounted) {
-        authProvider.loadLockMode().catchError((e) {
-          debugPrint('Error loading lock mode: $e');
-        });
-      }
+      authProvider.loadLockMode().catchError((e) {
+        debugPrint('Error loading lock mode: $e');
+      });
       
       // If user is already signed in with Firebase Auth, restore session
       if (auth.currentUser != null && mounted) {
@@ -210,44 +201,10 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
         // Restore session by checking Firestore document
         final email = auth.currentUser!.email;
         if (email != null && email.toLowerCase() == 'chiyagadi@gmail.com') {
-          // This is admin - restore session
-          try {
-            final dbProvider = context.read<UnifiedDatabaseProvider>();
-            // Init won't throw - it handles errors internally
-            await dbProvider.init();
-            
-            // Only restore if database is available
-            if (dbProvider.isAvailable) {
-              // Check for admin document ID: dSc8mQzHPsftOpqb200d7xPhS7K2
-              const adminDocumentId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
-              final adminUsers = await dbProvider.query(
-                'users',
-                where: 'documentId = ?',
-                whereArgs: [adminDocumentId],
-              );
-              
-              if (adminUsers.isNotEmpty) {
-                final adminUser = adminUsers.first;
-                final adminEmail = adminUser['email'] as String?;
-                
-                if (adminEmail?.toLowerCase() == email.toLowerCase()) {
-                  authProvider.setContext(context);
-                  // Manually set authenticated state since Firebase Auth already verified
-                  debugPrint('AuthWrapper: Restoring admin session for $email');
-                  // Note: We can't directly set auth state here, but login will handle it
-                }
-              } else {
-                // Admin document doesn't exist but Firebase Auth succeeded
-                // Login will create it
-                debugPrint('AuthWrapper: Admin document not found, will be created on login');
-              }
-            } else {
-              debugPrint('AuthWrapper: Database not available, cannot restore session');
-            }
-          } catch (e) {
+          // This is admin - restore session (non-blocking)
+          _restoreAdminSession(authProvider, email).catchError((e) {
             debugPrint('AuthWrapper: Error restoring session: $e');
-            // Don't rethrow - app should continue
-          }
+          });
         }
       }
     } catch (e) {
@@ -255,14 +212,44 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _restoreAdminSession(InaraAuthProvider authProvider, String email) async {
+    try {
+      final dbProvider = context.read<UnifiedDatabaseProvider>();
+      // Init won't throw - it handles errors internally
+      await dbProvider.init();
+      
+      // Only restore if database is available
+      if (dbProvider.isAvailable && mounted) {
+        // Check for admin document ID: dSc8mQzHPsftOpqb200d7xPhS7K2
+        const adminDocumentId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
+        final adminUsers = await dbProvider.query(
+          'users',
+          where: 'documentId = ?',
+          whereArgs: [adminDocumentId],
+        );
+        
+        if (adminUsers.isNotEmpty) {
+          final adminUser = adminUsers.first;
+          final adminEmail = adminUser['email'] as String?;
+          
+          if (adminEmail?.toLowerCase() == email.toLowerCase() && mounted) {
+            authProvider.setContext(context);
+            debugPrint('AuthWrapper: Restoring admin session for $email');
+          }
+        } else {
+          debugPrint('AuthWrapper: Admin document not found, will be created on login');
+        }
+      } else {
+        debugPrint('AuthWrapper: Database not available, cannot restore session');
+      }
+    } catch (e) {
+      debugPrint('AuthWrapper: Error restoring session: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
+    // PERF: Show UI immediately without loading spinner
     return Consumer<InaraAuthProvider>(
       builder: (context, authProvider, _) {
         // IMPORTANT: keep a stable, long-lived context in AuthProvider so it can safely

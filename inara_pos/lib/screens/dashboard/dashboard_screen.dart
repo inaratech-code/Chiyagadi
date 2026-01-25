@@ -33,7 +33,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<_LowStockItem> _lowStockItems = []; // NEW: Store specific low stock items
   String _shopName = 'Shop';
   List<_ActivityItem> _recentActivity = const [];
-  bool _isLoading = true; // Add loading state
+  bool _isLoading = false; // PERF: Start with false to show UI immediately
   // FIXED: Use ledger service instead of direct inventory service
   final InventoryLedgerService _ledgerService = InventoryLedgerService();
 
@@ -57,7 +57,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadDashboardData() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    // PERF: Don't set loading immediately - show content first, update as data loads
+    // Only show loading if data takes more than 300ms
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted && _todaySales == 0.0 && _recentActivity.isEmpty) {
+        setState(() => _isLoading = true);
+      }
+    });
     
     try {
       final dbProvider =

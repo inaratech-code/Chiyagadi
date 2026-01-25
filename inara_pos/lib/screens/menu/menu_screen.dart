@@ -27,7 +27,7 @@ class MenuScreen extends StatefulWidget {
 class _MenuScreenState extends State<MenuScreen> {
   List<Category> _categories = [];
   List<Product> _products = [];
-  bool _isLoading = true;
+  bool _isLoading = false; // PERF: Start with false to show UI immediately
   String _searchQuery = '';
 
   // NEW: Quick order flow (cashier-friendly)
@@ -497,7 +497,14 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    // PERF: Don't set loading immediately - show content first, update as data loads
+    // Only show loading if data takes more than 300ms
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted && _products.isEmpty && _categories.isEmpty) {
+        setState(() => _isLoading = true);
+      }
+    });
+    
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
