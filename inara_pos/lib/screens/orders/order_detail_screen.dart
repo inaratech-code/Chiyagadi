@@ -8,6 +8,7 @@ import '../../services/order_service.dart';
 import '../../services/inventory_ledger_service.dart';
 import '../../utils/theme.dart';
 import 'package:intl/intl.dart';
+import '../dashboard/dashboard_screen.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final dynamic orderId; // Can be int (SQLite) or String (Firestore)
@@ -1849,6 +1850,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   : int.tryParse(authProvider.currentUserId!))
               : null,
         );
+
+        // NEW: Refresh dashboard to update sales and credit immediately
+        DashboardScreen.refreshDashboard();
 
         await _loadData(); // Await to ensure data is loaded
 

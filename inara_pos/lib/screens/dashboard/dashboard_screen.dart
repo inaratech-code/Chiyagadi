@@ -24,6 +24,13 @@ class DashboardScreen extends StatefulWidget {
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
+  
+  // NEW: Static reference to refresh dashboard from anywhere
+  static _DashboardScreenState? _currentState;
+  
+  static void refreshDashboard() {
+    _currentState?._loadDashboardData();
+  }
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
@@ -45,6 +52,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    // NEW: Register this state for global refresh access
+    DashboardScreen._currentState = this;
     // PERF: Show UI immediately, then load data asynchronously
     // This ensures the page appears instantly on Android/iOS
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -53,6 +62,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _loadDashboardData();
       }
     });
+  }
+  
+  @override
+  void dispose() {
+    // NEW: Clear static reference when disposed
+    if (DashboardScreen._currentState == this) {
+      DashboardScreen._currentState = null;
+    }
+    super.dispose();
   }
 
   Future<void> _loadDashboardData() async {

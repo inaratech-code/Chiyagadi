@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../providers/unified_database_provider.dart';
 import '../../services/order_service.dart';
 import '../../utils/number_formatter.dart';
+import '../dashboard/dashboard_screen.dart';
 
 class POSPaymentDialog extends StatefulWidget {
   final Order order;
@@ -184,6 +185,9 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
         amount: amount,
         createdBy: createdBy,
       );
+
+      // NEW: Refresh dashboard to update sales and credit immediately
+      DashboardScreen.refreshDashboard();
 
       if (mounted) {
         Navigator.of(context).pop({

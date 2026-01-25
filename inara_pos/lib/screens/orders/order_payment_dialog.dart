@@ -7,6 +7,7 @@ import '../../services/order_service.dart';
 import '../../utils/number_formatter.dart';
 import '../../utils/app_messenger.dart';
 import '../../models/customer.dart';
+import '../dashboard/dashboard_screen.dart';
 
 class OrderPaymentDialog extends StatefulWidget {
   final dynamic orderId; // int (SQLite) or String (Firestore)
@@ -282,6 +283,9 @@ class _OrderPaymentDialogState extends State<OrderPaymentDialog> {
             : (isPartial ? amount : null),
         createdBy: createdBy,
       );
+
+      // NEW: Refresh dashboard to update sales and credit immediately
+      DashboardScreen.refreshDashboard();
 
       if (mounted) {
         if (_selectedPaymentMethod == 'credit') {
