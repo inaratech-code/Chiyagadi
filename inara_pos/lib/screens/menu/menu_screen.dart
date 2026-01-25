@@ -521,7 +521,7 @@ class _MenuScreenState extends State<MenuScreen> {
         context: context,
         orderId: _activeOrderId,
         product: product,
-        quantity: quantityResult, // NEW: Use the quantity from dialog
+        quantity: quantityResult.toInt(), // NEW: Use the quantity from dialog (convert to int)
         createdBy: createdBy,
       );
 
