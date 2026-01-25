@@ -2851,6 +2851,9 @@ class _MenuScreenState extends State<MenuScreen> {
         );
         
         // NEW: Handle inventory quantity if provided
+        // IMPORTANT: This only updates inventory stock via ledger entries.
+        // It does NOT create orders - inventory management is separate from order creation.
+        // Low inventory items will automatically appear in the home/dashboard section.
         final inventoryQuantityText = inventoryQuantityController.text.trim();
         if (inventoryQuantityText.isNotEmpty) {
           final inventoryQuantity = double.tryParse(inventoryQuantityText);
@@ -2872,7 +2875,8 @@ class _MenuScreenState extends State<MenuScreen> {
                   );
                 }
                 
-                // Create inventory ledger entry
+                // Create inventory ledger entry (NOT an order entry)
+                // This only updates stock levels and will be reflected in dashboard low stock alerts
                 final auth = Provider.of<InaraAuthProvider>(context, listen: false);
                 int? createdBy;
                 if (auth.currentUserId != null) {
@@ -2899,7 +2903,7 @@ class _MenuScreenState extends State<MenuScreen> {
                   ledgerEntry: ledgerEntry,
                 );
                 
-                debugPrint('MenuScreen: Added ${inventoryQuantity} to inventory for ${newName}');
+                debugPrint('MenuScreen: Added ${inventoryQuantity} to inventory for ${newName} (not an order)');
               }
             } catch (e) {
               debugPrint('Error adding inventory: $e');
