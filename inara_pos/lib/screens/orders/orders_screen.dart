@@ -281,6 +281,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
           ? null
           : AppBar(
               elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                tooltip: 'Back',
+              ),
               title: const Text(
                 'Orders',
                 style: TextStyle(fontWeight: FontWeight.bold),
@@ -299,6 +306,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         icon: const Icon(Icons.add),
         label: const Text('New Order'),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat, // FIXED: Ensure FAB stays visible
       body: Column(
         children: [
           // Filter chips
@@ -358,7 +366,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             : RefreshIndicator(
                                 onRefresh: _loadOrders,
                                 child: ListView.builder(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: const EdgeInsets.only(
+                                    left: 16,
+                                    right: 16,
+                                    top: 16,
+                                    bottom: 100, // FIXED: Add bottom padding to prevent FAB from being hidden
+                                  ),
                                   itemCount: _filteredOrders.length +
                                       (_canLoadMore ? 1 : 0),
                                   itemBuilder: (context, index) {
@@ -410,7 +423,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         : RefreshIndicator(
                             onRefresh: _loadOrders,
                             child: ListView.builder(
-                              padding: const EdgeInsets.all(16),
+                              padding: const EdgeInsets.only(
+                                left: 16,
+                                right: 16,
+                                top: 16,
+                                bottom: 100, // FIXED: Add bottom padding to prevent FAB from being hidden
+                              ),
                               itemCount: _filteredOrders.length +
                                   (_canLoadMore ? 1 : 0),
                               itemBuilder: (context, index) {
