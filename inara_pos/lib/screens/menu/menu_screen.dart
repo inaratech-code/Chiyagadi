@@ -11,6 +11,7 @@ import '../../widgets/order_overlay_widget.dart';
 import '../../models/inventory_ledger_model.dart';
 import '../../services/inventory_ledger_service.dart';
 import '../../utils/theme.dart';
+import '../../utils/inventory_category_helper.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io' as io;
 import 'dart:convert';
@@ -2791,16 +2792,30 @@ class _MenuScreenState extends State<MenuScreen> {
                     },
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: inventoryQuantityController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
-                      labelText: 'Add Inventory Quantity',
-                      hintText: 'Enter quantity to add (optional)',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.add_box),
-                      helperText: 'Leave empty if no inventory change needed',
-                    ),
+                  Builder(
+                    builder: (context) {
+                      // Calculate trackInventory from selected category
+                      final selectedCategory = _categories.firstWhere(
+                        (c) => _getCategoryIdentifier(c) == selectedCategoryId,
+                        orElse: () => _categories.first,
+                      );
+                      final trackInventory = canTrackInventoryForCategory(selectedCategory.name);
+                      
+                      return TextField(
+                        controller: inventoryQuantityController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(
+                          labelText: 'Add Inventory Quantity',
+                          hintText: 'Enter quantity to add (optional)',
+                          border: const OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.add_box),
+                          helperText: trackInventory 
+                              ? 'Only allowed for Food, Cold Drinks, and Cigarettes'
+                              : 'Inventory tracking not available for this category',
+                          enabled: trackInventory, // Disable if category doesn't allow inventory
+                        ),
+                      );
+                    },
                   ),
 
                   const SizedBox(height: 16),
@@ -2940,9 +2955,8 @@ class _MenuScreenState extends State<MenuScreen> {
         );
         
         // NEW: Handle inventory quantity if provided
-        // IMPORTANT: This only updates inventory stock via ledger entries.
-        // It does NOT create orders - inventory management is separate from order creation.
-        // Low inventory items will automatically appear in the home/dashboard section.
+        // IMPORTANT: Only allows inventory for countable items (Food, Cold Drinks, Cigarettes)
+        // Uses stockQuantity field directly instead of ledger entries
         final inventoryQuantityText = inventoryQuantityController.text.trim();
         if (inventoryQuantityText.isNotEmpty) {
           final inventoryQuantity = double.tryParse(inventoryQuantityText);
@@ -2950,52 +2964,51 @@ class _MenuScreenState extends State<MenuScreen> {
             try {
               final productId = kIsWeb ? product.documentId : product.id;
               if (productId != null) {
-                // Ensure product is marked as purchasable
-                if (!product.isPurchasable) {
-                  final now = DateTime.now().millisecondsSinceEpoch;
-                  await dbProvider.update(
-                    'products',
-                    values: {
-                      'is_purchasable': 1,
-                      'updated_at': now,
-                    },
-                    where: kIsWeb ? 'documentId = ?' : 'id = ?',
-                    whereArgs: [productId],
-                  );
-                }
-                
-                // Create inventory ledger entry (NOT an order entry)
-                // This only updates stock levels and will be reflected in dashboard low stock alerts
-                final auth = Provider.of<InaraAuthProvider>(context, listen: false);
-                int? createdBy;
-                if (auth.currentUserId != null) {
-                  createdBy = int.tryParse(auth.currentUserId!);
-                }
-                
-                final ledgerEntry = InventoryLedger(
+                // Validate that this product's category allows inventory tracking
+                await validateInventoryAllowed(
+                  dbProvider: dbProvider,
                   productId: productId,
-                  productName: newName,
-                  quantityIn: inventoryQuantity,
-                  quantityOut: 0.0,
-                  unitPrice: product.cost ?? 0.0,
-                  transactionType: 'manual_adjustment',
-                  referenceType: 'manual',
-                  referenceId: null,
-                  notes: 'Manual stock addition from menu edit',
-                  createdBy: createdBy,
-                  createdAt: DateTime.now().millisecondsSinceEpoch,
                 );
                 
-                final ledgerService = InventoryLedgerService();
-                await ledgerService.addLedgerEntry(
-                  context: context,
-                  ledgerEntry: ledgerEntry,
+                // Get current stock
+                final currentProduct = await dbProvider.query(
+                  'products',
+                  where: kIsWeb ? 'documentId = ?' : 'id = ?',
+                  whereArgs: [productId],
                 );
                 
-                debugPrint('MenuScreen: Added ${inventoryQuantity} to inventory for ${newName} (not an order)');
+                if (currentProduct.isEmpty) {
+                  throw Exception('Product not found');
+                }
+                
+                final currentStock = (currentProduct.first['stock_quantity'] as num?)?.toDouble() ?? 0.0;
+                final newStock = currentStock + inventoryQuantity;
+                
+                // Update stockQuantity directly
+                await dbProvider.update(
+                  'products',
+                  values: {
+                    'track_inventory': 1, // Ensure tracking is enabled
+                    'stock_quantity': newStock,
+                    'updated_at': DateTime.now().millisecondsSinceEpoch,
+                  },
+                  where: kIsWeb ? 'documentId = ?' : 'id = ?',
+                  whereArgs: [productId],
+                );
+                
+                debugPrint('MenuScreen: Added ${inventoryQuantity} to inventory for ${newName}. Stock: $currentStock -> $newStock');
               }
             } catch (e) {
               debugPrint('Error adding inventory: $e');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Cannot add inventory: ${e.toString()}'),
+                    backgroundColor: AppTheme.errorColor,
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              }
               // Don't fail the whole save if inventory add fails
             }
           }

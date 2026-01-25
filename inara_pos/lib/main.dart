@@ -62,10 +62,9 @@ class InaraPOSApp extends StatelessWidget {
             themeMode: themeProvider.themeMode,
             scaffoldMessengerKey: AppMessenger.messengerKey,
             navigatorKey: AppMessenger.navigatorKey,
-            home: const _WarmStart(child: AuthWrapper()),
+            // IMPORTANT: Using routes instead of home to allow explicit root route
+            // so logout/login can reliably reset navigation back to AuthWrapper.
             routes: {
-              // IMPORTANT: provide an explicit root route so logout/login can
-              // reliably reset navigation back to AuthWrapper.
               '/': (context) => const _WarmStart(child: AuthWrapper()),
               '/home': (context) => const HomeScreen(),
             },

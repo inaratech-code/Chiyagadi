@@ -127,16 +127,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           where: 'created_at >= ? AND created_at <= ?',
           whereArgs: [startOfDay, endOfDay],
         ),
-        // 3: purchasable products for low stock
+        // 3: products that track inventory (Food, Cold Drinks, Cigarettes)
         kIsWeb
             ? dbProvider.query(
                 'products',
-                where: 'is_purchasable = ?',
+                where: 'track_inventory = ?',
                 whereArgs: [1],
               )
             : dbProvider.query(
                 'products',
-                where: 'is_purchasable = ?',
+                where: 'track_inventory = ?',
                 whereArgs: [1],
               ),
         // 4: recent orders (limit to 3 for faster loading)
@@ -186,48 +186,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
             sum + ((transaction['amount'] as num?)?.toDouble() ?? 0.0),
       );
 
-      // Load stock data asynchronously after main data is shown
+      // Load stock data - use stockQuantity directly from products that track inventory
       if (mounted && products.isNotEmpty) {
-        final productIds = products
-            .map((p) => p['id'])
-            .where((id) => id != null)
-            .toList()
-            .cast<dynamic>();
+        // Process stock data directly from products (no async ledger call needed)
+        int lowStockCount = 0;
+        List<_LowStockItem> lowStockItems = [];
         
-        // Load stock in background to not block UI
-        _ledgerService.getCurrentStockBatch(
-          context: context,
-          productIds: productIds,
-        ).then((stockMap) {
-          if (!mounted) return;
-          int lowStockCount = 0;
-          List<_LowStockItem> lowStockItems = [];
+        // Check stock for products that track inventory (Food, Cold Drinks, Cigarettes)
+        for (final product in products) {
+          final pid = product['id'];
+          if (pid == null) continue;
           
-          // NEW: Track specific low stock items
-          for (final product in products) {
-            final pid = product['id'];
-            if (pid == null) continue;
-            final currentStock = stockMap[pid] ?? 0.0;
-            if (currentStock <= 0) {
-              lowStockCount++;
-              final productName = product['name'] as String? ?? 'Unknown';
-              lowStockItems.add(_LowStockItem(
-                productId: pid,
-                productName: productName,
-                stock: currentStock,
-              ));
-            }
-          }
+          // Get stockQuantity directly from product
+          final stockQuantity = (product['stock_quantity'] as num?)?.toDouble();
+          final currentStock = stockQuantity ?? 0.0;
           
-          if (mounted) {
-            setState(() {
-              _lowStockCount = lowStockCount;
-              _lowStockItems = lowStockItems; // NEW: Store low stock items
-            });
+          // Only show low stock if stock is 0 or less
+          if (currentStock <= 0) {
+            lowStockCount++;
+            final productName = product['name'] as String? ?? 'Unknown';
+            lowStockItems.add(_LowStockItem(
+              productId: pid,
+              productName: productName,
+              stock: currentStock,
+            ));
           }
-        }).catchError((e) {
-          debugPrint('Error loading stock: $e');
-        });
+        }
+        
+        if (mounted) {
+          setState(() {
+            _lowStockCount = lowStockCount;
+            _lowStockItems = lowStockItems;
+          });
+        }
       }
       
       nextLowStockCount = 0; // Will be updated async
@@ -464,7 +455,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _buildSummaryCards(),
       const SizedBox(height: 24),
 
-      // Low Stock Alert
+      // Low Stock Alert - Only for products that track inventory (Food, Cold Drinks, Cigarettes)
       if (_lowStockCount > 0) ...[
         _buildLowStockAlert(),
         const SizedBox(height: 24),
@@ -560,7 +551,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(40),
                 ),
               ),
               const SizedBox(width: 16),

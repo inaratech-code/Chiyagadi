@@ -6,6 +6,7 @@ import '../../services/inventory_ledger_service.dart';
 import '../../models/product.dart';
 import '../../models/inventory_ledger_model.dart';
 import '../../utils/theme.dart';
+import '../../utils/inventory_category_helper.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../purchases/purchases_screen.dart';
@@ -96,16 +97,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
-      // Inventory should be separate from Menu/Orders.
-      // We only show *purchasable* items here (raw materials / stock items),
-      // not sellable menu items.
+      // UPDATED: Only show products that track inventory (countable items: Food, Cold Drinks, Cigarettes)
+      // These are sellable menu items that can be counted, not raw materials
       List<Map<String, dynamic>> productMaps;
 
       if (kIsWeb) {
         // Firestore: use a simple filter (server-side), then sort in memory
         productMaps = await dbProvider.query(
           'products',
-          where: 'is_purchasable = ?',
+          where: 'track_inventory = ?',
           whereArgs: [1],
         );
 
@@ -119,7 +119,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         // For SQLite: simple filter
         productMaps = await dbProvider.query(
           'products',
-          where: 'is_purchasable = ?',
+          where: 'track_inventory = ?',
           whereArgs: [1],
           orderBy: 'name ASC',
         );
@@ -138,26 +138,20 @@ class _InventoryScreenState extends State<InventoryScreen> {
         }
       }
 
-      // FIXED: Calculate stock from ledger for each product
+      // UPDATED: Use stockQuantity directly from products (not ledger-based)
       final List<Map<String, dynamic>> inventoryList = [];
       final List<Map<String, dynamic>> lowStockList = [];
-
-      // PERF: Batch-calc stock (avoids N sequential queries on web)
-      final productIds = products
-          .map((p) => kIsWeb ? p.documentId : p.id)
-          .where((id) => id != null)
-          .toList()
-          .cast<dynamic>();
-      final stockMap = await _ledgerService.getCurrentStockBatch(
-        context: context,
-        productIds: productIds,
-      );
 
       for (final product in products) {
         final productId = kIsWeb ? product.documentId : product.id;
         if (productId == null) continue;
 
-        final currentStock = stockMap[productId] ?? 0.0;
+        // Get stockQuantity directly from product map (Product model may not have it yet)
+        final productMap = productMaps.firstWhere(
+          (p) => (kIsWeb ? p['id'] : p['id']) == productId,
+          orElse: () => <String, dynamic>{},
+        );
+        final currentStock = (productMap['stock_quantity'] as num?)?.toDouble() ?? 0.0;
 
         // UPDATED: Default min stock level (no manual editing; can be configured later)
         const minStockLevel = 5.0;
@@ -602,11 +596,24 @@ class _InventoryScreenState extends State<InventoryScreen> {
         final productId = item['product_id'];
         final productName = item['product_name'] as String;
 
-        // Get current stock from ledger
-        final currentStock = await _ledgerService.getCurrentStock(
-          context: context,
+        // Validate that this product's category allows inventory tracking
+        await validateInventoryAllowed(
+          dbProvider: dbProvider,
           productId: productId,
         );
+
+        // Get current stockQuantity directly from product
+        final productData = await dbProvider.query(
+          'products',
+          where: kIsWeb ? 'documentId = ?' : 'id = ?',
+          whereArgs: [productId],
+        );
+
+        if (productData.isEmpty) {
+          throw Exception('Product not found');
+        }
+
+        final currentStock = (productData.first['stock_quantity'] as num?)?.toDouble() ?? 0.0;
 
         if (currentStock <= 0) {
           if (mounted) {
@@ -617,27 +624,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
           return;
         }
 
-        // Create ledger entry to remove all stock
+        // UPDATED: Update stockQuantity directly to 0 (not via ledger)
         final now = DateTime.now().millisecondsSinceEpoch;
-        final createdBy = authProvider.currentUserId != null
-            ? int.tryParse(authProvider.currentUserId!)
-            : null;
 
-        await _ledgerService.addLedgerEntry(
-          context: context,
-          ledgerEntry: InventoryLedger(
-            productId: productId,
-            productName: productName,
-            transactionType: 'adjustment',
-            quantityIn: 0.0,
-            quantityOut: currentStock,
-            unitPrice: 0.0,
-            referenceType: 'adjustment',
-            referenceId: null,
-            notes: 'Manual stock deletion - removed all stock',
-            createdBy: createdBy,
-            createdAt: now,
-          ),
+        await dbProvider.update(
+          'products',
+          values: {
+            'stock_quantity': 0.0,
+            'updated_at': now,
+          },
+          where: kIsWeb ? 'documentId = ?' : 'id = ?',
+          whereArgs: [productId],
         );
 
         await _loadInventory();
@@ -667,7 +664,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           throw Exception('Stock cannot be negative');
         }
 
-        // FIXED: Use ledger service to create adjustment entry (not direct update)
+        // UPDATED: Validate category allows inventory tracking
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
@@ -676,15 +673,26 @@ class _InventoryScreenState extends State<InventoryScreen> {
         final productId = item['product_id'];
         final productName = item['product_name'] as String;
 
-        // FIXED: Get current stock from ledger (not from inventory table)
-        final currentStock = await _ledgerService.getCurrentStock(
-          context: context,
+        // Validate that this product's category allows inventory tracking
+        await validateInventoryAllowed(
+          dbProvider: dbProvider,
           productId: productId,
         );
 
-        final difference = newQuantity - currentStock;
+        // Get current stockQuantity directly from product
+        final productData = await dbProvider.query(
+          'products',
+          where: kIsWeb ? 'documentId = ?' : 'id = ?',
+          whereArgs: [productId],
+        );
 
-        if (difference == 0) {
+        if (productData.isEmpty) {
+          throw Exception('Product not found');
+        }
+
+        final currentStock = (productData.first['stock_quantity'] as num?)?.toDouble() ?? 0.0;
+
+        if (newQuantity == currentStock) {
           // No change needed
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -694,54 +702,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
           return;
         }
 
-        // FIXED: Create ledger entry for adjustment instead of direct update
+        // UPDATED: Update stockQuantity directly (not via ledger)
         final now = DateTime.now().millisecondsSinceEpoch;
-        final createdBy = authProvider.currentUserId != null
-            ? int.tryParse(authProvider.currentUserId!)
-            : null;
-
-        // Create adjustment ledger entry
-        if (difference > 0) {
-          // Stock increase
-          await _ledgerService.addLedgerEntry(
-            context: context,
-            ledgerEntry: InventoryLedger(
-              productId: productId,
-              productName: productName,
-              transactionType: transactionType,
-              quantityIn: difference,
-              quantityOut: 0.0,
-              unitPrice: 0.0, // Adjustment doesn't have a cost
-              referenceType: 'adjustment',
-              referenceId: null,
-              notes: notesController.text.trim().isEmpty
-                  ? 'Manual stock adjustment'
-                  : notesController.text.trim(),
-              createdBy: createdBy,
-              createdAt: now,
-            ),
-          );
-        } else {
-          // Stock decrease
-          await _ledgerService.addLedgerEntry(
-            context: context,
-            ledgerEntry: InventoryLedger(
-              productId: productId,
-              productName: productName,
-              transactionType: transactionType,
-              quantityIn: 0.0,
-              quantityOut: difference.abs(),
-              unitPrice: 0.0, // Adjustment doesn't have a cost
-              referenceType: 'adjustment',
-              referenceId: null,
-              notes: notesController.text.trim().isEmpty
-                  ? 'Manual stock adjustment'
-                  : notesController.text.trim(),
-              createdBy: createdBy,
-              createdAt: now,
-            ),
-          );
-        }
+        
+        await dbProvider.update(
+          'products',
+          values: {
+            'stock_quantity': newQuantity,
+            'updated_at': now,
+          },
+          where: kIsWeb ? 'documentId = ?' : 'id = ?',
+          whereArgs: [productId],
+        );
 
         // Note: Min stock level can be stored in products table or a separate settings table
         // For now, we'll skip updating min_stock_level as it's not critical
