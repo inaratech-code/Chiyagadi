@@ -775,46 +775,9 @@ class _MenuScreenState extends State<MenuScreen> {
         children: [
           Column(
         children: [
-          // Category Section - Compact with small button
+          // Search Bar with Add Item button
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppTheme.logoLight.withOpacity(0.15),
-              border: Border(
-                bottom: BorderSide(
-                  color: AppTheme.logoSecondary.withOpacity(0.2),
-                  width: 1,
-                ),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.category, color: AppTheme.logoPrimary, size: 16),
-                const SizedBox(width: 6),
-                const Text(
-                  'Categories',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => _showAddCategoryDialog(),
-                  icon: const Icon(Icons.add_circle_outline, size: 20),
-                  tooltip: 'Add Category',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  style: IconButton.styleFrom(
-                    foregroundColor: AppTheme.logoPrimary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Search Bar
-          Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.92),
               boxShadow: [
@@ -826,43 +789,60 @@ class _MenuScreenState extends State<MenuScreen> {
                 ),
               ],
             ),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'I want to sell...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          setState(() {
-                            _searchQuery = '';
-                          });
-                        },
-                      )
-                    : Icon(Icons.view_list, color: Colors.blue),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    decoration: InputDecoration(
+                      hintText: 'I want to sell...',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                setState(() {
+                                  _searchQuery = '';
+                                });
+                              },
+                            )
+                          : Icon(Icons.view_list, color: Colors.blue),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                            color: Theme.of(context).primaryColor, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey[50],
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value;
+                      });
+                    },
+                  ),
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  onPressed: () => _showAddProductDialog(),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Add Item'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.logoPrimary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  ),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                      color: Theme.of(context).primaryColor, width: 2),
-                ),
-                filled: true,
-                fillColor: Colors.grey[50],
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
-              },
+              ],
             ),
           ),
 
@@ -1425,11 +1405,18 @@ class _MenuScreenState extends State<MenuScreen> {
       final productId = kIsWeb ? product.documentId : product.id;
       if (productId == null) return 0.0;
       
-      final ledgerService = InventoryLedgerService();
-      return await ledgerService.getCurrentStock(
-        context: context,
-        productId: productId,
+      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      await dbProvider.init();
+      
+      final productData = await dbProvider.query(
+        'products',
+        where: kIsWeb ? 'documentId = ?' : 'id = ?',
+        whereArgs: [productId],
       );
+      
+      if (productData.isEmpty) return 0.0;
+      
+      return (productData.first['stock_quantity'] as num?)?.toDouble() ?? 0.0;
     } catch (e) {
       debugPrint('Error getting product stock: $e');
       return 0.0;
@@ -2799,14 +2786,33 @@ class _MenuScreenState extends State<MenuScreen> {
                     },
                   ),
                   const SizedBox(height: 12),
-                  Builder(
-                    builder: (context) {
-                      // Calculate trackInventory from selected category
+                  FutureBuilder<Map<String, dynamic>>(
+                    future: () async {
+                      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+                      await dbProvider.init();
+                      final productId = kIsWeb ? product.documentId : product.id;
+                      if (productId == null) return <String, dynamic>{};
+                      final productData = await dbProvider.query(
+                        'products',
+                        where: kIsWeb ? 'documentId = ?' : 'id = ?',
+                        whereArgs: [productId],
+                      );
+                      return productData.isNotEmpty ? productData.first : <String, dynamic>{};
+                    }(),
+                    builder: (context, snapshot) {
+                      final productData = snapshot.data ?? {};
+                      final productTrackInventory = (productData['track_inventory'] as int?) == 1;
+                      
+                      // Check both product's current category and selected category
+                      // Also check if product already has track_inventory enabled
+                      final currentCategoryAllows = canTrackInventoryForCategory(matchingCategory.name);
                       final selectedCategory = _categories.firstWhere(
                         (c) => _getCategoryIdentifier(c) == selectedCategoryId,
-                        orElse: () => _categories.first,
+                        orElse: () => matchingCategory,
                       );
-                      final trackInventory = canTrackInventoryForCategory(selectedCategory.name);
+                      final selectedCategoryAllows = canTrackInventoryForCategory(selectedCategory.name);
+                      // Enable if product already tracks inventory OR if category allows it
+                      final trackInventory = productTrackInventory || currentCategoryAllows || selectedCategoryAllows;
                       
                       return TextField(
                         controller: inventoryQuantityController,
@@ -2817,9 +2823,9 @@ class _MenuScreenState extends State<MenuScreen> {
                           border: const OutlineInputBorder(),
                           prefixIcon: const Icon(Icons.add_box),
                           helperText: trackInventory 
-                              ? 'Only allowed for Food, Cold Drinks, and Cigarettes'
+                              ? 'Enter quantity to add to current stock'
                               : 'Inventory tracking not available for this category',
-                          enabled: trackInventory, // Disable if category doesn't allow inventory
+                          enabled: trackInventory, // Enable if product tracks inventory or category allows it
                         ),
                       );
                     },
