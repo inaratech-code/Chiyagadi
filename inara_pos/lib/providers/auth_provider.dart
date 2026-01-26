@@ -1100,9 +1100,17 @@ class InaraAuthProvider with ChangeNotifier {
           final errorMsg = authError.toString();
           debugPrint('createUser: Firebase Auth user creation failed: $authError');
           
-          // If user already exists, that's okay - continue with database insert
-          if (!errorMsg.contains('email-already-in-use')) {
-            debugPrint('createUser: Firebase Auth error (non-critical), continuing with database insert');
+          // If email already exists in Firebase Auth, check if it's a critical error
+          if (errorMsg.contains('email-already-in-use')) {
+            // Email exists in Firebase Auth - this might be okay if user exists in DB
+            // Continue with database insert - if username is different, it should work
+            debugPrint('createUser: Email already exists in Firebase Auth, continuing with database insert');
+          } else if (errorMsg.contains('weak-password') || errorMsg.contains('invalid-email')) {
+            // Critical Firebase Auth errors that should prevent user creation
+            return 'Invalid email or password format. Please check your input.';
+          } else {
+            // Other Firebase Auth errors - log but continue (non-critical for database insert)
+            debugPrint('createUser: Firebase Auth error (non-critical), continuing with database insert: $errorMsg');
           }
         }
       }
