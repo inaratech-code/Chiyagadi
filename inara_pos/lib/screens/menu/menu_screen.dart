@@ -832,6 +832,21 @@ class _MenuScreenState extends State<MenuScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
+                // Compact Category Button
+                IconButton(
+                  onPressed: () => _showAddCategoryDialog(),
+                  icon: const Icon(Icons.category, size: 18),
+                  tooltip: 'Add Category',
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.grey[100],
+                    foregroundColor: AppTheme.logoPrimary,
+                    padding: const EdgeInsets.all(10),
+                    minimumSize: const Size(40, 40),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Add Item Button
                 ElevatedButton.icon(
                   onPressed: () => _showAddProductDialog(),
                   icon: const Icon(Icons.add, size: 18),
