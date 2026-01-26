@@ -1035,18 +1035,25 @@ class InaraAuthProvider with ChangeNotifier {
   }
 
   // Create new user (admin only)
-  Future<bool> createUser(String username, String pin, String role, {String? email}) async {
-    if (!_isValidPassword(pin)) {
-      return false;
+  /// Create a user with better error handling
+  /// Returns a String? where null means success, and non-null means error message
+  Future<String?> createUserWithError(String username, String pin, String role, {String? email}) async {
+    if (username.trim().isEmpty) {
+      return 'Username cannot be empty';
     }
 
-    if (username.isEmpty || (role != 'admin' && role != 'cashier')) {
-      return false;
+    if (!_isValidPassword(pin)) {
+      return 'Password must be 4-20 characters and contain only letters, numbers, and special characters';
+    }
+
+    // UPDATED: Allow any role (not just admin/cashier) to support custom roles
+    if (role.trim().isEmpty) {
+      return 'Role cannot be empty';
     }
 
     // Email is required only for admin role
     if (role == 'admin' && (email == null || email.trim().isEmpty)) {
-      return false;
+      return 'Email is required for admin users';
     }
 
     try {
@@ -1057,25 +1064,27 @@ class InaraAuthProvider with ChangeNotifier {
       final existing = await dbProvider.query(
         'users',
         where: 'username = ?',
-        whereArgs: [username],
+        whereArgs: [username.trim()],
       );
 
       if (existing.isNotEmpty) {
-        return false; // Username already exists
+        return 'Username already exists. Please choose a different username';
       }
 
       final pinHash = _hashPin(pin);
       final now = DateTime.now().millisecondsSinceEpoch;
       
-      // Auto-generate temporary email for cashiers if not provided
+      // Auto-generate temporary email for non-admin roles if not provided
       String? normalizedEmail;
       if (email != null && email.trim().isNotEmpty) {
         normalizedEmail = email.trim().toLowerCase();
-      } else if (role == 'cashier') {
-        // Generate temporary email: cashier_username@temp.chiyagadi.local
+      } else if (role != 'admin') {
+        // Generate temporary email for cashiers and custom roles
+        // Format: role_username@temp.chiyagadi.local
+        final sanitizedRole = role.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
         final sanitizedUsername = username.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
-        normalizedEmail = 'cashier_$sanitizedUsername@temp.chiyagadi.local';
-        debugPrint('createUser: Auto-generated temporary email for cashier: $normalizedEmail');
+        normalizedEmail = '${sanitizedRole}_$sanitizedUsername@temp.chiyagadi.local';
+        debugPrint('createUser: Auto-generated temporary email for $role: $normalizedEmail');
       }
 
       // Create Firebase Auth user if on web (for email-based login)
@@ -1100,31 +1109,48 @@ class InaraAuthProvider with ChangeNotifier {
 
       // Store user in database
       await dbProvider.insert('users', {
-        'username': username,
+        'username': username.trim(),
         'pin_hash': pinHash,
         'email': normalizedEmail,
-        'role': role,
+        'role': role.trim(),
         'is_active': 1,
         'created_at': now,
         'updated_at': now,
       });
 
-      debugPrint('createUser: User created successfully - username: $username, email: $normalizedEmail, role: $role');
-      return true;
+      debugPrint('createUser: User created successfully - username: ${username.trim()}, email: $normalizedEmail, role: ${role.trim()}');
+      return null; // Success
     } catch (e) {
       debugPrint('Error creating user: $e');
-      return false;
+      final errorStr = e.toString();
+      if (errorStr.contains('UNIQUE constraint') || errorStr.contains('unique')) {
+        return 'Username already exists. Please choose a different username';
+      }
+      return 'Failed to create user: ${errorStr.length > 100 ? errorStr.substring(0, 100) + "..." : errorStr}';
     }
+  }
+
+  /// Legacy method for backward compatibility - returns bool
+  /// UPDATED: Now supports custom roles (not just admin/cashier)
+  Future<bool> createUser(String username, String pin, String role, {String? email}) async {
+    final error = await createUserWithError(username, pin, role, email: email);
+    return error == null; // Return true if no error
   }
 
   /// Create a user with a specific document ID (for Firestore) or regular insert (SQLite)
   /// Useful for migrating users or setting up specific user IDs
+  /// UPDATED: Now supports custom roles (not just admin/cashier)
   Future<bool> createUserWithId(String userId, String username, String pin, String role, {String? email}) async {
     if (!_isValidPassword(pin)) {
       return false;
     }
 
-    if (username.isEmpty || (role != 'admin' && role != 'cashier')) {
+    if (username.trim().isEmpty || role.trim().isEmpty) {
+      return false;
+    }
+
+    // Email is required only for admin role
+    if (role == 'admin' && (email == null || email.trim().isEmpty)) {
       return false;
     }
 
@@ -1136,7 +1162,7 @@ class InaraAuthProvider with ChangeNotifier {
       final existing = await dbProvider.query(
         'users',
         where: 'username = ?',
-        whereArgs: [username],
+        whereArgs: [username.trim()],
       );
 
       if (existing.isNotEmpty) {
@@ -1157,12 +1183,24 @@ class InaraAuthProvider with ChangeNotifier {
 
       final pinHash = _hashPin(pin);
       final now = DateTime.now().millisecondsSinceEpoch;
+      
+      // Auto-generate temporary email for non-admin roles if not provided
+      String? normalizedEmail;
+      if (email != null && email.trim().isNotEmpty) {
+        normalizedEmail = email.trim().toLowerCase();
+      } else if (role != 'admin') {
+        // Generate temporary email for cashiers and custom roles
+        final sanitizedRole = role.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+        final sanitizedUsername = username.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+        normalizedEmail = '${sanitizedRole}_$sanitizedUsername@temp.chiyagadi.local';
+        debugPrint('createUserWithId: Auto-generated temporary email for $role: $normalizedEmail');
+      }
 
       await dbProvider.insert('users', {
-        'username': username,
+        'username': username.trim(),
         'pin_hash': pinHash,
-        if (email != null && email.isNotEmpty) 'email': email,
-        'role': role,
+        'email': normalizedEmail,
+        'role': role.trim(),
         'is_active': 1,
         'created_at': now,
         'updated_at': now,

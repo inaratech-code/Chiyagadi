@@ -323,24 +323,27 @@ class _UsersAndRolesManagementScreenState
       return;
     }
 
-    final ok = await auth.createUser(
+    // UPDATED: Use createUserWithError for better error messages
+    final error = await auth.createUserWithError(
       username,
       pin,
       selectedRole,
       email: selectedRole == 'admin' ? email : null,
     );
     if (!mounted) return;
-    if (ok) {
+    
+    if (error == null) {
+      // Success
       await _loadUsers();
       final createdUser = _users.firstWhere(
         (u) => u['username'] == username,
         orElse: () => {},
       );
 
-      String message = 'User "$username" created';
+      String message = 'User "$username" created successfully';
       if (createdUser.isNotEmpty && createdUser['email'] != null) {
         final userEmail = createdUser['email'] as String;
-        message = 'User "$username" created\nLogin email: $userEmail';
+        message = 'User "$username" created successfully\nLogin email: $userEmail';
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -350,10 +353,12 @@ class _UsersAndRolesManagementScreenState
             duration: const Duration(seconds: 5)),
       );
     } else {
+      // Show specific error message
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Failed to create user (username may exist)'),
-            backgroundColor: Colors.red),
+        SnackBar(
+            content: Text(error),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5)),
       );
     }
   }
