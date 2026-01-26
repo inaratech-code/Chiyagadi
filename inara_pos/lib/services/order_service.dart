@@ -117,76 +117,10 @@ class OrderService {
     final unitPrice = product.price;
     final totalPrice = unitPrice * quantity;
 
-    // UPDATED: Check if product has inventory and deduct stock automatically
-    final inventoryLedgerService = InventoryLedgerService();
-    try {
-      // UPDATED: Only check inventory if product has inventory history (has been purchased)
-      final hasInventory = await _hasInventoryHistory(dbProvider, productId);
-      
-      debugPrint('OrderService: Adding ${product.name} (ID: $productId) - hasInventory: $hasInventory');
-      
-      if (hasInventory) {
-        // Product has inventory tracking - check stock and deduct
-        final currentStock = await inventoryLedgerService.getCurrentStock(
-          context: context,
-          productId: productId,
-        );
-
-        debugPrint('OrderService: Current stock for ${product.name}: $currentStock, Required: $quantity');
-
-        // Check if sufficient stock is available
-        if (currentStock < quantity) {
-          throw Exception(
-              'Insufficient stock for ${product.name}. Available: ${currentStock.toStringAsFixed(2)}, Required: $quantity');
-        }
-
-        // Convert createdBy to int? for InventoryLedger
-        // createdBy can be String (Firestore) or int (SQLite), but InventoryLedger expects int?
-        int? createdByInt;
-        if (createdBy != null) {
-          if (createdBy is int) {
-            createdByInt = createdBy;
-          } else if (createdBy is String) {
-            createdByInt = int.tryParse(createdBy);
-          } else if (createdBy is num) {
-            createdByInt = createdBy.toInt();
-          }
-        }
-
-        // Create ledger entry to decrease stock
-        final ledgerEntry = InventoryLedger(
-          productId: productId,
-          productName: product.name,
-          quantityIn: 0.0,
-          quantityOut: quantity.toDouble(),
-          unitPrice: unitPrice,
-          transactionType: 'sale',
-          referenceType: 'order',
-          referenceId: orderId,
-          notes: notes ?? 'Order item: ${product.name}',
-          createdBy: createdByInt,
-          createdAt: DateTime.now().millisecondsSinceEpoch,
-        );
-
-        await inventoryLedgerService.addLedgerEntry(
-          context: context,
-          ledgerEntry: ledgerEntry,
-        );
-
-        debugPrint(
-            'OrderService: Deducted $quantity ${product.name} from inventory. New stock: ${currentStock - quantity}');
-      } else {
-        // Product has no inventory tracking - skip stock deduction
-        debugPrint('OrderService: Product ${product.name} has no inventory tracking, skipping stock deduction');
-      }
-    } catch (e) {
-      // If it's a stock-related error, rethrow it
-      if (e.toString().contains('Insufficient stock')) {
-        rethrow;
-      }
-      // For other errors, continue without deducting
-      debugPrint('OrderService: Error checking inventory for ${product.name}: $e');
-    }
+    // UPDATED: Removed inventory check - items can be added to orders regardless of stock
+    // Inventory is managed manually from the menu section
+    // Stock deduction will happen on payment completion if needed
+    debugPrint('OrderService: Adding ${product.name} (ID: $productId) - quantity: $quantity (inventory check disabled)');
 
     // Check if item already exists in order
     final existingItems = await dbProvider.query(

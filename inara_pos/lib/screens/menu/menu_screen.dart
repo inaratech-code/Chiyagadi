@@ -498,13 +498,10 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Future<void> _loadData() async {
-    // PERF: Don't set loading immediately - show content first, update as data loads
-    // Only show loading if data takes more than 300ms
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted && _products.isEmpty && _categories.isEmpty) {
-        setState(() => _isLoading = true);
-      }
-    });
+    // UPDATED: Set loading state immediately if no data exists
+    if (mounted && _products.isEmpty && _categories.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     
     try {
       final dbProvider =
@@ -615,10 +612,39 @@ class _MenuScreenState extends State<MenuScreen> {
 
       debugPrint('MenuScreen: Loaded ${categoryMaps.length} categories and ${productMaps.length} products');
 
-      _categories = categoryMaps.map((map) => Category.fromMap(map)).toList();
-      _products = productMaps.map((map) => Product.fromMap(map)).toList();
+      // UPDATED: Safe parsing with null checks
+      _categories = categoryMaps
+          .map((map) {
+            try {
+              return Category.fromMap(map);
+            } catch (e) {
+              debugPrint('MenuScreen: Error parsing category: $e');
+              return null;
+            }
+          })
+          .whereType<Category>()
+          .toList();
+      
+      _products = productMaps
+          .map((map) {
+            try {
+              return Product.fromMap(map);
+            } catch (e) {
+              debugPrint('MenuScreen: Error parsing product: $e');
+              return null;
+            }
+          })
+          .whereType<Product>()
+          .toList();
       
       debugPrint('MenuScreen: Parsed ${_categories.length} categories and ${_products.length} products');
+      
+      // UPDATED: Update state safely
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
       
       if (_categories.isEmpty && _products.isEmpty && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -632,46 +658,74 @@ class _MenuScreenState extends State<MenuScreen> {
     } catch (e, stackTrace) {
       debugPrint('MenuScreen: Error loading menu data: $e');
       debugPrint('MenuScreen: Stack trace: $stackTrace');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading menu: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
-    } finally {
+      
+      // UPDATED: Ensure loading state is cleared even on error
       if (mounted) {
         setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading menu: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: () => _loadData(),
+            ),
+          ),
+        );
       }
     }
   }
 
+  // UPDATED: Safe filtered products getter with null checks
   List<Product> get _filteredProducts {
+    // UPDATED: Ensure _products is never null
+    final products = _products;
+    if (products.isEmpty) return [];
+    
     if (_searchQuery.isEmpty) {
-      return _products;
+      return products;
     }
-    return _products
-        .where((p) =>
-            p.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            (p.description != null &&
-                p.description!
-                    .toLowerCase()
-                    .contains(_searchQuery.toLowerCase())))
+    
+    final query = _searchQuery.toLowerCase().trim();
+    if (query.isEmpty) return products;
+    
+    return products
+        .where((p) {
+          try {
+            return p.name.toLowerCase().contains(query) ||
+                (p.description != null &&
+                    p.description!.toLowerCase().contains(query));
+          } catch (e) {
+            debugPrint('MenuScreen: Error filtering product ${p.name}: $e');
+            return false;
+          }
+        })
         .toList();
   }
 
   // Group products by category
+  // UPDATED: Improved null safety and error handling
   Map<Category, List<Product>> get _productsByCategory {
     final Map<String, Category> categoryMap = {};
     final Map<String, List<Product>> grouped = {};
 
+    // UPDATED: Ensure _categories and _filteredProducts are safe
+    final categories = _categories;
+    final filteredProducts = _filteredProducts;
+    
+    if (filteredProducts.isEmpty) return {};
+
     // Create a map of category IDs to Category objects
-    for (final cat in _categories) {
-      final catId = _getCategoryIdentifier(cat);
-      if (catId != null) {
-        categoryMap[catId.toString()] = cat;
+    for (final cat in categories) {
+      try {
+        final catId = _getCategoryIdentifier(cat);
+        if (catId != null) {
+          categoryMap[catId.toString()] = cat;
+        }
+      } catch (e) {
+        debugPrint('MenuScreen: Error processing category ${cat.name}: $e');
       }
     }
 
@@ -686,20 +740,30 @@ class _MenuScreenState extends State<MenuScreen> {
     );
 
     // Group products by category
-    for (final product in _filteredProducts) {
-      String categoryKey = 'uncategorized';
+    // UPDATED: Safe product grouping with error handling
+    for (final product in filteredProducts) {
+      try {
+        String categoryKey = 'uncategorized';
 
-      if (product.categoryId != null) {
-        final catIdStr = product.categoryId.toString();
-        if (categoryMap.containsKey(catIdStr)) {
-          categoryKey = catIdStr;
+        if (product.categoryId != null) {
+          final catIdStr = product.categoryId.toString();
+          if (categoryMap.containsKey(catIdStr)) {
+            categoryKey = catIdStr;
+          }
         }
-      }
 
-      if (!grouped.containsKey(categoryKey)) {
-        grouped[categoryKey] = [];
+        if (!grouped.containsKey(categoryKey)) {
+          grouped[categoryKey] = [];
+        }
+        grouped[categoryKey]!.add(product);
+      } catch (e) {
+        debugPrint('MenuScreen: Error grouping product ${product.name}: $e');
+        // Add to uncategorized on error
+        if (!grouped.containsKey('uncategorized')) {
+          grouped['uncategorized'] = [];
+        }
+        grouped['uncategorized']!.add(product);
       }
-      grouped[categoryKey]!.add(product);
     }
 
     // Convert to Map<Category, List<Product>> and sort by display order
@@ -773,269 +837,270 @@ class _MenuScreenState extends State<MenuScreen> {
             ),
       body: Stack(
         children: [
-          Column(
-        children: [
-          // Search Bar with Add Item button
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.92),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: 'I want to sell...',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                setState(() {
-                                  _searchQuery = '';
-                                });
-                              },
-                            )
-                          : Icon(Icons.view_list, color: Colors.blue),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey[300]!),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey[300]!),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                            color: Theme.of(context).primaryColor, width: 2),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[50],
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Compact Category Button
-                IconButton(
-                  onPressed: () => _showAddCategoryDialog(),
-                  icon: const Icon(Icons.category, size: 18),
-                  tooltip: 'Add Category',
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.grey[100],
-                    foregroundColor: AppTheme.logoPrimary,
-                    padding: const EdgeInsets.all(10),
-                    minimumSize: const Size(40, 40),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Add Item Button
-                ElevatedButton.icon(
-                  onPressed: () => _showAddProductDialog(),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Add Item'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.logoPrimary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Menu Items List
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredProducts.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.restaurant_menu,
-                              size: 64,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _searchQuery.isEmpty
-                                  ? 'No menu items found'
-                                  : 'No items match your search',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 16,
-                              ),
-                            ),
-                            if (_searchQuery.isEmpty) ...[
-                              const SizedBox(height: 8),
-                              ElevatedButton.icon(
-                                onPressed: () => _showAddProductDialog(),
-                                icon: const Icon(Icons.add),
-                                label: const Text('Add Menu Item'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      Theme.of(context).primaryColor,
-                                  foregroundColor: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ],
+          // UPDATED: Use CustomScrollView so everything scrolls together
+          RefreshIndicator(
+            onRefresh: _loadData,
+            child: CustomScrollView(
+              slivers: [
+                // Search Bar with Add Category button
+                SliverToBoxAdapter(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.92),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          spreadRadius: 1,
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
                         ),
-                      )
-                            : RefreshIndicator(
-                        onRefresh: _loadData,
-                        child: _productsByCategory.isEmpty
-                            ? const SizedBox.shrink()
-                            : ListView.builder(
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            decoration: InputDecoration(
+                              hintText: 'I want to sell...',
+                              prefixIcon: const Icon(Icons.search),
+                              suffixIcon: _searchQuery.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear),
+                                      onPressed: () {
+                                        setState(() {
+                                          _searchQuery = '';
+                                        });
+                                      },
+                                    )
+                                  : Icon(Icons.view_list, color: Colors.blue),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                    color: Theme.of(context).primaryColor, width: 2),
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                _searchQuery = value;
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Add Category Button (changed from Add Item)
+                        // UPDATED: Ensure button is always visible and properly sized
+                        Flexible(
+                          child: ElevatedButton.icon(
+                            onPressed: _isLoading ? null : () => _showAddCategoryDialog(),
+                            icon: const Icon(Icons.category, size: 18),
+                            label: const Text('Add Category'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.logoPrimary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              minimumSize: const Size(0, 40), // Ensure minimum height
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // Loading or Empty State
+                // UPDATED: Better loading state handling
+                if (_isLoading && _products.isEmpty && _categories.isEmpty)
+                  const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_filteredProducts.isEmpty)
+                  SliverFillRemaining(
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.restaurant_menu,
+                            size: 64,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _searchQuery.isEmpty
+                                ? 'No menu items found'
+                                : 'No items match your search',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 16,
+                            ),
+                          ),
+                          if (_searchQuery.isEmpty) ...[
+                            const SizedBox(height: 8),
+                            ElevatedButton.icon(
+                              onPressed: () => _showAddProductDialog(),
+                              icon: const Icon(Icons.add),
+                              label: const Text('Add Menu Item'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    Theme.of(context).primaryColor,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  )
+                // Menu Items List
+                else if (_productsByCategory.isNotEmpty)
+                  SliverPadding(
+                    padding: EdgeInsets.only(
+                      left: 8,
+                      right: 8,
+                      top: 8,
+                      bottom: kIsWeb ? 8 : 120,
+                    ),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, categoryIndex) {
+                          final category = _productsByCategory.keys
+                              .elementAt(categoryIndex);
+                          final categoryProducts =
+                              _productsByCategory[category]!;
+
+                          return Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              // Category Heading (with top margin to prevent overlap)
+                              Padding(
                                 padding: EdgeInsets.only(
                                   left: 8,
                                   right: 8,
-                                  top: 8,
-                                  bottom: kIsWeb ? 8 : 120, // Increased bottom padding on mobile to prevent FAB overlap
+                                  top: categoryIndex == 0 ? 10 : 20, // Extra top margin for non-first categories
+                                  bottom: 10,
                                 ),
-                                itemCount: _productsByCategory.length,
-                                itemBuilder: (context, categoryIndex) {
-                                  final category = _productsByCategory.keys
-                                      .elementAt(categoryIndex);
-                                  final categoryProducts =
-                                      _productsByCategory[category]!;
-
-                                  return Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      // Category Heading (with top margin to prevent overlap)
-                                      Padding(
-                                        padding: EdgeInsets.only(
-                                          left: 8,
-                                          right: 8,
-                                          top: categoryIndex == 0 ? 10 : 20, // Extra top margin for non-first categories
-                                          bottom: 10,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Container(
+                                        padding:
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 10,
+                                                vertical: 5),
+                                        decoration: BoxDecoration(
+                                          color: _categoryColorForName(category.name)
+                                              .withOpacity(0.15),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: _categoryColorForName(category.name),
+                                            width: 1.5,
+                                          ),
                                         ),
-                                        child: Row(
+                                        child: Text(
+                                          category.name.toUpperCase(),
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: _categoryColorForName(category.name),
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '(${categoryProducts.length} items)',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey[600],
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                    Builder(
+                                      builder: (context) {
+                                        final auth = Provider.of<InaraAuthProvider>(context, listen: false);
+                                        if (!auth.isAdmin) return const SizedBox.shrink();
+                                        return Row(
+                                          mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Expanded(
-                                              child: Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 10,
-                                                        vertical: 5),
-                                                decoration: BoxDecoration(
-                                                  color: _categoryColorForName(category.name)
-                                                      .withOpacity(0.15),
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                  border: Border.all(
-                                                    color: _categoryColorForName(category.name),
-                                                    width: 1.5,
-                                                  ),
-                                                ),
-                                                child: Text(
-                                                  category.name.toUpperCase(),
-                                                  style: TextStyle(
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: _categoryColorForName(category.name),
-                                                    letterSpacing: 0.5,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
                                             const SizedBox(width: 8),
-                                            Text(
-                                              '(${categoryProducts.length} items)',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: Colors.grey[600],
-                                                fontStyle: FontStyle.italic,
-                                              ),
-                                            ),
-                                            Builder(
-                                              builder: (context) {
-                                                final auth = Provider.of<InaraAuthProvider>(context, listen: false);
-                                                if (!auth.isAdmin) return const SizedBox.shrink();
-                                                return Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    const SizedBox(width: 8),
-                                                    IconButton(
-                                                      icon: const Icon(Icons.edit, size: 18),
-                                                      onPressed: () => _showEditCategoryDialog(category),
-                                                      tooltip: 'Edit Category',
-                                                      padding: EdgeInsets.zero,
-                                                      constraints: const BoxConstraints(),
-                                                      color: Colors.grey[600],
-                                                    ),
-                                                  ],
-                                                );
-                                              },
+                                            IconButton(
+                                              icon: const Icon(Icons.edit, size: 18),
+                                              onPressed: () => _showEditCategoryDialog(category),
+                                              tooltip: 'Edit Category',
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                              color: Colors.grey[600],
                                             ),
                                           ],
-                                        ),
-                                      ),
-                                      // Products Grid for this category
-                                      GridView.builder(
-                                        shrinkWrap: true,
-                                        physics:
-                                            const NeverScrollableScrollPhysics(),
-                                        padding: const EdgeInsets.only(
-                                            left: 8, right: 8, bottom: 16), // FIXED: Add bottom padding to prevent overlap
-                                        gridDelegate:
-                                            SliverGridDelegateWithFixedCrossAxisCount(
-                                          // UPDATED: 3 columns for mobile (Android/iOS) as per design reference
-                                          crossAxisCount: () {
-                                            final width = MediaQuery.of(context).size.width;
-                                            if (!kIsWeb && width < 900) return 3; // Mobile (Android/iOS): 3 columns
-                                            if (width < 600) return 3; // Mobile web: 3 columns
-                                            if (width < 900) return 4; // Tablet: 4 columns
-                                            if (width < 1200) return 5; // Desktop: 5 columns
-                                            return 6; // Large desktop: 6 columns
-                                          }(),
-                                          // UPDATED: Aspect ratio optimized for 3-column layout - adjusted for better spacing
-                                          childAspectRatio: () {
-                                            final width = MediaQuery.of(context).size.width;
-                                            if (!kIsWeb && width < 900) return 0.68; // Mobile (Android/iOS): taller to accommodate all elements
-                                            if (width < 600) return 0.68; // Mobile web: taller to accommodate all elements
-                                            return 0.75; // Web/Tablet: taller cards
-                                          }(),
-                                          crossAxisSpacing: 8,
-                                          mainAxisSpacing: 8,
-                                        ),
-                                        itemCount: categoryProducts.length,
-                                        itemBuilder: (context, productIndex) {
-                                          final product =
-                                              categoryProducts[productIndex];
-                                          return _buildProductCard(product);
-                                        },
-                                      ),
-                                      // FIXED: Increased spacing between categories to prevent overlap
-                                      SizedBox(height: !kIsWeb ? 40 : 24),
-                                    ],
-                                  );
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Products Grid for this category
+                              GridView.builder(
+                                shrinkWrap: true,
+                                physics:
+                                    const NeverScrollableScrollPhysics(),
+                                padding: const EdgeInsets.only(
+                                    left: 8, right: 8, bottom: 16), // FIXED: Add bottom padding to prevent overlap
+                                gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                  // UPDATED: 3 columns for mobile (Android/iOS) as per design reference
+                                  crossAxisCount: () {
+                                    final width = MediaQuery.of(context).size.width;
+                                    if (!kIsWeb && width < 900) return 3; // Mobile (Android/iOS): 3 columns
+                                    if (width < 600) return 3; // Mobile web: 3 columns
+                                    if (width < 900) return 4; // Tablet: 4 columns
+                                    if (width < 1200) return 5; // Desktop: 5 columns
+                                    return 6; // Large desktop: 6 columns
+                                  }(),
+                                  // UPDATED: Aspect ratio optimized for 3-column layout - adjusted for better spacing
+                                  childAspectRatio: () {
+                                    final width = MediaQuery.of(context).size.width;
+                                    if (!kIsWeb && width < 900) return 0.68; // Mobile (Android/iOS): taller to accommodate all elements
+                                    if (width < 600) return 0.68; // Mobile web: taller to accommodate all elements
+                                    return 0.75; // Web/Tablet: taller cards
+                                  }(),
+                                  crossAxisSpacing: 8,
+                                  mainAxisSpacing: 8,
+                                ),
+                                itemCount: categoryProducts.length,
+                                itemBuilder: (context, productIndex) {
+                                  final product =
+                                      categoryProducts[productIndex];
+                                  return _buildProductCard(product);
                                 },
                               ),
+                              // FIXED: Increased spacing between categories to prevent overlap
+                              SizedBox(height: !kIsWeb ? 40 : 24),
+                            ],
+                          );
+                        },
+                        childCount: _productsByCategory.length,
                       ),
-          ),
-        ],
+                    ),
+                  ),
+              ],
+            ),
           ),
           // UPDATED: Semi-transparent backdrop on left side only (menu area) - allows menu clicks
           // Responsive: Full screen on mobile, side panel on larger screens
@@ -1345,13 +1410,21 @@ class _MenuScreenState extends State<MenuScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       // NEW: Show quantity/stock for menu items
+                      // UPDATED: Better error handling for stock display
                       FutureBuilder<double>(
                         future: _getProductStock(product),
                         builder: (context, snapshot) {
-                          final stock = snapshot.data ?? 0.0;
-                          if (!snapshot.hasData && snapshot.connectionState == ConnectionState.waiting) {
+                          // UPDATED: Handle loading and error states gracefully
+                          if (snapshot.connectionState == ConnectionState.waiting) {
                             return const SizedBox.shrink(); // Don't show anything while loading
                           }
+                          
+                          if (snapshot.hasError) {
+                            debugPrint('MenuScreen: Error loading stock for ${product.name}: ${snapshot.error}');
+                            return const SizedBox.shrink(); // Hide on error
+                          }
+                          
+                          final stock = snapshot.data ?? 0.0;
                           return Padding(
                             padding: const EdgeInsets.only(top: 2),
                             child: Text(
@@ -1415,12 +1488,25 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   // Helper method to get current stock for a product
+  // UPDATED: Improved error handling and null safety
   Future<double> _getProductStock(Product product) async {
     try {
       final productId = kIsWeb ? product.documentId : product.id;
-      if (productId == null) return 0.0;
+      if (productId == null) {
+        debugPrint('MenuScreen: Product ID is null for ${product.name}');
+        return 0.0;
+      }
+      
+      if (!mounted) return 0.0;
       
       final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      
+      // UPDATED: Check if database is available before querying
+      if (!dbProvider.isAvailable) {
+        debugPrint('MenuScreen: Database not available for stock query');
+        return 0.0;
+      }
+      
       await dbProvider.init();
       
       final productData = await dbProvider.query(
@@ -1429,12 +1515,26 @@ class _MenuScreenState extends State<MenuScreen> {
         whereArgs: [productId],
       );
       
-      if (productData.isEmpty) return 0.0;
+      if (productData.isEmpty) {
+        debugPrint('MenuScreen: Product data not found for ID: $productId');
+        return 0.0;
+      }
       
-      return (productData.first['stock_quantity'] as num?)?.toDouble() ?? 0.0;
-    } catch (e) {
-      debugPrint('Error getting product stock: $e');
+      final stockValue = productData.first['stock_quantity'];
+      if (stockValue == null) return 0.0;
+      
+      // UPDATED: Safe type conversion
+      if (stockValue is num) {
+        return stockValue.toDouble();
+      } else if (stockValue is String) {
+        return double.tryParse(stockValue) ?? 0.0;
+      }
+      
       return 0.0;
+    } catch (e, stackTrace) {
+      debugPrint('MenuScreen: Error getting product stock for ${product.name}: $e');
+      debugPrint('MenuScreen: Stack trace: $stackTrace');
+      return 0.0; // Return 0 on error to prevent UI crashes
     }
   }
 
