@@ -8,14 +8,11 @@ import '../../models/category.dart';
 import '../../models/product.dart';
 import '../../services/order_service.dart';
 import '../../widgets/order_overlay_widget.dart';
-import '../../models/inventory_ledger_model.dart';
-import '../../services/inventory_ledger_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/inventory_category_helper.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io' as io;
 import 'dart:convert';
-import 'dart:typed_data';
 
 class MenuScreen extends StatefulWidget {
   final bool hideAppBar;
@@ -1726,7 +1723,6 @@ class _MenuScreenState extends State<MenuScreen> {
   Future<void> _showEditCategoryDialog(Category category) async {
     final nameController = TextEditingController(text: category.name);
     bool isActive = category.isActive;
-    final originalName = category.name;
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -1934,27 +1930,41 @@ class _MenuScreenState extends State<MenuScreen> {
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => Dialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Container(
-            width: MediaQuery.of(context).size.width * 0.95,
-            constraints: const BoxConstraints(maxWidth: 700, maxHeight: 800),
-            padding: const EdgeInsets.all(24),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Add Menu Item',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+      builder: (context) {
+        // UPDATED: Responsive sizing for mobile devices
+        final screenSize = MediaQuery.of(context).size;
+        final isMobile = screenSize.width < 600;
+        final dialogWidth = isMobile ? screenSize.width * 0.95 : 700.0;
+        final dialogPadding = isMobile ? 16.0 : 24.0;
+        final maxDialogHeight = screenSize.height * 0.9;
+        
+        return StatefulBuilder(
+          builder: (context, setDialogState) => Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 8.0 : 24.0,
+              vertical: isMobile ? 16.0 : 24.0,
+            ),
+            child: Container(
+              width: dialogWidth,
+              constraints: BoxConstraints(
+                maxWidth: 700,
+                maxHeight: maxDialogHeight,
+              ),
+              padding: EdgeInsets.all(dialogPadding),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Add Menu Item',
+                      style: TextStyle(
+                        fontSize: isMobile ? 18 : 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
+                    SizedBox(height: isMobile ? 16 : 16),
 
                   // Title
                   TextField(
@@ -1965,45 +1975,76 @@ class _MenuScreenState extends State<MenuScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 12),
+                    SizedBox(height: isMobile ? 12 : 12),
 
-                  // Price and Category Row
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: priceController,
-                          decoration: const InputDecoration(
-                            labelText: 'Price (NPR) *',
-                            border: OutlineInputBorder(),
+                    // Price and Category Row - UPDATED: Stack on mobile
+                    isMobile
+                        ? Column(
+                            children: [
+                              TextField(
+                                controller: priceController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Price (NPR) *',
+                                  border: OutlineInputBorder(),
+                                ),
+                                keyboardType: TextInputType.number,
+                              ),
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<dynamic>(
+                                value: selectedCategoryId,
+                                decoration: const InputDecoration(
+                                  labelText: 'Category *',
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: _categories.map((cat) {
+                                  final catId = _getCategoryIdentifier(cat);
+                                  return DropdownMenuItem(
+                                    value: catId,
+                                    child: Text(cat.name),
+                                  );
+                                }).toList(),
+                                onChanged: (value) {
+                                  setDialogState(() => selectedCategoryId = value);
+                                },
+                              ),
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: priceController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Price (NPR) *',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: DropdownButtonFormField<dynamic>(
+                                  value: selectedCategoryId,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Category *',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  items: _categories.map((cat) {
+                                    final catId = _getCategoryIdentifier(cat);
+                                    return DropdownMenuItem(
+                                      value: catId,
+                                      child: Text(cat.name),
+                                    );
+                                  }).toList(),
+                                  onChanged: (value) {
+                                    setDialogState(() => selectedCategoryId = value);
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: DropdownButtonFormField<dynamic>(
-                          value: selectedCategoryId,
-                          decoration: const InputDecoration(
-                            labelText: 'Category *',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: _categories.map((cat) {
-                            final catId = _getCategoryIdentifier(cat);
-                            return DropdownMenuItem(
-                              value: catId,
-                              child: Text(cat.name),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setDialogState(() => selectedCategoryId = value);
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
 
-                  const SizedBox(height: 16),
+                    SizedBox(height: isMobile ? 12 : 16),
 
                   // Image Upload Section
                   Text(
@@ -2122,22 +2163,22 @@ class _MenuScreenState extends State<MenuScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: imageUrlController,
-                    decoration: const InputDecoration(
-                      labelText: 'Or enter Image URL',
-                      hintText: 'https://...',
-                      border: OutlineInputBorder(),
+                    SizedBox(height: isMobile ? 12 : 12),
+                    TextField(
+                      controller: imageUrlController,
+                      decoration: const InputDecoration(
+                        labelText: 'Or enter Image URL',
+                        hintText: 'https://...',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (value) {
+                        if (value.isNotEmpty) {
+                          setDialogState(() {
+                            selectedImageFile = null;
+                          });
+                        }
+                      },
                     ),
-                    onChanged: (value) {
-                      if (value.isNotEmpty) {
-                        setDialogState(() {
-                          selectedImageFile = null;
-                        });
-                      }
-                    },
-                  ),
 
                   const SizedBox(height: 16),
 
@@ -2264,35 +2305,62 @@ class _MenuScreenState extends State<MenuScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 24),
+                    SizedBox(height: isMobile ? 16 : 24),
 
-                  // Buttons
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel'),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).primaryColor,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 32, vertical: 12),
-                        ),
-                        child: const Text('Add Item'),
-                      ),
-                    ],
-                  ),
-                ],
+                    // Buttons - UPDATED: Stack on mobile
+                    isMobile
+                        ? Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Theme.of(context).primaryColor,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                  ),
+                                  child: const Text('Add Item'),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: double.infinity,
+                                child: TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text('Cancel'),
+                                ),
+                              ),
+                            ],
+                          )
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('Cancel'),
+                              ),
+                              const SizedBox(width: 12),
+                              ElevatedButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Theme.of(context).primaryColor,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 32, vertical: 12),
+                                ),
+                                child: const Text('Add Item'),
+                              ),
+                            ],
+                          ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
 
     if (result == true &&
@@ -2466,27 +2534,41 @@ class _MenuScreenState extends State<MenuScreen> {
 
     final result = await showDialog<String?>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => Dialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Container(
-            width: MediaQuery.of(context).size.width * 0.95,
-            constraints: const BoxConstraints(maxWidth: 700, maxHeight: 800),
-            padding: const EdgeInsets.all(24),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Edit Menu Item',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+      builder: (context) {
+        // UPDATED: Responsive sizing for mobile devices
+        final screenSize = MediaQuery.of(context).size;
+        final isMobile = screenSize.width < 600;
+        final dialogWidth = isMobile ? screenSize.width * 0.95 : 700.0;
+        final dialogPadding = isMobile ? 16.0 : 24.0;
+        final maxDialogHeight = screenSize.height * 0.9; // Use 90% of screen height
+        
+        return StatefulBuilder(
+          builder: (context, setDialogState) => Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 8.0 : 24.0,
+              vertical: isMobile ? 16.0 : 24.0,
+            ),
+            child: Container(
+              width: dialogWidth,
+              constraints: BoxConstraints(
+                maxWidth: 700,
+                maxHeight: maxDialogHeight,
+              ),
+              padding: EdgeInsets.all(dialogPadding),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Edit Menu Item',
+                      style: TextStyle(
+                        fontSize: isMobile ? 18 : 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
+                    SizedBox(height: isMobile ? 16 : 24),
 
                   // Title
                   TextField(
@@ -2535,157 +2617,304 @@ class _MenuScreenState extends State<MenuScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 16),
+                    SizedBox(height: isMobile ? 12 : 16),
 
-                  // Image Upload Section
-                  Text(
-                    'Product Image',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          height: 150,
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey[300]!),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: selectedImageFile != null
-                              ? ClipRRect(
+                    // Image Upload Section - UPDATED: Stack on mobile
+                    Text(
+                      'Product Image',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    SizedBox(height: isMobile ? 8 : 8),
+                    isMobile
+                        ? Column(
+                            children: [
+                              Container(
+                                width: double.infinity,
+                                height: 150,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey[300]!),
                                   borderRadius: BorderRadius.circular(10),
-                                  child: kIsWeb
-                                      ? Image.network(
-                                          selectedImageFile!.path,
-                                          fit: BoxFit.cover,
-                                        )
-                                      : Image.file(
-                                          io.File(selectedImageFile!.path),
-                                          fit: BoxFit.cover,
-                                        ),
-                                )
-                              : imageUrlController.text.isNotEmpty
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(10),
-                                      child: (imageUrlController.text
-                                                  .startsWith('http') ||
-                                              imageUrlController.text
-                                                  .startsWith('data:image/'))
-                                          ? Image.network(
-                                              imageUrlController.text,
-                                              fit: BoxFit.cover,
-                                              errorBuilder:
-                                                  (context, error, stackTrace) {
-                                                return const Center(
-                                                  child: Icon(Icons.image,
-                                                      size: 48,
-                                                      color: Colors.grey),
-                                                );
-                                              },
-                                            )
-                                          : kIsWeb
+                                ),
+                                child: selectedImageFile != null
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: kIsWeb
+                                            ? Image.network(
+                                                selectedImageFile!.path,
+                                                fit: BoxFit.cover,
+                                              )
+                                            : Image.file(
+                                                io.File(selectedImageFile!.path),
+                                                fit: BoxFit.cover,
+                                              ),
+                                      )
+                                    : imageUrlController.text.isNotEmpty
+                                        ? ClipRRect(
+                                            borderRadius: BorderRadius.circular(10),
+                                            child: (imageUrlController.text
+                                                        .startsWith('http') ||
+                                                    imageUrlController.text
+                                                        .startsWith('data:image/'))
+                                                ? Image.network(
+                                                    imageUrlController.text,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder:
+                                                        (context, error, stackTrace) {
+                                                      return const Center(
+                                                        child: Icon(Icons.image,
+                                                            size: 48,
+                                                            color: Colors.grey),
+                                                      );
+                                                    },
+                                                  )
+                                                : kIsWeb
+                                                    ? Image.network(
+                                                        imageUrlController.text,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (context, error,
+                                                            stackTrace) {
+                                                          return const Center(
+                                                            child: Icon(Icons.image,
+                                                                size: 48,
+                                                                color: Colors.grey),
+                                                          );
+                                                        },
+                                                      )
+                                                    : Image.file(
+                                                        io.File(
+                                                            imageUrlController.text),
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (context, error,
+                                                            stackTrace) {
+                                                          return const Center(
+                                                            child: Icon(Icons.image,
+                                                                size: 48,
+                                                                color: Colors.grey),
+                                                          );
+                                                        },
+                                                      ),
+                                          )
+                                        : const Center(
+                                            child: Icon(Icons.image,
+                                                size: 48, color: Colors.grey),
+                                          ),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      onPressed: () async {
+                                        final picker = ImagePicker();
+                                        final pickedFile = await picker.pickImage(
+                                          source: ImageSource.gallery,
+                                          maxWidth: 800,
+                                          maxHeight: 800,
+                                          imageQuality: 85,
+                                        );
+                                        if (pickedFile != null) {
+                                          setDialogState(() {
+                                            selectedImageFile = pickedFile;
+                                            imageUrlController.clear();
+                                          });
+                                        }
+                                      },
+                                      icon: const Icon(Icons.photo_library, size: 18),
+                                      label: const Text('Gallery'),
+                                      style: ElevatedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      onPressed: () async {
+                                        final picker = ImagePicker();
+                                        final pickedFile = await picker.pickImage(
+                                          source: ImageSource.camera,
+                                          maxWidth: 800,
+                                          maxHeight: 800,
+                                          imageQuality: 85,
+                                        );
+                                        if (pickedFile != null) {
+                                          setDialogState(() {
+                                            selectedImageFile = pickedFile;
+                                            imageUrlController.clear();
+                                          });
+                                        }
+                                      },
+                                      icon: const Icon(Icons.camera_alt, size: 18),
+                                      label: const Text('Camera'),
+                                      style: ElevatedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (selectedImageFile != null ||
+                                  imageUrlController.text.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: TextButton.icon(
+                                    onPressed: () {
+                                      setDialogState(() {
+                                        selectedImageFile = null;
+                                        imageUrlController.clear();
+                                      });
+                                    },
+                                    icon: const Icon(Icons.delete, size: 18),
+                                    label: const Text('Remove'),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  height: 150,
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey[300]!),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: selectedImageFile != null
+                                      ? ClipRRect(
+                                          borderRadius: BorderRadius.circular(10),
+                                          child: kIsWeb
                                               ? Image.network(
-                                                  imageUrlController.text,
+                                                  selectedImageFile!.path,
                                                   fit: BoxFit.cover,
-                                                  errorBuilder: (context, error,
-                                                      stackTrace) {
-                                                    return const Center(
-                                                      child: Icon(Icons.image,
-                                                          size: 48,
-                                                          color: Colors.grey),
-                                                    );
-                                                  },
                                                 )
                                               : Image.file(
-                                                  io.File(
-                                                      imageUrlController.text),
+                                                  io.File(selectedImageFile!.path),
                                                   fit: BoxFit.cover,
-                                                  errorBuilder: (context, error,
-                                                      stackTrace) {
-                                                    return const Center(
-                                                      child: Icon(Icons.image,
-                                                          size: 48,
-                                                          color: Colors.grey),
-                                                    );
-                                                  },
                                                 ),
-                                    )
-                                  : const Center(
-                                      child: Icon(Icons.image,
-                                          size: 48, color: Colors.grey),
+                                        )
+                                      : imageUrlController.text.isNotEmpty
+                                          ? ClipRRect(
+                                              borderRadius: BorderRadius.circular(10),
+                                              child: (imageUrlController.text
+                                                          .startsWith('http') ||
+                                                      imageUrlController.text
+                                                          .startsWith('data:image/'))
+                                                  ? Image.network(
+                                                      imageUrlController.text,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder:
+                                                          (context, error, stackTrace) {
+                                                        return const Center(
+                                                          child: Icon(Icons.image,
+                                                              size: 48,
+                                                              color: Colors.grey),
+                                                        );
+                                                      },
+                                                    )
+                                                  : kIsWeb
+                                                      ? Image.network(
+                                                          imageUrlController.text,
+                                                          fit: BoxFit.cover,
+                                                          errorBuilder: (context, error,
+                                                              stackTrace) {
+                                                            return const Center(
+                                                              child: Icon(Icons.image,
+                                                                  size: 48,
+                                                                  color: Colors.grey),
+                                                            );
+                                                          },
+                                                        )
+                                                      : Image.file(
+                                                          io.File(
+                                                              imageUrlController.text),
+                                                          fit: BoxFit.cover,
+                                                          errorBuilder: (context, error,
+                                                              stackTrace) {
+                                                            return const Center(
+                                                              child: Icon(Icons.image,
+                                                                  size: 48,
+                                                                  color: Colors.grey),
+                                                            );
+                                                          },
+                                                        ),
+                                            )
+                                          : const Center(
+                                              child: Icon(Icons.image,
+                                                  size: 48, color: Colors.grey),
+                                            ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Column(
+                                children: [
+                                  ElevatedButton.icon(
+                                    onPressed: () async {
+                                      final picker = ImagePicker();
+                                      final pickedFile = await picker.pickImage(
+                                        source: ImageSource.gallery,
+                                        maxWidth: 800,
+                                        maxHeight: 800,
+                                        imageQuality: 85,
+                                      );
+                                      if (pickedFile != null) {
+                                        setDialogState(() {
+                                          selectedImageFile = pickedFile;
+                                          imageUrlController.clear();
+                                        });
+                                      }
+                                    },
+                                    icon: const Icon(Icons.photo_library),
+                                    label: const Text('Gallery'),
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 12),
                                     ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: () async {
-                              final picker = ImagePicker();
-                              final pickedFile = await picker.pickImage(
-                                source: ImageSource.gallery,
-                                maxWidth: 800,
-                                maxHeight: 800,
-                                imageQuality: 85,
-                              );
-                              if (pickedFile != null) {
-                                setDialogState(() {
-                                  selectedImageFile = pickedFile;
-                                  imageUrlController.clear();
-                                });
-                              }
-                            },
-                            icon: const Icon(Icons.photo_library),
-                            label: const Text('Gallery'),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 12),
-                            ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: () async {
+                                      final picker = ImagePicker();
+                                      final pickedFile = await picker.pickImage(
+                                        source: ImageSource.camera,
+                                        maxWidth: 800,
+                                        maxHeight: 800,
+                                        imageQuality: 85,
+                                      );
+                                      if (pickedFile != null) {
+                                        setDialogState(() {
+                                          selectedImageFile = pickedFile;
+                                          imageUrlController.clear();
+                                        });
+                                      }
+                                    },
+                                    icon: const Icon(Icons.camera_alt),
+                                    label: const Text('Camera'),
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 12),
+                                    ),
+                                  ),
+                                  if (selectedImageFile != null ||
+                                      imageUrlController.text.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    TextButton.icon(
+                                      onPressed: () {
+                                        setDialogState(() {
+                                          selectedImageFile = null;
+                                          imageUrlController.clear();
+                                        });
+                                      },
+                                      icon: const Icon(Icons.delete),
+                                      label: const Text('Remove'),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 8),
-                          ElevatedButton.icon(
-                            onPressed: () async {
-                              final picker = ImagePicker();
-                              final pickedFile = await picker.pickImage(
-                                source: ImageSource.camera,
-                                maxWidth: 800,
-                                maxHeight: 800,
-                                imageQuality: 85,
-                              );
-                              if (pickedFile != null) {
-                                setDialogState(() {
-                                  selectedImageFile = pickedFile;
-                                  imageUrlController.clear();
-                                });
-                              }
-                            },
-                            icon: const Icon(Icons.camera_alt),
-                            label: const Text('Camera'),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 12),
-                            ),
-                          ),
-                          if (selectedImageFile != null ||
-                              imageUrlController.text.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            TextButton.icon(
-                              onPressed: () {
-                                setDialogState(() {
-                                  selectedImageFile = null;
-                                  imageUrlController.clear();
-                                });
-                              },
-                              icon: const Icon(Icons.delete),
-                              label: const Text('Remove'),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
+                    SizedBox(height: isMobile ? 12 : 12),
                   TextField(
                     controller: imageUrlController,
                     decoration: const InputDecoration(
@@ -2702,41 +2931,52 @@ class _MenuScreenState extends State<MenuScreen> {
                     },
                   ),
 
-                  const SizedBox(height: 16),
+                    SizedBox(height: isMobile ? 12 : 16),
 
-                  // Description
-                  TextField(
-                    controller: descController,
-                    decoration: const InputDecoration(
-                      labelText: 'Description',
-                      border: OutlineInputBorder(),
+                    // Description
+                    TextField(
+                      controller: descController,
+                      decoration: const InputDecoration(
+                        labelText: 'Description',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 2,
                     ),
-                    maxLines: 2,
-                  ),
 
-                  const SizedBox(height: 12),
+                    SizedBox(height: isMobile ? 12 : 12),
 
-                  // Checkboxes
-                  Row(
-                    children: [
-                      Checkbox(
-                        value: isVeg,
-                        onChanged: (value) {
-                          setDialogState(() => isVeg = value ?? true);
-                        },
-                      ),
-                      const Text('Vegetarian'),
-                      const SizedBox(width: 16),
-                      Checkbox(
-                        value: isActive,
-                        onChanged: (value) {
-                          setDialogState(() => isActive = value ?? true);
-                        },
-                      ),
-                      const Text('Available'),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
+                    // Checkboxes - UPDATED: Wrap on mobile
+                    Wrap(
+                      spacing: isMobile ? 8 : 16,
+                      runSpacing: isMobile ? 8 : 0,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Checkbox(
+                              value: isVeg,
+                              onChanged: (value) {
+                                setDialogState(() => isVeg = value ?? true);
+                              },
+                            ),
+                            const Text('Vegetarian'),
+                          ],
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Checkbox(
+                              value: isActive,
+                              onChanged: (value) {
+                                setDialogState(() => isActive = value ?? true);
+                              },
+                            ),
+                            const Text('Available'),
+                          ],
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: isMobile ? 8 : 10),
 
                   // Quick category toggles (Smokes / Drinks) – checkbox + color only
                   Row(
@@ -2825,160 +3065,196 @@ class _MenuScreenState extends State<MenuScreen> {
                         ),
                       ),
                     ],
-                  ),
+                    ),
 
-                  const SizedBox(height: 16),
+                    SizedBox(height: isMobile ? 12 : 16),
 
-                  // NEW: Simple Inventory Management Section
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.inventory_2, size: 20, color: Colors.blue),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Inventory Management',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[800],
+                    // NEW: Simple Inventory Management Section
+                    const Divider(),
+                    SizedBox(height: isMobile ? 8 : 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.inventory_2, size: 20, color: Colors.blue),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Inventory Management',
+                          style: TextStyle(
+                            fontSize: isMobile ? 14 : 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[800],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // NEW: Show current stock quantity
-                  FutureBuilder<double>(
-                    future: _getProductStock(product),
-                    builder: (context, snapshot) {
-                      final currentStock = snapshot.data ?? 0.0;
-                      return Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey[300]!),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Current Stock',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[600],
-                                  ),
+                      ],
+                    ),
+                    SizedBox(height: isMobile ? 12 : 12),
+                    // NEW: Show current stock quantity
+                    FutureBuilder<double>(
+                      future: _getProductStock(product),
+                      builder: (context, snapshot) {
+                        final currentStock = snapshot.data ?? 0.0;
+                        return Container(
+                          padding: EdgeInsets.all(isMobile ? 10 : 12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey[300]!),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Flexible(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Current Stock',
+                                      style: TextStyle(
+                                        fontSize: isMobile ? 11 : 12,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      snapshot.hasData
+                                          ? '${currentStock.toStringAsFixed(currentStock.truncateToDouble() == currentStock ? 0 : 1)} pcs'
+                                          : 'Loading...',
+                                      style: TextStyle(
+                                        fontSize: isMobile ? 16 : 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: currentStock > 0 
+                                            ? Colors.green[700] 
+                                            : Colors.red[700],
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  snapshot.hasData
-                                      ? '${currentStock.toStringAsFixed(currentStock.truncateToDouble() == currentStock ? 0 : 1)} pcs'
-                                      : 'Loading...',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: currentStock > 0 
-                                        ? Colors.green[700] 
-                                        : Colors.red[700],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (currentStock > 0)
-                              Icon(
-                                Icons.check_circle,
-                                color: Colors.green[700],
-                                size: 24,
                               ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  FutureBuilder<Map<String, dynamic>>(
-                    future: () async {
-                      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-                      await dbProvider.init();
-                      final productId = kIsWeb ? product.documentId : product.id;
-                      if (productId == null) return <String, dynamic>{};
-                      final productData = await dbProvider.query(
-                        'products',
-                        where: kIsWeb ? 'documentId = ?' : 'id = ?',
-                        whereArgs: [productId],
-                      );
-                      return productData.isNotEmpty ? productData.first : <String, dynamic>{};
-                    }(),
-                    builder: (context, snapshot) {
-                      // UPDATED: Only check category - inventory is ONLY allowed for Food, Cold Drinks, and Cigarettes
-                      // Do NOT check if product already has track_inventory - enforce category-based restriction
-                      final currentCategoryAllows = canTrackInventoryForCategory(matchingCategory.name);
-                      final selectedCategory = _categories.firstWhere(
-                        (c) => _getCategoryIdentifier(c) == selectedCategoryId,
-                        orElse: () => matchingCategory,
-                      );
-                      final selectedCategoryAllows = canTrackInventoryForCategory(selectedCategory.name);
-                      // UPDATED: Only enable if the category allows it (Food, Cold Drinks, or Cigarettes)
-                      final trackInventory = currentCategoryAllows || selectedCategoryAllows;
-                      
-                      return TextField(
-                        controller: inventoryQuantityController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: InputDecoration(
-                          labelText: 'Add Inventory Quantity',
-                          hintText: 'Enter quantity to add (optional)',
-                          border: const OutlineInputBorder(),
-                          prefixIcon: const Icon(Icons.add_box),
-                          helperText: trackInventory 
-                              ? 'Allowed for Food, Cold Drinks, Cigarettes, Smokes, and Snacks'
-                              : 'Inventory tracking not available for "${matchingCategory.name}" category. Only Food, Cold Drinks, Cigarettes, Smokes, and Snacks can have inventory.',
-                          enabled: trackInventory, // Only enable for allowed categories
-                        ),
-                      );
-                    },
-                  ),
+                              if (currentStock > 0)
+                                Icon(
+                                  Icons.check_circle,
+                                  color: Colors.green[700],
+                                  size: isMobile ? 20 : 24,
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    SizedBox(height: isMobile ? 12 : 12),
+                    FutureBuilder<Map<String, dynamic>>(
+                      future: () async {
+                        final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+                        await dbProvider.init();
+                        final productId = kIsWeb ? product.documentId : product.id;
+                        if (productId == null) return <String, dynamic>{};
+                        final productData = await dbProvider.query(
+                          'products',
+                          where: kIsWeb ? 'documentId = ?' : 'id = ?',
+                          whereArgs: [productId],
+                        );
+                        return productData.isNotEmpty ? productData.first : <String, dynamic>{};
+                      }(),
+                      builder: (context, snapshot) {
+                        final currentCategoryAllows = canTrackInventoryForCategory(matchingCategory.name);
+                        final selectedCategory = _categories.firstWhere(
+                          (c) => _getCategoryIdentifier(c) == selectedCategoryId,
+                          orElse: () => matchingCategory,
+                        );
+                        final selectedCategoryAllows = canTrackInventoryForCategory(selectedCategory.name);
+                        final trackInventory = currentCategoryAllows || selectedCategoryAllows;
+                        
+                        return TextField(
+                          controller: inventoryQuantityController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: InputDecoration(
+                            labelText: 'Add Inventory Quantity',
+                            hintText: 'Enter quantity to add (optional)',
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.add_box),
+                            helperText: trackInventory 
+                                ? 'Allowed for Food, Cold Drinks, Cigarettes, Smokes, and Snacks'
+                                : 'Inventory tracking not available for "${matchingCategory.name}" category. Only Food, Cold Drinks, Cigarettes, Smokes, and Snacks can have inventory.',
+                            helperMaxLines: isMobile ? 2 : 1,
+                            enabled: trackInventory,
+                          ),
+                        );
+                      },
+                    ),
 
-                  const SizedBox(height: 16),
+                    SizedBox(height: isMobile ? 12 : 16),
 
-                  // Buttons
-                  Row(
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, null),
-                        child: const Text('Cancel'),
-                      ),
-                      const Spacer(),
-                      TextButton.icon(
-                        // NEW: delete menu item (admin only dialog)
-                        onPressed: () => Navigator.pop(context, 'delete'),
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        label: const Text(
-                          'Delete',
-                          style: TextStyle(color: Colors.red),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context, 'save'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).primaryColor,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 32, vertical: 12),
-                        ),
-                        child: const Text('Save'),
-                      ),
-                    ],
-                  ),
-                ],
+                    // Buttons - UPDATED: Stack on mobile, wrap properly
+                    isMobile
+                        ? Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: () => Navigator.pop(context, 'save'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Theme.of(context).primaryColor,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                  ),
+                                  child: const Text('Save'),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context, null),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  TextButton.icon(
+                                    onPressed: () => Navigator.pop(context, 'delete'),
+                                    icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+                                    label: const Text(
+                                      'Delete',
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, null),
+                                child: const Text('Cancel'),
+                              ),
+                              const Spacer(),
+                              TextButton.icon(
+                                onPressed: () => Navigator.pop(context, 'delete'),
+                                icon: const Icon(Icons.delete, color: Colors.red),
+                                label: const Text(
+                                  'Delete',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              ElevatedButton(
+                                onPressed: () => Navigator.pop(context, 'save'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Theme.of(context).primaryColor,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 32, vertical: 12),
+                                ),
+                                child: const Text('Save'),
+                              ),
+                            ],
+                          ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
 
     if (result == 'delete') {
