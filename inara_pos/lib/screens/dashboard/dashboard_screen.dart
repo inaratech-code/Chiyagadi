@@ -7,6 +7,7 @@ import '../../providers/unified_database_provider.dart';
 import '../../services/inventory_ledger_service.dart';
 import '../../widgets/responsive_wrapper.dart';
 import '../../utils/theme.dart';
+import '../../utils/inventory_category_helper.dart';
 import '../inventory/inventory_screen.dart';
 import '../customers/customers_screen.dart';
 import '../settings/settings_screen.dart';
@@ -75,13 +76,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadDashboardData() async {
     if (!mounted) return;
-    // PERF: Don't set loading immediately - show content first, update as data loads
-    // Only show loading if data takes more than 300ms
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted && _todaySales == 0.0 && _recentActivity.isEmpty) {
+    // UPDATED: Set loading state immediately if no data exists for faster feedback
+    if (_todaySales == 0.0 && _recentActivity.isEmpty && _lowStockCount == 0) {
+      if (mounted) {
         setState(() => _isLoading = true);
       }
-    });
+    }
     
     try {
       final dbProvider =
@@ -102,7 +102,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59)
           .millisecondsSinceEpoch;
 
-      // PERF: Run independent queries in parallel.
+      // UPDATED: Run independent queries in parallel for faster loading
+      // Optimized to fetch only necessary data
       final results = await Future.wait<List<Map<String, dynamic>>>([
         // 0: settings
         dbProvider.query('settings'),
@@ -122,28 +123,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
         // 2: today's credit transactions
         dbProvider.query(
           'credit_transactions',
-          // Web/Firestore: (created_at range + transaction_type) often requires a composite index.
-          // Fetch by date range only and filter in-memory to avoid index requirement.
+          // Web/Firestore: Fetch by date range only and filter in-memory to avoid index requirement
           where: 'created_at >= ? AND created_at <= ?',
           whereArgs: [startOfDay, endOfDay],
         ),
-        // 3: products that track inventory (Food, Cold Drinks, Cigarettes)
-        kIsWeb
-            ? dbProvider.query(
-                'products',
-                where: 'track_inventory = ?',
-                whereArgs: [1],
-              )
-            : dbProvider.query(
-                'products',
-                where: 'track_inventory = ?',
-                whereArgs: [1],
-              ),
-        // 4: recent orders (limit to 3 for faster loading)
+        // 3: products that track inventory (Food, Cold Drinks, Cigarettes, Smokes, Snacks)
+        // UPDATED: Only fetch products with track_inventory = 1 for better performance
+        dbProvider.query(
+          'products',
+          where: 'track_inventory = ?',
+          whereArgs: [1],
+        ),
+        // 4: categories (needed to filter by countable categories)
+        dbProvider.query('categories'),
+        // 5: recent orders (limit to 3 for faster loading)
         dbProvider.query('orders', orderBy: 'created_at DESC', limit: 3),
-        // 5: recent expenses (limit to 3 for faster loading)
+        // 6: recent expenses (limit to 3 for faster loading)
         dbProvider.query('expenses', orderBy: 'created_at DESC', limit: 3),
-        // 6: recent credits (limit to 3 for faster loading)
+        // 7: recent credits (limit to 3 for faster loading)
         dbProvider.query('credit_transactions',
             orderBy: 'created_at DESC', limit: 3),
       ]);
@@ -152,9 +149,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final todayOrdersRaw = results[1];
       final todayCreditTransactionsRaw = results[2];
       final products = results[3];
-      final recentOrders = results[4];
-      final recentExpenses = results[5];
-      final recentCredits = results[6];
+      final categories = results[4];
+      final recentOrders = results[5];
+      final recentExpenses = results[6];
+      final recentCredits = results[7];
 
       // Get shop name from settings
       for (final setting in settingsRows) {
@@ -187,15 +185,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
 
       // Load stock data - use stockQuantity directly from products that track inventory
+      // UPDATED: Only show low stock for countable categories (Food, Cold Drinks, Cigarettes, Smokes, Snacks)
       if (mounted && products.isNotEmpty) {
         // Process stock data directly from products (no async ledger call needed)
         int lowStockCount = 0;
         List<_LowStockItem> lowStockItems = [];
         
-        // Check stock for products that track inventory (Food, Cold Drinks, Cigarettes)
+        // UPDATED: Build category map from already fetched categories (no extra query)
+        final categoryMap = <dynamic, String>{};
+        for (final cat in categories) {
+          final catId = kIsWeb ? cat['id'] : cat['id'];
+          final catName = cat['name'] as String? ?? '';
+          if (catId != null) {
+            categoryMap[catId] = catName;
+          }
+        }
+        
+        // Check stock for products that track inventory AND belong to countable categories
         for (final product in products) {
           final pid = product['id'];
           if (pid == null) continue;
+          
+          // Check if product's category allows inventory tracking
+          final categoryId = product['category_id'];
+          if (categoryId == null) continue;
+          
+          final categoryName = categoryMap[categoryId] ?? '';
+          if (!canTrackInventoryForCategory(categoryName)) {
+            continue; // Skip products from non-countable categories
+          }
           
           // Get stockQuantity directly from product
           final stockQuantity = (product['stock_quantity'] as num?)?.toDouble();
@@ -290,10 +308,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _recentActivity = nextRecent;
         _isLoading = false;
       });
-    } catch (e) {
-      debugPrint('Error loading dashboard data: $e');
+    } catch (e, stackTrace) {
+      debugPrint('DashboardScreen: Error loading dashboard data: $e');
+      debugPrint('DashboardScreen: Stack trace: $stackTrace');
       if (mounted) {
         setState(() => _isLoading = false);
+        // UPDATED: Show user-friendly error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading dashboard: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: () => _loadDashboardData(),
+            ),
+          ),
+        );
       }
     }
   }
@@ -800,29 +832,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // UPDATED: Cleaner low stock alert with better UI
   Widget _buildLowStockAlert() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.red[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.red[200]!, width: 1),
+        color: Colors.orange[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange[200]!, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.orange.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.warning, color: Colors.red[700]),
-              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.warning_amber_rounded, 
+                  color: Colors.orange[800], 
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  '$_lowStockCount item(s) are low on stock!',
+                  '$_lowStockCount item(s) are low on stock',
                   style: TextStyle(
-                    color: Colors.red[900],
+                    color: Colors.orange[900],
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                    fontSize: 15,
                   ),
                 ),
               ),
@@ -837,37 +888,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     );
                   }
                 },
-                child: const Text('View All'),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+                child: Text(
+                  'View All',
+                  style: TextStyle(
+                    color: Colors.orange[800],
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ],
           ),
-          // NEW: Display specific low stock items
+          // UPDATED: Display specific low stock items with cleaner design
           if (_lowStockItems.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            const Divider(color: Colors.red, height: 1),
-            const SizedBox(height: 8),
-            ..._lowStockItems.take(5).map((item) => Padding(
-              padding: const EdgeInsets.only(bottom: 6),
+            const SizedBox(height: 12),
+            Container(
+              height: 1,
+              color: Colors.orange[200],
+            ),
+            const SizedBox(height: 12),
+            ..._lowStockItems.take(5).map((item) => Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.orange[100]!, width: 1),
+              ),
               child: Row(
                 children: [
-                  Icon(Icons.inventory_2, size: 16, color: Colors.red[700]),
-                  const SizedBox(width: 8),
+                  Icon(Icons.inventory_2_outlined, 
+                    size: 18, 
+                    color: Colors.orange[700],
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       item.productName,
                       style: TextStyle(
-                        color: Colors.red[800],
+                        color: Colors.grey[800],
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
-                  Text(
-                    'Stock: ${item.stock.toStringAsFixed(item.stock.truncateToDouble() == item.stock ? 0 : 2)}',
-                    style: TextStyle(
-                      color: Colors.red[700],
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.red[50],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'Stock: ${item.stock.toStringAsFixed(item.stock.truncateToDouble() == item.stock ? 0 : 1)}',
+                      style: TextStyle(
+                        color: Colors.red[700],
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -876,12 +955,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             if (_lowStockItems.length > 5)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  '... and ${_lowStockItems.length - 5} more',
-                  style: TextStyle(
-                    color: Colors.red[600],
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
+                child: Center(
+                  child: Text(
+                    '... and ${_lowStockItems.length - 5} more',
+                    style: TextStyle(
+                      color: Colors.orange[700],
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ),
               ),
