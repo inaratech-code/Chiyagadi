@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart' show InaraAuthProvider;
+import '../../providers/unified_database_provider.dart';
 import '../../utils/theme.dart';
 
 class UsersManagementScreen extends StatefulWidget {
@@ -14,6 +15,7 @@ class UsersManagementScreen extends StatefulWidget {
 class _UsersManagementScreenState extends State<UsersManagementScreen> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _users = [];
+  List<Map<String, dynamic>> _roles = []; // UPDATED: Load roles from database
   String _search = '';
 
   @override
@@ -28,6 +30,31 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
     setState(() => _isLoading = true);
     try {
       final auth = Provider.of<InaraAuthProvider>(context, listen: false);
+      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      await dbProvider.init();
+      
+      // UPDATED: Load roles from database
+      try {
+        final roleMaps = await dbProvider.query(
+          'roles',
+          where: 'is_active = ?',
+          whereArgs: [1],
+          orderBy: 'name ASC',
+        );
+        if (mounted) {
+          setState(() => _roles = roleMaps);
+        }
+      } catch (e) {
+        debugPrint('Error loading roles (table may not exist yet): $e');
+        // Fallback to default roles if table doesn't exist
+        if (mounted) {
+          setState(() => _roles = [
+            {'name': 'admin', 'description': 'Full system access'},
+            {'name': 'cashier', 'description': 'Sales and order management'},
+          ]);
+        }
+      }
+      
       final users = await auth.getAllUsers();
       if (!mounted) return;
       setState(() => _users = users);
@@ -112,10 +139,28 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
                     labelText: 'Role',
                     border: OutlineInputBorder(),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                    DropdownMenuItem(value: 'cashier', child: Text('Cashier')),
-                  ],
+                  items: _roles.map((role) {
+                    final roleName = role['name'] as String;
+                    final roleDesc = role['description'] as String? ?? '';
+                    return DropdownMenuItem(
+                      value: roleName,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(roleName),
+                          if (roleDesc.isNotEmpty)
+                            Text(
+                              roleDesc,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
                   onChanged: (value) {
                     if (value != null) {
                       setDialogState(() => selectedRole = value);
@@ -405,10 +450,28 @@ class _UsersManagementScreenState extends State<UsersManagementScreen> {
             value: role,
             decoration: const InputDecoration(
                 border: OutlineInputBorder(), labelText: 'Role'),
-            items: const [
-              DropdownMenuItem(value: 'admin', child: Text('Admin')),
-              DropdownMenuItem(value: 'cashier', child: Text('Cashier')),
-            ],
+            items: _roles.map((r) {
+              final roleName = r['name'] as String;
+              final roleDesc = r['description'] as String? ?? '';
+              return DropdownMenuItem(
+                value: roleName,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(roleName),
+                    if (roleDesc.isNotEmpty)
+                      Text(
+                        roleDesc,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }).toList(),
             onChanged: (v) => setDialogState(() => role = v ?? role),
           ),
           actions: [

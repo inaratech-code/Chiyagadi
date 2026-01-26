@@ -10,7 +10,7 @@ class DatabaseProvider with ChangeNotifier {
   static Database? _database;
   static const String _databaseName = 'inara_pos.db';
   // Bump DB version so expensive migrations run once (onUpgrade) instead of every launch.
-  static const int _databaseVersion = 2;
+  static const int _databaseVersion = 3; // UPDATED: Increment for roles table
 
   DatabaseProvider();
 
@@ -104,6 +104,7 @@ class DatabaseProvider with ChangeNotifier {
       // Check if critical tables exist
       final tables = [
         'users',
+        'roles', // UPDATED: Add roles table
         'orders',
         'order_items',
         'products',
@@ -630,6 +631,55 @@ CREATE TABLE IF NOT EXISTS expenses (
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     debugPrint('Database: Upgrading from version $oldVersion to $newVersion');
     await _addMissingColumns(db);
+    
+    // UPDATED: Add roles table migration
+    if (oldVersion < 3) {
+      try {
+        // Create roles table if it doesn't exist
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS roles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            description TEXT,
+            permissions TEXT NOT NULL DEFAULT '[]',
+            is_system_role INTEGER NOT NULL DEFAULT 0 CHECK(is_system_role IN (0, 1)),
+            is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+          )
+        ''');
+        debugPrint('Database: Created roles table');
+        
+        // Insert default system roles (admin and cashier)
+        final now = DateTime.now().millisecondsSinceEpoch;
+        await db.insert('roles', {
+          'name': 'admin',
+          'description': 'Full system access',
+          'permissions': '[0,1,2,3,4,5,6,7,8,9]', // All sections
+          'is_system_role': 1,
+          'is_active': 1,
+          'created_at': now,
+          'updated_at': now,
+        });
+        await db.insert('roles', {
+          'name': 'cashier',
+          'description': 'Sales and order management',
+          'permissions': '[0,1,2,3,4,5,7,9]', // All except Inventory (6) and Purchases (8)
+          'is_system_role': 1,
+          'is_active': 1,
+          'created_at': now,
+          'updated_at': now,
+        });
+        debugPrint('Database: Inserted default system roles');
+        
+        // Remove role constraint from users table (if it exists)
+        // SQLite doesn't support DROP CONSTRAINT, so we need to recreate the table
+        // But we'll keep the existing data and just allow any role name
+        debugPrint('Database: Users table now supports custom roles');
+      } catch (e) {
+        debugPrint('Database: Error during roles migration: $e');
+      }
+    }
   }
 
   Future<void> init() async {

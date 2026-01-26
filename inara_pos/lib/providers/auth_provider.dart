@@ -1348,11 +1348,36 @@ class InaraAuthProvider with ChangeNotifier {
   };
 
   /// Get permissions for a role
+  /// UPDATED: First check roles table, then fallback to settings table for backward compatibility
   Future<Set<int>> getRolePermissions(String role) async {
     try {
       final dbProvider = _getDatabaseProvider();
       await dbProvider.init();
       
+      // UPDATED: First try to get permissions from roles table
+      try {
+        final roleData = await dbProvider.query(
+          'roles',
+          where: 'name = ? AND is_active = ?',
+          whereArgs: [role, 1],
+        );
+
+        if (roleData.isNotEmpty) {
+          final permissionsJson = roleData.first['permissions'] as String? ?? '[]';
+          final List<dynamic> permissionsList = jsonDecode(permissionsJson);
+          final permissions = permissionsList.map((e) => (e as num).toInt()).toSet();
+          
+          // Always ensure Dashboard (0) is included
+          if (!permissions.contains(0)) {
+            permissions.add(0);
+          }
+          return permissions;
+        }
+      } catch (e) {
+        debugPrint('AuthProvider: Error querying roles table (may not exist yet): $e');
+      }
+      
+      // FALLBACK: Check settings table for backward compatibility
       final settings = await dbProvider.query(
         'settings',
         where: 'key = ?',

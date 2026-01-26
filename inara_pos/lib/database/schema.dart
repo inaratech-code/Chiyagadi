@@ -9,13 +9,25 @@ CREATE TABLE IF NOT EXISTS settings (
   updated_at INTEGER NOT NULL
 );
 
+-- Roles Table (for custom role management)
+CREATE TABLE IF NOT EXISTS roles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT UNIQUE NOT NULL,
+  description TEXT,
+  permissions TEXT NOT NULL DEFAULT '[]', -- JSON array of section indices
+  is_system_role INTEGER NOT NULL DEFAULT 0 CHECK(is_system_role IN (0, 1)), -- 1 for admin/cashier (cannot be deleted)
+  is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
 -- Users Table (for PIN-based auth)
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT UNIQUE NOT NULL,
   pin_hash TEXT NOT NULL,
   email TEXT,
-  role TEXT NOT NULL CHECK(role IN ('admin', 'cashier')),
+  role TEXT NOT NULL, -- UPDATED: Can be any role name (admin, cashier, or custom roles)
   is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL

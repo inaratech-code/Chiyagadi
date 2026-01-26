@@ -5,6 +5,7 @@ import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../utils/theme.dart';
 import '../../utils/app_messenger.dart';
 import 'users_management_screen.dart';
+import 'roles_management_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final bool showUserManagement;
@@ -470,6 +471,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 style: ElevatedButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(vertical: 16),
                                   backgroundColor: AppTheme.logoPrimary,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Roles Management (Admin Only)
+                    Card(
+                      color: AppTheme.logoSecondary.withOpacity(0.1),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.admin_panel_settings,
+                                    color: AppTheme.logoSecondary),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Roles Management',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleLarge
+                                      ?.copyWith(
+                                        color: AppTheme.logoSecondary,
+                                      ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Create and manage custom roles with limited permissions',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                        builder: (_) =>
+                                            const RolesManagementScreen()),
+                                  );
+                                },
+                                icon: const Icon(Icons.security),
+                                label: const Text('Manage Roles'),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  backgroundColor: AppTheme.logoSecondary,
                                   foregroundColor: Colors.white,
                                 ),
                               ),
