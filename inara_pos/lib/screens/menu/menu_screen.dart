@@ -2915,19 +2915,16 @@ class _MenuScreenState extends State<MenuScreen> {
                       return productData.isNotEmpty ? productData.first : <String, dynamic>{};
                     }(),
                     builder: (context, snapshot) {
-                      final productData = snapshot.data ?? {};
-                      final productTrackInventory = (productData['track_inventory'] as int?) == 1;
-                      
-                      // Check both product's current category and selected category
-                      // Also check if product already has track_inventory enabled
+                      // UPDATED: Only check category - inventory is ONLY allowed for Food, Cold Drinks, and Cigarettes
+                      // Do NOT check if product already has track_inventory - enforce category-based restriction
                       final currentCategoryAllows = canTrackInventoryForCategory(matchingCategory.name);
                       final selectedCategory = _categories.firstWhere(
                         (c) => _getCategoryIdentifier(c) == selectedCategoryId,
                         orElse: () => matchingCategory,
                       );
                       final selectedCategoryAllows = canTrackInventoryForCategory(selectedCategory.name);
-                      // Enable if product already tracks inventory OR if category allows it
-                      final trackInventory = productTrackInventory || currentCategoryAllows || selectedCategoryAllows;
+                      // UPDATED: Only enable if the category allows it (Food, Cold Drinks, or Cigarettes)
+                      final trackInventory = currentCategoryAllows || selectedCategoryAllows;
                       
                       return TextField(
                         controller: inventoryQuantityController,
@@ -2938,9 +2935,9 @@ class _MenuScreenState extends State<MenuScreen> {
                           border: const OutlineInputBorder(),
                           prefixIcon: const Icon(Icons.add_box),
                           helperText: trackInventory 
-                              ? 'Enter quantity to add to current stock'
-                              : 'Inventory tracking not available for this category',
-                          enabled: trackInventory, // Enable if product tracks inventory or category allows it
+                              ? 'Only allowed for Food, Cold Drinks, and Cigarettes'
+                              : 'Inventory tracking not available for "${matchingCategory.name}" category. Only Food, Cold Drinks, and Cigarettes can have inventory.',
+                          enabled: trackInventory, // Only enable for allowed categories
                         ),
                       );
                     },
@@ -3064,7 +3061,8 @@ class _MenuScreenState extends State<MenuScreen> {
         // Auto-assign image by name if none provided.
         finalImageUrl ??= _defaultMenuImageForName(newName);
 
-        // Determine if the new category allows inventory tracking
+        // UPDATED: Determine if the new category allows inventory tracking
+        // Only Food, Cold Drinks, and Cigarettes can have inventory
         final selectedCategory = _categories.firstWhere(
           (c) => _getCategoryIdentifier(c) == selectedCategoryId,
           orElse: () => _categories.isNotEmpty ? _categories.first : Category(
@@ -3075,7 +3073,7 @@ class _MenuScreenState extends State<MenuScreen> {
         );
         final trackInventory = canTrackInventoryForCategory(selectedCategory.name);
         
-        // Get current product data to preserve stock_quantity if category doesn't change tracking
+        // Get current product data
         final currentProduct = await dbProvider.query(
           'products',
           where: kIsWeb ? 'documentId = ?' : 'id = ?',
@@ -3097,15 +3095,18 @@ class _MenuScreenState extends State<MenuScreen> {
           'image_url': finalImageUrl,
           'is_veg': isVeg ? 1 : 0,
           'is_active': isActive ? 1 : 0,
+          // UPDATED: Set track_inventory based ONLY on category (Food, Cold Drinks, Cigarettes)
           'track_inventory': trackInventory ? 1 : 0,
           'updated_at': DateTime.now().millisecondsSinceEpoch,
         };
         
-        // Handle stock_quantity: if tracking is enabled, ensure it's set (preserve existing or set to 0)
-        // If tracking is disabled, set to null
+        // UPDATED: Handle stock_quantity based on category
+        // If category allows inventory (Food, Cold Drinks, Cigarettes), preserve or set to 0
+        // If category doesn't allow inventory, set to null and clear tracking
         if (trackInventory) {
           updateValues['stock_quantity'] = currentStock ?? 0.0;
         } else {
+          // UPDATED: Clear stock_quantity if category doesn't allow inventory
           updateValues['stock_quantity'] = null;
         }
         
@@ -3126,7 +3127,8 @@ class _MenuScreenState extends State<MenuScreen> {
             try {
               final productId = kIsWeb ? product.documentId : product.id;
               if (productId != null) {
-                // Validate that this product's category allows inventory tracking
+                // UPDATED: Always validate category before adding inventory
+                // This ensures inventory can ONLY be added for Food, Cold Drinks, and Cigarettes
                 await validateInventoryAllowed(
                   dbProvider: dbProvider,
                   productId: productId,
