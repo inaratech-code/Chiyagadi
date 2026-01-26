@@ -4,13 +4,15 @@ import '../providers/unified_database_provider.dart';
 /// Inventory Category Helper
 /// 
 /// Determines which categories allow inventory tracking (countable items only).
-/// Only Food, Cold Drinks, and Cigarettes can have inventory added/updated.
+/// Only Food, Cold Drinks, Cigarettes, Smokes, and Snacks can have inventory added/updated.
 
 /// Categories that allow inventory tracking (countable items)
 const Set<String> _inventoryAllowedCategories = {
   'Food',
   'Cold Drinks',
   'Cigarettes',
+  'Smokes',
+  'Snacks',
 };
 
 /// Categories that do NOT allow inventory tracking
@@ -27,6 +29,8 @@ const Set<String> _inventoryExcludedCategories = {
 /// - Food
 /// - Cold Drinks
 /// - Cigarettes
+/// - Smokes
+/// - Snacks
 /// 
 /// Returns false for excluded categories:
 /// - Tea / Coffee / Drinks
@@ -95,6 +99,6 @@ Future<void> validateInventoryAllowed({
   if (!canTrackInventoryForCategory(categoryName)) {
     throw Exception(
         'Inventory tracking is not allowed for "${categoryName}" category. '
-        'Only Food, Cold Drinks, and Cigarettes can have inventory.');
+        'Only Food, Cold Drinks, Cigarettes, Smokes, and Snacks can have inventory.');
   }
 }

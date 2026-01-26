@@ -900,19 +900,17 @@ class _MenuScreenState extends State<MenuScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        // Add Category Button (changed from Add Item)
-                        // UPDATED: Ensure button is always visible and properly sized
-                        Flexible(
-                          child: ElevatedButton.icon(
-                            onPressed: _isLoading ? null : () => _showAddCategoryDialog(),
-                            icon: const Icon(Icons.category, size: 18),
-                            label: const Text('Add Category'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.logoPrimary,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                              minimumSize: const Size(0, 40), // Ensure minimum height
-                            ),
+                        // Add Category Button - Made smaller and compact
+                        IconButton(
+                          onPressed: _isLoading ? null : () => _showAddCategoryDialog(),
+                          icon: const Icon(Icons.category, size: 20),
+                          tooltip: 'Add Category',
+                          style: IconButton.styleFrom(
+                            backgroundColor: AppTheme.logoPrimary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.all(10),
+                            minimumSize: const Size(40, 40),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                         ),
                       ],
@@ -2935,8 +2933,8 @@ class _MenuScreenState extends State<MenuScreen> {
                           border: const OutlineInputBorder(),
                           prefixIcon: const Icon(Icons.add_box),
                           helperText: trackInventory 
-                              ? 'Only allowed for Food, Cold Drinks, and Cigarettes'
-                              : 'Inventory tracking not available for "${matchingCategory.name}" category. Only Food, Cold Drinks, and Cigarettes can have inventory.',
+                              ? 'Allowed for Food, Cold Drinks, Cigarettes, Smokes, and Snacks'
+                              : 'Inventory tracking not available for "${matchingCategory.name}" category. Only Food, Cold Drinks, Cigarettes, Smokes, and Snacks can have inventory.',
                           enabled: trackInventory, // Only enable for allowed categories
                         ),
                       );
