@@ -4,8 +4,7 @@ import '../../providers/unified_database_provider.dart';
 import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../utils/theme.dart';
 import '../../utils/app_messenger.dart';
-import 'users_management_screen.dart';
-import 'roles_management_screen.dart';
+import 'users_and_roles_management_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final bool showUserManagement;
@@ -36,9 +35,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadSettings());
     if (widget.showUserManagement) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        // Backwards-compatible: if caller asks for user management, open the full screen.
+        // Backwards-compatible: if caller asks for user management, open the unified screen.
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const UsersManagementScreen()),
+          MaterialPageRoute(builder: (_) => const UsersAndRolesManagementScreen()),
         );
       });
     }
@@ -423,7 +422,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    // User Management (Admin Only)
+                    // Users & Roles Management (Admin Only) - Unified
                     Card(
                       color: AppTheme.logoPrimary.withOpacity(0.1),
                       child: Padding(
@@ -436,20 +435,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 Icon(Icons.manage_accounts,
                                     color: AppTheme.logoPrimary),
                                 const SizedBox(width: 8),
-                                Text(
-                                  'User Management',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleLarge
-                                      ?.copyWith(
-                                        color: AppTheme.logoPrimary,
-                                      ),
+                                Expanded(
+                                  child: Text(
+                                    'Users & Roles Management',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(
+                                          color: AppTheme.logoPrimary,
+                                        ),
+                                  ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Create users, reset PINs, and manage roles (Admin/Cashier)',
+                              'Create users, manage roles, and configure permissions all in one place',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],
@@ -463,71 +464,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                         builder: (_) =>
-                                            const UsersManagementScreen()),
+                                            const UsersAndRolesManagementScreen()),
                                   );
                                 },
-                                icon: const Icon(Icons.people),
-                                label: const Text('Manage Users'),
+                                icon: const Icon(Icons.settings_applications),
+                                label: const Text('Manage Users & Roles'),
                                 style: ElevatedButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(vertical: 16),
                                   backgroundColor: AppTheme.logoPrimary,
-                                  foregroundColor: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Roles Management (Admin Only)
-                    Card(
-                      color: AppTheme.logoSecondary.withOpacity(0.1),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.admin_panel_settings,
-                                    color: AppTheme.logoSecondary),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Roles Management',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleLarge
-                                      ?.copyWith(
-                                        color: AppTheme.logoSecondary,
-                                      ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Create and manage custom roles with limited permissions',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                        builder: (_) =>
-                                            const RolesManagementScreen()),
-                                  );
-                                },
-                                icon: const Icon(Icons.security),
-                                label: const Text('Manage Roles'),
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  backgroundColor: AppTheme.logoSecondary,
                                   foregroundColor: Colors.white,
                                 ),
                               ),
@@ -842,7 +786,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  // NOTE: Creating users is handled in `UsersManagementScreen`.
+  // NOTE: Creating users and managing roles is handled in `UsersAndRolesManagementScreen`.
   @override
   void dispose() {
     _cafeNameController.dispose();

@@ -46,9 +46,21 @@ class Role {
     final List<dynamic> permissionsList = jsonDecode(permissionsJson);
     final permissions = permissionsList.map((e) => (e as num).toInt()).toSet();
 
+    // UPDATED: Better handling of ID from both SQLite and Firestore
+    // SQLite uses 'id' as integer, Firestore uses 'documentId' as string
+    dynamic id = map['id'];
+    String? documentId = map['documentId'] as String?;
+    
+    // If documentId is not set but we have an id, try to use it as documentId for Firestore
+    // For SQLite, id should be an integer
+    if (documentId == null && id != null && id is String) {
+      documentId = id as String;
+      id = null; // Clear id if it's actually a documentId
+    }
+
     return Role(
-      id: map['id'],
-      documentId: map['documentId'],
+      id: id,
+      documentId: documentId,
       name: map['name'] as String,
       description: map['description'] as String?,
       permissions: permissions,
