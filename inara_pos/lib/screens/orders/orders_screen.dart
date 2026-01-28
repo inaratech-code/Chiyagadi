@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
@@ -29,13 +30,17 @@ class OrdersScreen extends StatefulWidget {
   State<OrdersScreen> createState() => _OrdersScreenState();
 }
 
+/// Minimum time before showing full-screen loading (avoids spinner flash on fast loads).
+const _kDeferLoadingMs = 100;
+
 class _OrdersScreenState extends State<OrdersScreen> {
   final OrderService _orderService = OrderService();
   List<Map<String, dynamic>> _orders = [];
-  bool _isLoading = true;
+  bool _isLoading = false; // Start false so scaffold paints immediately
   String _filterStatus = 'all'; // 'all', 'pending', 'completed', 'cancelled'
   int _ordersLimit = 50;
   bool _canLoadMore = false;
+  Timer? _loadDeferTimer;
 
   // NEW: Sensitive action confirmation (password)
   Future<bool> _confirmAdminPin() async {
@@ -159,33 +164,38 @@ class _OrdersScreenState extends State<OrdersScreen> {
   @override
   void initState() {
     super.initState();
-    // PERF: Let the screen render first.
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadOrders());
+  }
+
+  @override
+  void dispose() {
+    _loadDeferTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadOrders() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    _loadDeferTimer?.cancel();
+    // Show loading only after a short delay so fast loads don't flash a spinner.
+    _loadDeferTimer = Timer(const Duration(milliseconds: _kDeferLoadingMs), () {
+      if (mounted) setState(() => _isLoading = true);
+    });
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
-      // UPDATED: Query by order_type only, filter status in-memory to avoid Firestore composite index
       final allOrders = await dbProvider.query(
         'orders',
         where: 'order_type = ?',
         whereArgs: ['dine_in'],
         orderBy: 'created_at DESC',
-        limit: _ordersLimit * 2, // Get more to account for filtering
+        limit: _ordersLimit * 2,
       );
 
-      // Filter by status in-memory
       final orders = _filterStatus == 'all'
           ? allOrders
           : allOrders.where((o) => o['status'] == _filterStatus).toList();
-
-      // Limit after filtering
       final limitedOrders = orders.take(_ordersLimit).toList();
 
       if (!mounted) return;
@@ -194,9 +204,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
     } catch (e) {
       debugPrint('Error loading orders: $e');
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      _loadDeferTimer?.cancel();
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

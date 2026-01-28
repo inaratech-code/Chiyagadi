@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
@@ -42,8 +43,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _shopName = 'Shop';
   List<_ActivityItem> _recentActivity = const [];
   bool _isLoading = false; // PERF: Start with false to show UI immediately
-  // FIXED: Use ledger service instead of direct inventory service
+  Timer? _loadDeferTimer; // Defer loading indicator so shell paints first
   final InventoryLedgerService _ledgerService = InventoryLedgerService();
+
+  static const _kDeferLoadingMs = 100;
 
   bool _isPaidOrPartial(dynamic paymentStatus) {
     final s = (paymentStatus ?? '').toString();
@@ -67,7 +70,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   
   @override
   void dispose() {
-    // NEW: Clear static reference when disposed
+    _loadDeferTimer?.cancel();
     if (DashboardScreen._currentState == this) {
       DashboardScreen._currentState = null;
     }
@@ -76,13 +79,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadDashboardData() async {
     if (!mounted) return;
-    // UPDATED: Set loading state immediately if no data exists for faster feedback
+    _loadDeferTimer?.cancel();
     if (_todaySales == 0.0 && _recentActivity.isEmpty && _lowStockCount == 0) {
-      if (mounted) {
-        setState(() => _isLoading = true);
-      }
+      _loadDeferTimer = Timer(const Duration(milliseconds: _kDeferLoadingMs), () {
+        if (mounted) setState(() => _isLoading = true);
+      });
     }
-    
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
@@ -313,7 +315,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       debugPrint('DashboardScreen: Stack trace: $stackTrace');
       if (mounted) {
         setState(() => _isLoading = false);
-        // UPDATED: Show user-friendly error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error loading dashboard: ${e.toString()}'),
@@ -327,6 +328,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         );
       }
+    } finally {
+      _loadDeferTimer?.cancel();
     }
   }
 

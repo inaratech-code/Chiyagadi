@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:image_picker/image_picker.dart';
@@ -44,6 +45,8 @@ class _MenuScreenState extends State<MenuScreen> {
   bool _showOrderOverlay = false; // UPDATED: Track overlay visibility
   int _overlayRefreshKey = 0; // UPDATED: Force overlay refresh
   int? _lastStartNewOrderKey; // Used when arriving from Orders "New Order"
+  Timer? _loadDeferTimer;
+  static const _kDeferLoadingMs = 100;
 
   // NEW: Delete menu item (soft delete)
   //
@@ -371,6 +374,12 @@ class _MenuScreenState extends State<MenuScreen> {
     }
   }
 
+  @override
+  void dispose() {
+    _loadDeferTimer?.cancel();
+    super.dispose();
+  }
+
   bool _isOrderMode(InaraAuthProvider auth) {
     // NEW: Cashier uses Menu as ordering surface (admin keeps menu management).
     return !auth.isAdmin;
@@ -521,11 +530,12 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Future<void> _loadData() async {
-    // UPDATED: Set loading state immediately if no data exists
+    _loadDeferTimer?.cancel();
     if (mounted && _products.isEmpty && _categories.isEmpty) {
-      setState(() => _isLoading = true);
+      _loadDeferTimer = Timer(const Duration(milliseconds: _kDeferLoadingMs), () {
+        if (mounted) setState(() => _isLoading = true);
+      });
     }
-    
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
@@ -564,6 +574,7 @@ class _MenuScreenState extends State<MenuScreen> {
         if (!initSuccess) {
           debugPrint('MenuScreen: Database still not available after all retry attempts');
           if (mounted) {
+            setState(() => _isLoading = false);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: const Text('Database not available. Tap to retry connection.'),
@@ -573,10 +584,9 @@ class _MenuScreenState extends State<MenuScreen> {
                   label: 'Retry',
                   textColor: Colors.white,
                   onPressed: () async {
-                    // Force reinitialize and reload
                     final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
                     await dbProvider.forceInit();
-                    _loadData(); // Retry loading immediately
+                    _loadData();
                   },
                 ),
               ),
@@ -681,8 +691,6 @@ class _MenuScreenState extends State<MenuScreen> {
     } catch (e, stackTrace) {
       debugPrint('MenuScreen: Error loading menu data: $e');
       debugPrint('MenuScreen: Stack trace: $stackTrace');
-      
-      // UPDATED: Ensure loading state is cleared even on error
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -698,6 +706,8 @@ class _MenuScreenState extends State<MenuScreen> {
           ),
         );
       }
+    } finally {
+      _loadDeferTimer?.cancel();
     }
   }
 

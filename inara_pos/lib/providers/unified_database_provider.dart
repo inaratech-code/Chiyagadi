@@ -50,6 +50,8 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     }
 
     try {
+      // Yield so the UI can paint before we do heavy work (smoother perceived load).
+      await Future.delayed(Duration.zero);
       // Ensure Firebase is initialized before any Firestore access (web).
       if (kIsWeb) {
         // Removed delay - check immediately for faster initialization
