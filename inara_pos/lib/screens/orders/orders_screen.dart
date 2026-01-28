@@ -13,6 +13,7 @@ import '../../utils/app_messenger.dart';
 import 'order_detail_screen.dart';
 import 'order_payment_dialog.dart';
 import 'package:intl/intl.dart';
+import '../../utils/loading_constants.dart';
 
 class OrdersScreen extends StatefulWidget {
   final bool hideAppBar;
@@ -29,9 +30,6 @@ class OrdersScreen extends StatefulWidget {
   @override
   State<OrdersScreen> createState() => _OrdersScreenState();
 }
-
-/// Minimum time before showing full-screen loading (avoids spinner flash on fast loads).
-const _kDeferLoadingMs = 100;
 
 class _OrdersScreenState extends State<OrdersScreen> {
   final OrderService _orderService = OrderService();
@@ -177,7 +175,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     if (!mounted) return;
     _loadDeferTimer?.cancel();
     // Show loading only after a short delay so fast loads don't flash a spinner.
-    _loadDeferTimer = Timer(const Duration(milliseconds: _kDeferLoadingMs), () {
+    _loadDeferTimer = Timer(Duration(milliseconds: kDeferLoadingMs), () {
       if (mounted) setState(() => _isLoading = true);
     });
     try {

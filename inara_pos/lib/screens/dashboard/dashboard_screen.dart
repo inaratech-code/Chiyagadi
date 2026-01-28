@@ -19,6 +19,7 @@ import '../orders/orders_screen.dart';
 import '../menu/menu_screen.dart';
 import '../expenses/expenses_screen.dart';
 import 'recent_activity_screen.dart';
+import '../../utils/loading_constants.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Function(int)? onNavigate;
@@ -45,8 +46,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoading = false; // PERF: Start with false to show UI immediately
   Timer? _loadDeferTimer; // Defer loading indicator so shell paints first
   final InventoryLedgerService _ledgerService = InventoryLedgerService();
-
-  static const _kDeferLoadingMs = 100;
 
   bool _isPaidOrPartial(dynamic paymentStatus) {
     final s = (paymentStatus ?? '').toString();
@@ -81,7 +80,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (!mounted) return;
     _loadDeferTimer?.cancel();
     if (_todaySales == 0.0 && _recentActivity.isEmpty && _lowStockCount == 0) {
-      _loadDeferTimer = Timer(const Duration(milliseconds: _kDeferLoadingMs), () {
+      _loadDeferTimer = Timer(Duration(milliseconds: kDeferLoadingMs), () {
         if (mounted) setState(() => _isLoading = true);
       });
     }

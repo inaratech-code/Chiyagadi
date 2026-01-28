@@ -11,6 +11,7 @@ import '../../services/order_service.dart';
 import '../../widgets/order_overlay_widget.dart';
 import '../../utils/theme.dart';
 import '../../utils/inventory_category_helper.dart';
+import '../../utils/loading_constants.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io' as io;
 import 'dart:convert';
@@ -46,7 +47,6 @@ class _MenuScreenState extends State<MenuScreen> {
   int _overlayRefreshKey = 0; // UPDATED: Force overlay refresh
   int? _lastStartNewOrderKey; // Used when arriving from Orders "New Order"
   Timer? _loadDeferTimer;
-  static const _kDeferLoadingMs = 100;
 
   // NEW: Delete menu item (soft delete)
   //
@@ -532,7 +532,7 @@ class _MenuScreenState extends State<MenuScreen> {
   Future<void> _loadData() async {
     _loadDeferTimer?.cancel();
     if (mounted && _products.isEmpty && _categories.isEmpty) {
-      _loadDeferTimer = Timer(const Duration(milliseconds: _kDeferLoadingMs), () {
+      _loadDeferTimer = Timer(Duration(milliseconds: kDeferLoadingMs), () {
         if (mounted) setState(() => _isLoading = true);
       });
     }
