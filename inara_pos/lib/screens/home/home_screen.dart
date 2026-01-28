@@ -173,12 +173,24 @@ class _HomeScreenState extends State<HomeScreen> {
     final isCompact = !kIsWeb || MediaQuery.of(context).size.width < 700;
     // (cleanup) mainNavItems was unused; selection logic uses _selectedIndex directly.
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: _selectedIndex == 0
-          ? null
-          : AppBar(
-              title: Row(
+    return PopScope(
+      canPop: _selectedIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _selectedIndex != 0) {
+          setState(() => _selectedIndex = 0);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: _selectedIndex == 0
+            ? null
+            : AppBar(
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => setState(() => _selectedIndex = 0),
+                  tooltip: 'Back to Dashboard',
+                ),
+                title: Row(
                 children: [
                   Container(
                     width: 30,
@@ -213,16 +225,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-      drawer: isCompact ? _buildDrawer(context, authProvider) : null,
-      body: kIsWeb
-          ? ResponsiveWrapper(
-              child: _buildOffstageStack(),
-              padding: EdgeInsets.zero, // Screens handle their own padding
-            )
-          : _buildOffstageStack(),
-      bottomNavigationBar: isCompact
-          ? _buildMobileBottomNav(authProvider)
-          : _buildWebBottomNav(authProvider),
+        drawer: isCompact ? _buildDrawer(context, authProvider) : null,
+        body: kIsWeb
+            ? ResponsiveWrapper(
+                child: _buildOffstageStack(),
+                padding: EdgeInsets.zero, // Screens handle their own padding
+              )
+            : _buildOffstageStack(),
+        bottomNavigationBar: isCompact
+            ? _buildMobileBottomNav(authProvider)
+            : _buildWebBottomNav(authProvider),
+      ),
     );
   }
 
