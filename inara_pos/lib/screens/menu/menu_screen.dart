@@ -16,7 +16,15 @@ import 'dart:convert';
 
 class MenuScreen extends StatefulWidget {
   final bool hideAppBar;
-  const MenuScreen({super.key, this.hideAppBar = false});
+  /// When this key changes (e.g. when navigating from Orders "New Order"),
+  /// the screen clears any active order so the next add creates a new order.
+  final int? startNewOrderKey;
+
+  const MenuScreen({
+    super.key,
+    this.hideAppBar = false,
+    this.startNewOrderKey,
+  });
 
   @override
   State<MenuScreen> createState() => _MenuScreenState();
@@ -35,6 +43,7 @@ class _MenuScreenState extends State<MenuScreen> {
   bool _isAddingToOrder = false;
   bool _showOrderOverlay = false; // UPDATED: Track overlay visibility
   int _overlayRefreshKey = 0; // UPDATED: Force overlay refresh
+  int? _lastStartNewOrderKey; // Used when arriving from Orders "New Order"
 
   // NEW: Delete menu item (soft delete)
   //
@@ -338,11 +347,28 @@ class _MenuScreenState extends State<MenuScreen> {
   @override
   void initState() {
     super.initState();
+    _lastStartNewOrderKey = widget.startNewOrderKey;
     // PERF: Let the screen render first.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
-      _loadActiveOrder(); // Load active order for cashiers
+      // When opened from Orders "New Order", start with no active order.
+      if (widget.startNewOrderKey == null) {
+        _loadActiveOrder(); // Load active order for cashiers
+      }
     });
+  }
+
+  @override
+  void didUpdateWidget(MenuScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.startNewOrderKey != null &&
+        widget.startNewOrderKey != _lastStartNewOrderKey) {
+      _lastStartNewOrderKey = widget.startNewOrderKey;
+      _activeOrderId = null;
+      _activeOrderNumber = null;
+      _showOrderOverlay = false;
+      setState(() {});
+    }
   }
 
   bool _isOrderMode(InaraAuthProvider auth) {

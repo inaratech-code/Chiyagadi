@@ -15,7 +15,15 @@ import 'package:intl/intl.dart';
 
 class OrdersScreen extends StatefulWidget {
   final bool hideAppBar;
-  const OrdersScreen({super.key, this.hideAppBar = false});
+  /// When set, the "New Order" FAB navigates to the Menu section to create
+  /// the order there (Menu is connected to inventory; avoids inventory errors).
+  final VoidCallback? onNewOrder;
+
+  const OrdersScreen({
+    super.key,
+    this.hideAppBar = false,
+    this.onNewOrder,
+  });
 
   @override
   State<OrdersScreen> createState() => _OrdersScreenState();
@@ -301,7 +309,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ],
             ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateOrderDialog(),
+        onPressed: () {
+          if (widget.onNewOrder != null) {
+            widget.onNewOrder!();
+          } else {
+            _showCreateOrderDialog();
+          }
+        },
         backgroundColor: Theme.of(context).primaryColor,
         icon: const Icon(Icons.add),
         label: const Text('New Order'),

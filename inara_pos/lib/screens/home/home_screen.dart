@@ -26,6 +26,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   static const int _maxAliveScreens = 3;
+  /// When Orders "New Order" is used, we bump this and switch to Menu so the
+  /// new order is created from the Menu section (inventory is handled there).
+  int _newOrderRequestKey = 0;
   final Map<int, GlobalKey> _screenKeys = {
     0: GlobalKey(),
     1: GlobalKey(),
@@ -90,11 +93,26 @@ class _HomeScreenState extends State<HomeScreen> {
           onNavigate: _navigateToScreen,
         );
       case 1:
-        return OrdersScreen(key: _screenKeys[1], hideAppBar: true);
+        return OrdersScreen(
+          key: _screenKeys[1],
+          hideAppBar: true,
+          onNewOrder: () {
+            setState(() {
+              _newOrderRequestKey++;
+              _screenCache.remove(3);
+              _screenKeys[3] = GlobalKey();
+            });
+            _selectIndex(3);
+          },
+        );
       case 2:
         return TablesScreen(key: _screenKeys[2], hideAppBar: true);
       case 3:
-        return MenuScreen(key: _screenKeys[3], hideAppBar: true);
+        return MenuScreen(
+          key: _screenKeys[3],
+          hideAppBar: true,
+          startNewOrderKey: _newOrderRequestKey,
+        );
       case 4:
         return SalesScreen(key: _screenKeys[4], hideAppBar: true);
       case 5:
