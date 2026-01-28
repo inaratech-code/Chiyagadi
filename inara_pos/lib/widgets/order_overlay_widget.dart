@@ -348,11 +348,9 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
           ),
         );
         
-        // Navigate to Orders page
-        // Removed delay for faster navigation
-        
+        // Navigate to Orders page (push, not replace, so Back returns to Menu/Home)
         if (mounted) {
-          Navigator.of(context).pushReplacement(
+          Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => const OrdersScreen(),
             ),
