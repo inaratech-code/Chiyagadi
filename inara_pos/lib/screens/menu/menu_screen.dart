@@ -1440,44 +1440,7 @@ class _MenuScreenState extends State<MenuScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      // NEW: Show quantity/stock for menu items
-                      // UPDATED: Better error handling for stock display
-                      FutureBuilder<double>(
-                        future: _getProductStock(product),
-                        builder: (context, snapshot) {
-                          // UPDATED: Handle loading and error states gracefully
-                          if (snapshot.connectionState == ConnectionState.waiting) {
-                            return const SizedBox.shrink(); // Don't show anything while loading
-                          }
-                          
-                          if (snapshot.hasError) {
-                            debugPrint('MenuScreen: Error loading stock for ${product.name}: ${snapshot.error}');
-                            return const SizedBox.shrink(); // Hide on error
-                          }
-                          
-                          final stock = snapshot.data ?? 0.0;
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Text(
-                              '${stock.toStringAsFixed(stock.truncateToDouble() == stock ? 0 : 1)} pcs',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: () {
-                                  final width = MediaQuery.of(context).size.width;
-                                  if (!kIsWeb && width < 900) return 10.0; // Mobile
-                                  if (width < 600) return 10.0; // Mobile web
-                                  return 11.0; // Web
-                                }(),
-                                fontWeight: FontWeight.w600,
-                                color: stock > 0 ? Colors.green[700] : Colors.red[700],
-                                height: 1.0,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          );
-                        },
-                      ),
+                      // Pieces/stock count hidden in menu section per user preference
                     ],
                   ),
                 ),

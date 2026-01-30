@@ -356,13 +356,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 24),
                     const Divider(),
                     const SizedBox(height: 16),
-                    // Quick Clear Data Button (Admin Only)
+                    // Clear Orders Only (Admin Only)
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         onPressed: _showResetDialog,
                         icon: const Icon(Icons.delete_sweep),
-                        label: const Text('Clear All Business Data'),
+                        label: const Text('Clear Orders'),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           backgroundColor: AppTheme.errorColor,
@@ -372,7 +372,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Warning: This will permanently delete all orders, products, inventory, purchases, customers, and expenses. Users and settings will be kept.',
+                      'Warning: This will permanently delete all orders, order items, and payments. Products, inventory, customers, and other data will be kept.',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],
@@ -502,9 +502,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ListTile(
                               leading: const Icon(Icons.delete_forever,
                                   color: AppTheme.errorColor),
-                              title: const Text('Clear App Data'),
+                              title: const Text('Clear Orders'),
                               subtitle: const Text(
-                                  'Delete all business data entered through the app'),
+                                  'Delete all orders, order items, and payments only'),
                               onTap: () => _showResetDialog(),
                             ),
                           ],
@@ -531,21 +531,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 confirmController.text.trim().toUpperCase() == 'RESET';
 
             return AlertDialog(
-              title: const Text('Clear App Data?'),
+              title: const Text('Clear Orders?'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'This will permanently delete business data entered through the app, including:\n'
-                      '- Orders, payments, and credit records\n'
-                      '- Products and categories\n'
-                      '- Inventory, stock transactions, inventory ledger\n'
-                      '- Purchases, suppliers, and purchase payments\n'
-                      '- Customers and expenses\n'
-                      '- Tables, day sessions, sync queue, and audit logs\n\n'
-                      'Users and settings will be kept.\n'
+                      'This will permanently delete only the order section:\n'
+                      '- All orders\n'
+                      '- All order items\n'
+                      '- All payments\n\n'
+                      'Products, inventory, customers, purchases, and other data will be kept.\n'
                       'This action cannot be undone.',
                     ),
                     const SizedBox(height: 16),
@@ -593,8 +590,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               dialogContext,
                               listen: false,
                             );
-                            await dbProvider.clearBusinessData(
-                                seedDefaults: true);
+                            await dbProvider.clearOrdersData();
                             if (dialogContext.mounted) {
                               Navigator.pop(dialogContext, true);
                             }
@@ -609,7 +605,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.errorColor,
                   ),
-                  child: const Text('Clear Data'),
+                  child: const Text('Clear Orders'),
                 ),
               ],
             );
@@ -622,7 +618,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (confirm == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('App data cleared successfully'),
+          content: Text('Orders cleared successfully'),
           backgroundColor: Colors.red,
         ),
       );

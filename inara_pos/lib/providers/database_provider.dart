@@ -706,6 +706,21 @@ CREATE TABLE IF NOT EXISTS expenses (
     }
   }
 
+  /// Clears only order-section data (order_items, payments, orders).
+  /// Keeps products, inventory, customers, and all other business data.
+  Future<void> clearOrdersData() async {
+    if (kIsWeb) {
+      throw UnsupportedError('SQLite is not supported on web.');
+    }
+    final db = await database;
+    await db.transaction((txn) async {
+      const orderTables = <String>['order_items', 'payments', 'orders'];
+      for (final table in orderTables) {
+        await txn.delete(table);
+      }
+    });
+  }
+
   /// Clears only the business data created through the app, keeping `users` and
   /// `settings` intact. Optionally reseeds default categories/products.
   Future<void> clearBusinessData({bool seedDefaults = true}) async {

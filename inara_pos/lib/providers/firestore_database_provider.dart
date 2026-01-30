@@ -1142,6 +1142,21 @@ class FirestoreDatabaseProvider with ChangeNotifier {
     }
   }
 
+  /// Clears only order-section data (orders, order_items, payments).
+  /// Keeps products, inventory, customers, and all other business data.
+  Future<void> clearOrdersData() async {
+    if (!_isInitialized) {
+      await init();
+    }
+    final orderCollections = <String>['order_items', 'payments', 'orders'];
+    int totalDeleted = 0;
+    for (final name in orderCollections) {
+      totalDeleted += await _deleteCollectionInBatches(name);
+    }
+    debugPrint(
+        'FirestoreDatabase: Cleared orders data. Deleted $totalDeleted documents');
+  }
+
   /// Clears business data created/entered through the app while keeping
   /// authentication/users and settings intact.
   ///

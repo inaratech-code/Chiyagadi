@@ -615,6 +615,24 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     }
   }
 
+  /// Clears only order-section data (orders, order_items, payments).
+  /// Keeps products, inventory, customers, and all other business data.
+  Future<void> clearOrdersData() async {
+    if (!_isInitialized) {
+      await init();
+    }
+    if (!isAvailable) {
+      debugPrint('UnifiedDatabase: Clear orders data skipped - database not available');
+      return;
+    }
+    try {
+      await _provider.clearOrdersData();
+    } catch (e) {
+      debugPrint('UnifiedDatabase: Clear orders data error: $e');
+      rethrow;
+    }
+  }
+
   /// Clears business data created/entered through the app while keeping
   /// authentication/users and settings intact.
   ///
