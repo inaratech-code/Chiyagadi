@@ -17,6 +17,7 @@ import '../../utils/loading_constants.dart';
 
 class OrdersScreen extends StatefulWidget {
   final bool hideAppBar;
+
   /// When set, the "New Order" FAB navigates to the Menu section to create
   /// the order there (Menu is connected to inventory; avoids inventory errors).
   final VoidCallback? onNewOrder;
@@ -73,31 +74,32 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ),
             ),
           ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final valid = await auth.verifyAdminPin(pinController.text.trim());
-              if (!valid) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Invalid Password'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final valid =
+                    await auth.verifyAdminPin(pinController.text.trim());
+                if (!valid) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Invalid Password'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                  return;
                 }
-                return;
-              }
-              if (context.mounted) Navigator.pop(context, true);
-            },
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
+                if (context.mounted) Navigator.pop(context, true);
+              },
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
       ),
     );
     return ok == true;
@@ -115,8 +117,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Order?'),
-        content: Text(
-            'Delete $orderNumber permanently? This cannot be undone.'),
+        content:
+            Text('Delete $orderNumber permanently? This cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -327,7 +329,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
         icon: const Icon(Icons.add),
         label: const Text('New Order'),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat, // FIXED: Ensure FAB stays visible
+      floatingActionButtonLocation: FloatingActionButtonLocation
+          .endFloat, // FIXED: Ensure FAB stays visible
       body: Column(
         children: [
           // Filter chips
@@ -391,7 +394,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                     left: 16,
                                     right: 16,
                                     top: 16,
-                                    bottom: 100, // FIXED: Add bottom padding to prevent FAB from being hidden
+                                    bottom:
+                                        100, // FIXED: Add bottom padding to prevent FAB from being hidden
                                   ),
                                   itemCount: _filteredOrders.length +
                                       (_canLoadMore ? 1 : 0),
@@ -448,7 +452,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 left: 16,
                                 right: 16,
                                 top: 16,
-                                bottom: 100, // FIXED: Add bottom padding to prevent FAB from being hidden
+                                bottom:
+                                    100, // FIXED: Add bottom padding to prevent FAB from being hidden
                               ),
                               itemCount: _filteredOrders.length +
                                   (_canLoadMore ? 1 : 0),
@@ -625,7 +630,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         MaterialPageRoute(
                           builder: (context) => OrderDetailScreen(
                             orderId: orderId,
-                            orderNumber: order['order_number'] as String? ?? 'Order',
+                            orderNumber:
+                                order['order_number'] as String? ?? 'Order',
                           ),
                         ),
                       ).then((_) => _loadOrders());
@@ -928,11 +934,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         border: OutlineInputBorder(),
                         suffixText: '%',
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       onChanged: (v) {
-                        final parsed =
-                            double.tryParse(v) ?? discountPercent;
+                        final parsed = double.tryParse(v) ?? discountPercent;
                         setDialogState(
                             () => discountPercent = parsed.clamp(0, 100));
                       },

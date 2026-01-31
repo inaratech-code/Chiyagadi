@@ -259,8 +259,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                           itemBuilder: (context, index) {
                             if (_canLoadMore && index == _expenses.length) {
                               return Padding(
-                                padding: const EdgeInsets.only(
-                                    top: 8, bottom: 24),
+                                padding:
+                                    const EdgeInsets.only(top: 8, bottom: 24),
                                 child: OutlinedButton(
                                   onPressed: () {
                                     setState(() {

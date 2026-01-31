@@ -95,7 +95,10 @@ class _UsersAndRolesManagementScreenState
         if (mounted) {
           setState(() => _roles = [
                 {'name': 'admin', 'description': 'Full system access'},
-                {'name': 'cashier', 'description': 'Sales and order management'},
+                {
+                  'name': 'cashier',
+                  'description': 'Sales and order management'
+                },
               ]);
         }
       }
@@ -141,7 +144,8 @@ class _UsersAndRolesManagementScreenState
     final emailController = TextEditingController();
     final pinController = TextEditingController();
     final confirmPinController = TextEditingController();
-    String selectedRole = _roles.isNotEmpty ? _roles.first['name'] as String : 'cashier';
+    String selectedRole =
+        _roles.isNotEmpty ? _roles.first['name'] as String : 'cashier';
     bool obscurePin = true;
     bool obscureConfirmPin = true;
 
@@ -164,112 +168,115 @@ class _UsersAndRolesManagementScreenState
                       labelText: 'Username',
                       border: OutlineInputBorder(),
                     ),
-                  autofocus: true,
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: selectedRole,
-                  decoration: const InputDecoration(
-                    labelText: 'Role',
-                    border: OutlineInputBorder(),
+                    autofocus: true,
                   ),
-                  items: _roles.map((role) {
-                    final roleName = role['name'] as String;
-                    final roleDesc = role['description'] as String? ?? '';
-                    return DropdownMenuItem(
-                      value: roleName,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(roleName),
-                          if (roleDesc.isNotEmpty)
-                            Text(
-                              roleDesc,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[600],
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: selectedRole,
+                    decoration: const InputDecoration(
+                      labelText: 'Role',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: _roles.map((role) {
+                      final roleName = role['name'] as String;
+                      final roleDesc = role['description'] as String? ?? '';
+                      return DropdownMenuItem(
+                        value: roleName,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(roleName),
+                            if (roleDesc.isNotEmpty)
+                              Text(
+                                roleDesc,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
+                                ),
                               ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => selectedRole = value);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  if (selectedRole == 'cashier')
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline,
+                              size: 18, color: Colors.blue[700]),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Set email for web login',
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.blue[800]),
                             ),
+                          ),
                         ],
                       ),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      setDialogState(() => selectedRole = value);
-                    }
-                  },
-                ),
-                const SizedBox(height: 12),
-                if (selectedRole == 'cashier')
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline, size: 18, color: Colors.blue[700]),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Set email for web login',
-                            style: TextStyle(fontSize: 12, color: Colors.blue[800]),
-                          ),
-                        ),
-                      ],
+                    ),
+                  TextField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    autofillHints: const [AutofillHints.email],
+                    decoration: InputDecoration(
+                      labelText: selectedRole == 'admin' ? 'Email *' : 'Email',
+                      hintText: 'user@example.com',
+                      border: const OutlineInputBorder(),
+                      helperText: selectedRole == 'admin'
+                          ? 'Required for admin users'
+                          : 'Optional – set for web login',
                     ),
                   ),
-                TextField(
-                  controller: emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  autofillHints: const [AutofillHints.email],
-                  decoration: InputDecoration(
-                    labelText: selectedRole == 'admin' ? 'Email *' : 'Email',
-                    hintText: 'user@example.com',
-                    border: const OutlineInputBorder(),
-                    helperText: selectedRole == 'admin'
-                        ? 'Required for admin users'
-                        : 'Optional – set for web login',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: pinController,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    border: const OutlineInputBorder(),
-                    helperText: '4-20 characters',
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                          obscurePin ? Icons.visibility : Icons.visibility_off),
-                      onPressed: () =>
-                          setDialogState(() => obscurePin = !obscurePin),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: pinController,
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      border: const OutlineInputBorder(),
+                      helperText: '4-20 characters',
+                      suffixIcon: IconButton(
+                        icon: Icon(obscurePin
+                            ? Icons.visibility
+                            : Icons.visibility_off),
+                        onPressed: () =>
+                            setDialogState(() => obscurePin = !obscurePin),
+                      ),
                     ),
+                    obscureText: obscurePin,
+                    keyboardType: TextInputType.text,
+                    maxLength: 20,
                   ),
-                  obscureText: obscurePin,
-                  keyboardType: TextInputType.text,
-                  maxLength: 20,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: confirmPinController,
-                  decoration: InputDecoration(
-                    labelText: 'Confirm Password',
-                    border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: Icon(obscureConfirmPin
-                          ? Icons.visibility
-                          : Icons.visibility_off),
-                      onPressed: () => setDialogState(
-                          () => obscureConfirmPin = !obscureConfirmPin),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: confirmPinController,
+                    decoration: InputDecoration(
+                      labelText: 'Confirm Password',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: Icon(obscureConfirmPin
+                            ? Icons.visibility
+                            : Icons.visibility_off),
+                        onPressed: () => setDialogState(
+                            () => obscureConfirmPin = !obscureConfirmPin),
+                      ),
                     ),
+                    obscureText: obscureConfirmPin,
+                    keyboardType: TextInputType.text,
+                    maxLength: 20,
                   ),
-                  obscureText: obscureConfirmPin,
-                  keyboardType: TextInputType.text,
-                  maxLength: 20,
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
           ),
           actions: [
             TextButton(
@@ -329,7 +336,7 @@ class _UsersAndRolesManagementScreenState
       email: email.isEmpty ? null : email,
     );
     if (!mounted) return;
-    
+
     if (error == null) {
       // Success
       await _loadUsers();
@@ -341,7 +348,8 @@ class _UsersAndRolesManagementScreenState
       String message = 'User "$username" created successfully';
       if (createdUser.isNotEmpty && createdUser['email'] != null) {
         final userEmail = createdUser['email'] as String;
-        message = 'User "$username" created successfully\nLogin email: $userEmail';
+        message =
+            'User "$username" created successfully\nLogin email: $userEmail';
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -439,8 +447,8 @@ class _UsersAndRolesManagementScreenState
     }
     if (pin != confirm) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Passwords do not match')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Passwords do not match')));
       }
       return;
     }
@@ -597,8 +605,7 @@ class _UsersAndRolesManagementScreenState
     final userId = user['id'];
     final username = user['username'] as String? ?? '';
 
-    if (auth.currentUserId != null &&
-        auth.currentUserId == userId.toString()) {
+    if (auth.currentUserId != null && auth.currentUserId == userId.toString()) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -674,7 +681,7 @@ class _UsersAndRolesManagementScreenState
       for (final item in roleMaps) {
         if (item is! Map) continue;
         try {
-          final map = Map<String, dynamic>.from(item as Map);
+          final map = Map<String, dynamic>.from(item);
           loaded.add(Role.fromMap(map));
         } catch (e) {
           debugPrint('Error parsing role (skipping): $e — map: $item');
@@ -728,7 +735,8 @@ class _UsersAndRolesManagementScreenState
           title: Text(existingRole == null ? 'Create Role' : 'Edit Role'),
           content: SizedBox(
             width: 400,
-            height: (MediaQuery.of(context).size.height * 0.6).clamp(300.0, 560.0),
+            height:
+                (MediaQuery.of(context).size.height * 0.6).clamp(300.0, 560.0),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -768,9 +776,11 @@ class _UsersAndRolesManagementScreenState
                       shrinkWrap: true,
                       itemCount: _sectionNames.length,
                       itemBuilder: (context, index) {
-                        final sectionIndex = _sectionNames.keys.elementAt(index);
+                        final sectionIndex =
+                            _sectionNames.keys.elementAt(index);
                         final sectionName = _sectionNames[sectionIndex]!;
-                        final isSelected = selectedPermissions.contains(sectionIndex);
+                        final isSelected =
+                            selectedPermissions.contains(sectionIndex);
                         final isDashboard = sectionIndex == 0;
 
                         return CheckboxListTile(
@@ -894,14 +904,15 @@ class _UsersAndRolesManagementScreenState
           // UPDATED: Better handling of role ID for both SQLite and Firestore
           dynamic roleId;
           String whereClause;
-          
+
           if (kIsWeb) {
             // Firestore uses documentId
             roleId = existingRole.documentId;
             whereClause = 'documentId = ?';
             if (roleId == null) {
               // Fallback: try to find by name if documentId is missing
-              debugPrint('Warning: Role documentId is null, attempting to find by name');
+              debugPrint(
+                  'Warning: Role documentId is null, attempting to find by name');
               final found = await dbProvider.query(
                 'roles',
                 where: 'name = ?',
@@ -910,10 +921,12 @@ class _UsersAndRolesManagementScreenState
               if (found.isNotEmpty) {
                 roleId = found.first['documentId'];
                 if (roleId == null) {
-                  throw Exception('Role ID is required for update. Role "${existingRole.name}" found but has no ID.');
+                  throw Exception(
+                      'Role ID is required for update. Role "${existingRole.name}" found but has no ID.');
                 }
               } else {
-                throw Exception('Role ID is required for update. Role "${existingRole.name}" not found in database.');
+                throw Exception(
+                    'Role ID is required for update. Role "${existingRole.name}" not found in database.');
               }
             }
           } else {
@@ -922,7 +935,8 @@ class _UsersAndRolesManagementScreenState
             whereClause = 'id = ?';
             if (roleId == null) {
               // Fallback: try to find by name if id is missing
-              debugPrint('Warning: Role id is null, attempting to find by name');
+              debugPrint(
+                  'Warning: Role id is null, attempting to find by name');
               final found = await dbProvider.query(
                 'roles',
                 where: 'name = ?',
@@ -931,10 +945,12 @@ class _UsersAndRolesManagementScreenState
               if (found.isNotEmpty) {
                 roleId = found.first['id'];
                 if (roleId == null) {
-                  throw Exception('Role ID is required for update. Role "${existingRole.name}" found but has no ID.');
+                  throw Exception(
+                      'Role ID is required for update. Role "${existingRole.name}" found but has no ID.');
                 }
               } else {
-                throw Exception('Role ID is required for update. Role "${existingRole.name}" not found in database.');
+                throw Exception(
+                    'Role ID is required for update. Role "${existingRole.name}" not found in database.');
               }
             }
           }
@@ -990,16 +1006,19 @@ class _UsersAndRolesManagementScreenState
         if (mounted) {
           String errorMessage = 'Error saving role';
           final errorStr = e.toString();
-          
+
           // UPDATED: More user-friendly error messages
           if (errorStr.contains('Role ID is required')) {
-            errorMessage = 'Unable to update role. Please refresh the page and try again.';
+            errorMessage =
+                'Unable to update role. Please refresh the page and try again.';
           } else if (errorStr.contains('already exists')) {
-            errorMessage = 'A role with this name already exists. Please choose a different name.';
+            errorMessage =
+                'A role with this name already exists. Please choose a different name.';
           } else {
-            errorMessage = 'Error saving role: ${errorStr.length > 100 ? errorStr.substring(0, 100) + "..." : errorStr}';
+            errorMessage =
+                'Error saving role: ${errorStr.length > 100 ? "${errorStr.substring(0, 100)}..." : errorStr}';
           }
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(errorMessage),
@@ -1070,7 +1089,7 @@ class _UsersAndRolesManagementScreenState
         // UPDATED: Better handling of role ID for deletion
         dynamic roleId;
         String whereClause;
-        
+
         if (kIsWeb) {
           roleId = role.documentId;
           whereClause = 'documentId = ?';
@@ -1078,10 +1097,11 @@ class _UsersAndRolesManagementScreenState
           roleId = role.id;
           whereClause = 'id = ?';
         }
-        
+
         if (roleId == null) {
           // Fallback: try to find by name
-          debugPrint('Warning: Role ID is null for deletion, attempting to find by name');
+          debugPrint(
+              'Warning: Role ID is null for deletion, attempting to find by name');
           final found = await dbProvider.query(
             'roles',
             where: 'name = ?',
@@ -1093,7 +1113,8 @@ class _UsersAndRolesManagementScreenState
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Cannot delete role: "${role.name}" - ID not found'),
+                    content: Text(
+                        'Cannot delete role: "${role.name}" - ID not found'),
                     backgroundColor: Colors.red,
                   ),
                 );
@@ -1104,7 +1125,8 @@ class _UsersAndRolesManagementScreenState
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Cannot delete role: "${role.name}" - not found in database'),
+                  content: Text(
+                      'Cannot delete role: "${role.name}" - not found in database'),
                   backgroundColor: Colors.red,
                 ),
               );
@@ -1160,7 +1182,8 @@ class _UsersAndRolesManagementScreenState
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Row(
                     children: [
-                      Icon(Icons.cloud_done, size: 18, color: Colors.green[700]),
+                      Icon(Icons.cloud_done,
+                          size: 18, color: Colors.green[700]),
                       const SizedBox(width: 6),
                       Text(
                         'Users are stored in Firebase and sync across devices.',
@@ -1189,8 +1212,7 @@ class _UsersAndRolesManagementScreenState
                       itemCount: _filteredUsers.length,
                       itemBuilder: (context, index) {
                         final u = _filteredUsers[index];
-                        final username =
-                            u['username'] as String? ?? 'Unknown';
+                        final username = u['username'] as String? ?? 'Unknown';
                         final role = u['role'] as String? ?? 'cashier';
                         final active = _isActive(u) == 1;
                         final isMe = auth.currentUserId != null &&
@@ -1234,7 +1256,8 @@ class _UsersAndRolesManagementScreenState
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: AppTheme.logoLight.withOpacity(0.25),
+                                      color:
+                                          AppTheme.logoLight.withOpacity(0.25),
                                       borderRadius: BorderRadius.circular(999),
                                     ),
                                     child: const Text('You',
@@ -1281,7 +1304,8 @@ class _UsersAndRolesManagementScreenState
                                           horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
                                         color: roleColor.withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(999),
+                                        borderRadius:
+                                            BorderRadius.circular(999),
                                       ),
                                       child: Text(
                                         role.toUpperCase(),
@@ -1297,7 +1321,8 @@ class _UsersAndRolesManagementScreenState
                                           horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
                                         color: statusColor.withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(999),
+                                        borderRadius:
+                                            BorderRadius.circular(999),
                                       ),
                                       child: Text(
                                         active ? 'ACTIVE' : 'DISABLED',
@@ -1330,8 +1355,7 @@ class _UsersAndRolesManagementScreenState
                                 const PopupMenuItem(
                                     value: 'pin', child: Text('Reset PIN')),
                                 const PopupMenuItem(
-                                    value: 'role',
-                                    child: Text('Change Role')),
+                                    value: 'role', child: Text('Change Role')),
                                 PopupMenuItem(
                                     value: 'active',
                                     child: Text(active
@@ -1366,7 +1390,8 @@ class _UsersAndRolesManagementScreenState
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Row(
                     children: [
-                      Icon(Icons.cloud_done, size: 18, color: Colors.green[700]),
+                      Icon(Icons.cloud_done,
+                          size: 18, color: Colors.green[700]),
                       const SizedBox(width: 6),
                       Text(
                         'Roles are stored in Firebase and sync across devices.',
@@ -1377,55 +1402,55 @@ class _UsersAndRolesManagementScreenState
                 ),
               Row(
                 children: [
-              Expanded(
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Search roles...',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _roleSearch.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              setState(() => _roleSearch = '');
-                            },
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onChanged: (value) {
-                    setState(() => _roleSearch = value);
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Material(
-                color: AppTheme.logoSecondary,
-                borderRadius: BorderRadius.circular(12),
-                child: InkWell(
-                  onTap: () => _showAddRoleDialog(),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 16),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.add, color: Colors.white),
-                        SizedBox(width: 8),
-                        Text(
-                          'Create Role',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
+                  Expanded(
+                    child: TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Search roles...',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _roleSearch.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  setState(() => _roleSearch = '');
+                                },
+                              )
+                            : null,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      ],
+                      ),
+                      onChanged: (value) {
+                        setState(() => _roleSearch = value);
+                      },
                     ),
                   ),
-                ),
-              ),
+                  const SizedBox(width: 12),
+                  Material(
+                    color: AppTheme.logoSecondary,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      onTap: () => _showAddRoleDialog(),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 16),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.add, color: Colors.white),
+                            SizedBox(width: 8),
+                            Text(
+                              'Create Role',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -1532,8 +1557,8 @@ class _UsersAndRolesManagementScreenState
                                       .map((perm) => Chip(
                                             label: Text(
                                               _sectionNames[perm] ?? 'Unknown',
-                                              style: const TextStyle(
-                                                  fontSize: 11),
+                                              style:
+                                                  const TextStyle(fontSize: 11),
                                             ),
                                             padding: EdgeInsets.zero,
                                             materialTapTargetSize:

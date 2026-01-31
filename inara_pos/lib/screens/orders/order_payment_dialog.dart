@@ -251,7 +251,8 @@ class _OrderPaymentDialogState extends State<OrderPaymentDialog> {
     setState(() => _isProcessing = true);
 
     try {
-      final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
+      final authProvider =
+          Provider.of<InaraAuthProvider>(context, listen: false);
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
 

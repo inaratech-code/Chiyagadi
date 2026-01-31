@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../providers/unified_database_provider.dart';
-import '../../services/inventory_ledger_service.dart';
 import '../../widgets/responsive_wrapper.dart';
 import '../../utils/theme.dart';
 import '../../utils/inventory_category_helper.dart';
@@ -27,10 +26,10 @@ class DashboardScreen extends StatefulWidget {
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
-  
+
   // NEW: Static reference to refresh dashboard from anywhere
   static _DashboardScreenState? _currentState;
-  
+
   static void refreshDashboard() {
     _currentState?._loadDashboardData();
   }
@@ -40,12 +39,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _todaySales = 0.0;
   double _todayCredit = 0.0;
   int _lowStockCount = 0;
-  List<_LowStockItem> _lowStockItems = []; // NEW: Store specific low stock items
+  List<_LowStockItem> _lowStockItems =
+      []; // NEW: Store specific low stock items
   String _shopName = 'Shop';
   List<_ActivityItem> _recentActivity = const [];
-  bool _isLoading = false; // PERF: Start with false to show UI immediately
-  Timer? _loadDeferTimer; // Defer loading indicator so shell paints first
-  final InventoryLedgerService _ledgerService = InventoryLedgerService();
+  bool _isLoading = false;
+  Timer? _loadDeferTimer;
 
   bool _isPaidOrPartial(dynamic paymentStatus) {
     final s = (paymentStatus ?? '').toString();
@@ -66,7 +65,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     });
   }
-  
+
   @override
   void dispose() {
     _loadDeferTimer?.cancel();
@@ -191,7 +190,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         // Process stock data directly from products (no async ledger call needed)
         int lowStockCount = 0;
         List<_LowStockItem> lowStockItems = [];
-        
+
         // UPDATED: Build category map from already fetched categories (no extra query)
         final categoryMap = <dynamic, String>{};
         for (final cat in categories) {
@@ -201,25 +200,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
             categoryMap[catId] = catName;
           }
         }
-        
+
         // Check stock for products that track inventory AND belong to countable categories
         for (final product in products) {
           final pid = product['id'];
           if (pid == null) continue;
-          
+
           // Check if product's category allows inventory tracking
           final categoryId = product['category_id'];
           if (categoryId == null) continue;
-          
+
           final categoryName = categoryMap[categoryId] ?? '';
           if (!canTrackInventoryForCategory(categoryName)) {
             continue; // Skip products from non-countable categories
           }
-          
+
           // Get stockQuantity directly from product
           final stockQuantity = (product['stock_quantity'] as num?)?.toDouble();
           final currentStock = stockQuantity ?? 0.0;
-          
+
           // Only show low stock if stock is 0 or less
           if (currentStock <= 0) {
             lowStockCount++;
@@ -231,7 +230,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ));
           }
         }
-        
+
         if (mounted) {
           setState(() {
             _lowStockCount = lowStockCount;
@@ -239,7 +238,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           });
         }
       }
-      
+
       nextLowStockCount = 0; // Will be updated async
 
       for (final o in recentOrders) {
@@ -373,11 +372,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  List<Widget> _buildContent(BuildContext context, InaraAuthProvider authProvider) {
+  List<Widget> _buildContent(
+      BuildContext context, InaraAuthProvider authProvider) {
     if (_isLoading) {
       return _buildLoadingContent();
     }
-    
+
     return [
       // Welcome Section with Logo and Settings Button
       const SizedBox(height: 8),
@@ -488,7 +488,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               IconButton(
                 icon: const Icon(Icons.logout),
                 onPressed: () {
-                  Provider.of<InaraAuthProvider>(context, listen: false).logout();
+                  Provider.of<InaraAuthProvider>(context, listen: false)
+                      .logout();
                 },
                 tooltip: 'Logout',
                 padding: const EdgeInsets.all(8),
@@ -714,16 +715,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
       const SizedBox(height: 16),
-      ...List.generate(3, (index) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Container(
-              height: 60,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          )),
+      ...List.generate(
+          3,
+          (index) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Container(
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              )),
     ];
   }
 
@@ -878,8 +881,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   color: Colors.orange[100],
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.warning_amber_rounded, 
-                  color: Colors.orange[800], 
+                child: Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.orange[800],
                   size: 20,
                 ),
               ),
@@ -901,12 +905,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   } else {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const InventoryScreen()),
+                      MaterialPageRoute(
+                          builder: (_) => const InventoryScreen()),
                     );
                   }
                 },
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
                 child: Text(
                   'View All',
@@ -927,48 +933,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 12),
             ..._lowStockItems.take(5).map((item) => Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: Colors.orange[100]!, width: 1),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.inventory_2_outlined, 
-                    size: 18, 
-                    color: Colors.orange[700],
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.orange[100]!, width: 1),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      item.productName,
-                      style: TextStyle(
-                        color: Colors.grey[800],
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.inventory_2_outlined,
+                        size: 18,
+                        color: Colors.orange[700],
                       ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.red[50],
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      'Stock: ${item.stock.toStringAsFixed(item.stock.truncateToDouble() == item.stock ? 0 : 1)}',
-                      style: TextStyle(
-                        color: Colors.red[700],
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          item.productName,
+                          style: TextStyle(
+                            color: Colors.grey[800],
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
-                    ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.red[50],
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Stock: ${item.stock.toStringAsFixed(item.stock.truncateToDouble() == item.stock ? 0 : 1)}',
+                          style: TextStyle(
+                            color: Colors.red[700],
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            )),
+                )),
             if (_lowStockItems.length > 5)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
@@ -1077,7 +1086,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     // Responsive grid: mobile (Android/iOS) = 3 columns, tablets = 3, desktop = 4
     final crossAxisCount = kIsWeb
-        ? (width > 1200 ? 4 : 3) // Web: 4 columns on large screens, 3 on smaller
+        ? (width > 1200
+            ? 4
+            : 3) // Web: 4 columns on large screens, 3 on smaller
         : (width < 600 ? 3 : 3); // Mobile: Always 3 columns for consistency
 
     return GridView.builder(
@@ -1216,7 +1227,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ? DateTime.fromMillisecondsSinceEpoch(a.createdAt)
                     : null;
                 // NEW: Make order items clickable to navigate to orders section
-                final isOrder = a.icon == Icons.receipt_long && a.orderId != null;
+                final isOrder =
+                    a.icon == Icons.receipt_long && a.orderId != null;
                 return InkWell(
                   onTap: isOrder
                       ? () {

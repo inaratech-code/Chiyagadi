@@ -100,7 +100,8 @@ class PurchaseService {
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
+      final authProvider =
+          Provider.of<InaraAuthProvider>(context, listen: false);
       await dbProvider.init();
 
       // Validate items

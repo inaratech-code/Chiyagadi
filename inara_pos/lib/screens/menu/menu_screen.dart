@@ -7,7 +7,6 @@ import '../../providers/unified_database_provider.dart';
 import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../models/category.dart';
 import '../../models/product.dart';
-import '../../services/order_service.dart';
 import '../../widgets/order_overlay_widget.dart';
 import '../../utils/theme.dart';
 import '../../utils/inventory_category_helper.dart';
@@ -18,6 +17,7 @@ import 'dart:convert';
 
 class MenuScreen extends StatefulWidget {
   final bool hideAppBar;
+
   /// When this key changes (e.g. when navigating from Orders "New Order"),
   /// the screen clears any active order so the next add creates a new order.
   final int? startNewOrderKey;
@@ -38,8 +38,7 @@ class _MenuScreenState extends State<MenuScreen> {
   bool _isLoading = false; // PERF: Start with false to show UI immediately
   String _searchQuery = '';
 
-  // NEW: Quick order flow (cashier-friendly)
-  final OrderService _orderService = OrderService();
+  // Quick order flow (cashier-friendly) - uses pending cart until Create Order
   dynamic _activeOrderId;
   String? _activeOrderNumber;
   bool _isAddingToOrder = false;
@@ -49,7 +48,8 @@ class _MenuScreenState extends State<MenuScreen> {
   Timer? _loadDeferTimer;
 
   // Pending cart: items held locally until "Create Order" is clicked (not in DB)
-  List<Map<String, dynamic>> _pendingCartItems = []; // [{product: Product, quantity: int}]
+  List<Map<String, dynamic>> _pendingCartItems =
+      []; // [{product: Product, quantity: int}]
 
   // NEW: Delete menu item (soft delete)
   //
@@ -154,47 +154,52 @@ class _MenuScreenState extends State<MenuScreen> {
     );
 
     try {
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+
       // Force re-initialization to reset any previous failures
       debugPrint('MenuScreen: Forcing database re-initialization for seed...');
       await dbProvider.forceInit();
-      
+
       if (!dbProvider.isAvailable) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Database not available. Please check Firebase connection and try refreshing the page.'),
+              content: Text(
+                  'Database not available. Please check Firebase connection and try refreshing the page.'),
               backgroundColor: Colors.red,
               duration: Duration(seconds: 5),
             ),
           );
         }
-        debugPrint('MenuScreen: Database still not available after forceInit()');
+        debugPrint(
+            'MenuScreen: Database still not available after forceInit()');
         return;
       }
 
       // Seed menu items
       debugPrint('MenuScreen: Starting menu seed...');
       final success = await dbProvider.seedMenuItems();
-      
+
       if (!mounted) return;
-      
+
       if (success) {
-        debugPrint('MenuScreen: Seed completed successfully, reloading data...');
-        
+        debugPrint(
+            'MenuScreen: Seed completed successfully, reloading data...');
+
         // Wait a moment for Firestore to propagate
         // Removed delay for faster operation
-        
+
         // Reload menu data
         await _loadData();
-        
+
         // Verify data was loaded
         if (mounted) {
           if (_categories.isEmpty && _products.isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Seed completed but no data loaded. Please refresh manually.'),
+                content: Text(
+                    'Seed completed but no data loaded. Please refresh manually.'),
                 backgroundColor: Colors.orange,
                 duration: Duration(seconds: 4),
               ),
@@ -202,7 +207,8 @@ class _MenuScreenState extends State<MenuScreen> {
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Menu items seeded successfully! Loaded ${_categories.length} categories and ${_products.length} products.'),
+                content: Text(
+                    'Menu items seeded successfully! Loaded ${_categories.length} categories and ${_products.length} products.'),
                 backgroundColor: Colors.green,
                 duration: const Duration(seconds: 3),
               ),
@@ -213,7 +219,8 @@ class _MenuScreenState extends State<MenuScreen> {
         debugPrint('MenuScreen: Seed failed');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Failed to seed menu items. Check console (F12) for details.'),
+            content: Text(
+                'Failed to seed menu items. Check console (F12) for details.'),
             backgroundColor: Colors.red,
             duration: Duration(seconds: 4),
           ),
@@ -251,8 +258,8 @@ class _MenuScreenState extends State<MenuScreen> {
         final bytes = await imageFile.readAsBytes();
         final base64String = base64Encode(bytes);
         // Determine MIME type from file extension or default to jpeg
-        final mimeType = imageFile.path.toLowerCase().endsWith('.png') 
-            ? 'image/png' 
+        final mimeType = imageFile.path.toLowerCase().endsWith('.png')
+            ? 'image/png'
             : 'image/jpeg';
         return 'data:$mimeType;base64,$base64String';
       } catch (e) {
@@ -277,16 +284,30 @@ class _MenuScreenState extends State<MenuScreen> {
 
   Color _categoryColorForName(String categoryName) {
     final key = _normalizeNameKey(categoryName);
-    
+
     // Define colors for all categories
-    if (key == _normalizeNameKey('Tuto Sip')) return const Color(0xFF4CAF50); // Green
-    if (key == _normalizeNameKey('Chill Sip')) return const Color(0xFF2196F3); // Blue
-    if (key == _normalizeNameKey('Snacks')) return const Color(0xFFFF9800); // Orange
-    if (key == _normalizeNameKey('Hookah')) return const Color(0xFF9C27B0); // Purple
-    if (key == _normalizeNameKey('Games & Vibes')) return const Color(0xFFE91E63); // Pink
-    if (key == _normalizeNameKey('Smokes')) return const Color(0xFF424242); // Dark Gray
-    if (key == _normalizeNameKey('Drinks')) return const Color(0xFF00BCD4); // Cyan
-    
+    if (key == _normalizeNameKey('Tuto Sip')) {
+      return const Color(0xFF4CAF50); // Green
+    }
+    if (key == _normalizeNameKey('Chill Sip')) {
+      return const Color(0xFF2196F3); // Blue
+    }
+    if (key == _normalizeNameKey('Snacks')) {
+      return const Color(0xFFFF9800); // Orange
+    }
+    if (key == _normalizeNameKey('Hookah')) {
+      return const Color(0xFF9C27B0); // Purple
+    }
+    if (key == _normalizeNameKey('Games & Vibes')) {
+      return const Color(0xFFE91E63); // Pink
+    }
+    if (key == _normalizeNameKey('Smokes')) {
+      return const Color(0xFF424242); // Dark Gray
+    }
+    if (key == _normalizeNameKey('Drinks')) {
+      return const Color(0xFF00BCD4); // Cyan
+    }
+
     // Default accent for any other categories
     return AppTheme.logoPrimary;
   }
@@ -303,9 +324,8 @@ class _MenuScreenState extends State<MenuScreen> {
         ? ''
         : rawUrl;
 
-    final effectiveUrl = safeUrl.isEmpty
-        ? _defaultMenuImageForName(name)
-        : safeUrl;
+    final effectiveUrl =
+        safeUrl.isEmpty ? _defaultMenuImageForName(name) : safeUrl;
 
     Widget fallback() => const Icon(Icons.image, size: 40, color: Colors.grey);
 
@@ -384,11 +404,6 @@ class _MenuScreenState extends State<MenuScreen> {
     super.dispose();
   }
 
-  bool _isOrderMode(InaraAuthProvider auth) {
-    // NEW: Cashier uses Menu as ordering surface (admin keeps menu management).
-    return !auth.isAdmin;
-  }
-
   Future<void> _loadActiveOrder() async {
     try {
       final dbProvider =
@@ -405,17 +420,20 @@ class _MenuScreenState extends State<MenuScreen> {
       );
 
       // Filter for dine_in orders in-memory
-      final dineInOrders = orders.where((o) => o['order_type'] == 'dine_in').toList();
+      final dineInOrders =
+          orders.where((o) => o['order_type'] == 'dine_in').toList();
 
       if (dineInOrders.isNotEmpty) {
         final order = dineInOrders.first; // Most recent dine_in pending order
         // UPDATED: Firestore query returns 'id' field (not 'documentId'), use 'id' for both web and mobile
         // Debug: Check all possible ID fields
         debugPrint('MenuScreen: Order keys: ${order.keys.toList()}');
-        debugPrint('MenuScreen: Order id field: ${order['id']}, documentId field: ${order['documentId']}');
+        debugPrint(
+            'MenuScreen: Order id field: ${order['id']}, documentId field: ${order['documentId']}');
         _activeOrderId = order['id'] ?? order['documentId'];
         _activeOrderNumber = order['order_number'] as String?;
-        debugPrint('MenuScreen: Loaded active order - ID: $_activeOrderId, Number: $_activeOrderNumber');
+        debugPrint(
+            'MenuScreen: Loaded active order - ID: $_activeOrderId, Number: $_activeOrderNumber');
       } else {
         _activeOrderId = null;
         _activeOrderNumber = null;
@@ -450,7 +468,8 @@ class _MenuScreenState extends State<MenuScreen> {
       if (mounted) {
         setState(() {
           if (existingIndex >= 0) {
-            final qty = (_pendingCartItems[existingIndex]['quantity'] as int) + 1;
+            final qty =
+                (_pendingCartItems[existingIndex]['quantity'] as int) + 1;
             _pendingCartItems[existingIndex]['quantity'] = qty;
           } else {
             _pendingCartItems.add({'product': product, 'quantity': 1});
@@ -496,48 +515,56 @@ class _MenuScreenState extends State<MenuScreen> {
 
       // Check if database is available
       if (!dbProvider.isAvailable) {
-        debugPrint('MenuScreen: Database not available, attempting to force reinitialize...');
-        
+        debugPrint(
+            'MenuScreen: Database not available, attempting to force reinitialize...');
+
         // Try to force reinitialize with multiple attempts
         bool initSuccess = false;
         for (int attempt = 1; attempt <= 3; attempt++) {
           try {
             debugPrint('MenuScreen: Force init attempt $attempt/3...');
             await dbProvider.forceInit();
-            
+
             // Check immediately without delay
-            
+
             // Test the connection to verify it actually works
             final connectionTest = await dbProvider.testConnection();
-            
+
             if (connectionTest && dbProvider.isAvailable) {
-              debugPrint('MenuScreen: Database available and connection test passed (attempt $attempt)');
+              debugPrint(
+                  'MenuScreen: Database available and connection test passed (attempt $attempt)');
               initSuccess = true;
               break;
             } else {
-              debugPrint('MenuScreen: Database still not available after attempt $attempt (connection test: $connectionTest)');
+              debugPrint(
+                  'MenuScreen: Database still not available after attempt $attempt (connection test: $connectionTest)');
               // Removed delay - retry immediately
             }
           } catch (e) {
-            debugPrint('MenuScreen: Error during force reinitialize attempt $attempt: $e');
+            debugPrint(
+                'MenuScreen: Error during force reinitialize attempt $attempt: $e');
             // Removed delay - retry immediately
           }
         }
-        
+
         if (!initSuccess) {
-          debugPrint('MenuScreen: Database still not available after all retry attempts');
+          debugPrint(
+              'MenuScreen: Database still not available after all retry attempts');
           if (mounted) {
             setState(() => _isLoading = false);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: const Text('Database not available. Tap to retry connection.'),
+                content: const Text(
+                    'Database not available. Tap to retry connection.'),
                 backgroundColor: Colors.orange,
                 duration: const Duration(seconds: 10),
                 action: SnackBarAction(
                   label: 'Retry',
                   textColor: Colors.white,
                   onPressed: () async {
-                    final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+                    final dbProvider = Provider.of<UnifiedDatabaseProvider>(
+                        context,
+                        listen: false);
                     await dbProvider.forceInit();
                     _loadData();
                   },
@@ -571,12 +598,14 @@ class _MenuScreenState extends State<MenuScreen> {
 
           // Fallback for legacy docs (missing is_sellable): fetch all and filter.
           final all = await dbProvider.query('products');
-          debugPrint('MenuScreen: Found ${all.length} total products, filtering...');
+          debugPrint(
+              'MenuScreen: Found ${all.length} total products, filtering...');
           final filtered = all.where((p) {
             final v = p['is_sellable'];
             return v == null || v == 1;
           }).toList();
-          debugPrint('MenuScreen: After filtering: ${filtered.length} products');
+          debugPrint(
+              'MenuScreen: After filtering: ${filtered.length} products');
           return filtered;
         }
 
@@ -596,7 +625,8 @@ class _MenuScreenState extends State<MenuScreen> {
       final categoryMaps = results[0];
       final productMaps = results[1];
 
-      debugPrint('MenuScreen: Loaded ${categoryMaps.length} categories and ${productMaps.length} products');
+      debugPrint(
+          'MenuScreen: Loaded ${categoryMaps.length} categories and ${productMaps.length} products');
 
       // UPDATED: Safe parsing with null checks
       _categories = categoryMaps
@@ -610,7 +640,7 @@ class _MenuScreenState extends State<MenuScreen> {
           })
           .whereType<Category>()
           .toList();
-      
+
       _products = productMaps
           .map((map) {
             try {
@@ -622,20 +652,22 @@ class _MenuScreenState extends State<MenuScreen> {
           })
           .whereType<Product>()
           .toList();
-      
-      debugPrint('MenuScreen: Parsed ${_categories.length} categories and ${_products.length} products');
-      
+
+      debugPrint(
+          'MenuScreen: Parsed ${_categories.length} categories and ${_products.length} products');
+
       // UPDATED: Update state safely
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
       }
-      
+
       if (_categories.isEmpty && _products.isEmpty && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No menu items found. Click the seed button to add menu items.'),
+            content: Text(
+                'No menu items found. Click the seed button to add menu items.'),
             duration: Duration(seconds: 4),
             backgroundColor: Colors.orange,
           ),
@@ -669,26 +701,24 @@ class _MenuScreenState extends State<MenuScreen> {
     // UPDATED: Ensure _products is never null
     final products = _products;
     if (products.isEmpty) return [];
-    
+
     if (_searchQuery.isEmpty) {
       return products;
     }
-    
+
     final query = _searchQuery.toLowerCase().trim();
     if (query.isEmpty) return products;
-    
-    return products
-        .where((p) {
-          try {
-            return p.name.toLowerCase().contains(query) ||
-                (p.description != null &&
-                    p.description!.toLowerCase().contains(query));
-          } catch (e) {
-            debugPrint('MenuScreen: Error filtering product ${p.name}: $e');
-            return false;
-          }
-        })
-        .toList();
+
+    return products.where((p) {
+      try {
+        return p.name.toLowerCase().contains(query) ||
+            (p.description != null &&
+                p.description!.toLowerCase().contains(query));
+      } catch (e) {
+        debugPrint('MenuScreen: Error filtering product ${p.name}: $e');
+        return false;
+      }
+    }).toList();
   }
 
   // Group products by category
@@ -700,7 +730,7 @@ class _MenuScreenState extends State<MenuScreen> {
     // UPDATED: Ensure _categories and _filteredProducts are safe
     final categories = _categories;
     final filteredProducts = _filteredProducts;
-    
+
     if (filteredProducts.isEmpty) return {};
 
     // Create a map of category IDs to Category objects
@@ -831,7 +861,8 @@ class _MenuScreenState extends State<MenuScreen> {
                 // Search Bar with Add Category button
                 SliverToBoxAdapter(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.92),
                       boxShadow: [
@@ -862,21 +893,24 @@ class _MenuScreenState extends State<MenuScreen> {
                                   : Icon(Icons.view_list, color: Colors.blue),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: Colors.grey[300]!),
+                                borderSide:
+                                    BorderSide(color: Colors.grey[300]!),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: Colors.grey[300]!),
+                                borderSide:
+                                    BorderSide(color: Colors.grey[300]!),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
-                                    color: Theme.of(context).primaryColor, width: 2),
+                                    color: Theme.of(context).primaryColor,
+                                    width: 2),
                               ),
                               filled: true,
                               fillColor: Colors.grey[50],
-                              contentPadding:
-                                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 12),
                             ),
                             onChanged: (value) {
                               setState(() {
@@ -888,7 +922,9 @@ class _MenuScreenState extends State<MenuScreen> {
                         const SizedBox(width: 8),
                         // Add Category Button - Made smaller and compact
                         IconButton(
-                          onPressed: _isLoading ? null : () => _showAddCategoryDialog(),
+                          onPressed: _isLoading
+                              ? null
+                              : () => _showAddCategoryDialog(),
                           icon: const Icon(Icons.category, size: 20),
                           tooltip: 'Add Category',
                           style: IconButton.styleFrom(
@@ -903,7 +939,7 @@ class _MenuScreenState extends State<MenuScreen> {
                     ),
                   ),
                 ),
-                
+
                 // Loading or Empty State
                 // UPDATED: Better loading state handling
                 if (_isLoading && _products.isEmpty && _categories.isEmpty)
@@ -939,8 +975,7 @@ class _MenuScreenState extends State<MenuScreen> {
                               icon: const Icon(Icons.add),
                               label: const Text('Add Menu Item'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    Theme.of(context).primaryColor,
+                                backgroundColor: Theme.of(context).primaryColor,
                                 foregroundColor: Colors.white,
                               ),
                             ),
@@ -961,38 +996,39 @@ class _MenuScreenState extends State<MenuScreen> {
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, categoryIndex) {
-                          final category = _productsByCategory.keys
-                              .elementAt(categoryIndex);
+                          final category =
+                              _productsByCategory.keys.elementAt(categoryIndex);
                           final categoryProducts =
                               _productsByCategory[category]!;
 
                           return Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               // Category Heading (with top margin to prevent overlap)
                               Padding(
                                 padding: EdgeInsets.only(
                                   left: 8,
                                   right: 8,
-                                  top: categoryIndex == 0 ? 10 : 20, // Extra top margin for non-first categories
+                                  top: categoryIndex == 0
+                                      ? 10
+                                      : 20, // Extra top margin for non-first categories
                                   bottom: 10,
                                 ),
                                 child: Row(
                                   children: [
                                     Expanded(
                                       child: Container(
-                                        padding:
-                                            const EdgeInsets.symmetric(
-                                                horizontal: 10,
-                                                vertical: 5),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 10, vertical: 5),
                                         decoration: BoxDecoration(
-                                          color: _categoryColorForName(category.name)
+                                          color: _categoryColorForName(
+                                                  category.name)
                                               .withOpacity(0.15),
                                           borderRadius:
                                               BorderRadius.circular(8),
                                           border: Border.all(
-                                            color: _categoryColorForName(category.name),
+                                            color: _categoryColorForName(
+                                                category.name),
                                             width: 1.5,
                                           ),
                                         ),
@@ -1001,7 +1037,8 @@ class _MenuScreenState extends State<MenuScreen> {
                                           style: TextStyle(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w700,
-                                            color: _categoryColorForName(category.name),
+                                            color: _categoryColorForName(
+                                                category.name),
                                             letterSpacing: 0.5,
                                           ),
                                         ),
@@ -1018,18 +1055,27 @@ class _MenuScreenState extends State<MenuScreen> {
                                     ),
                                     Builder(
                                       builder: (context) {
-                                        final auth = Provider.of<InaraAuthProvider>(context, listen: false);
-                                        if (!auth.isAdmin) return const SizedBox.shrink();
+                                        final auth =
+                                            Provider.of<InaraAuthProvider>(
+                                                context,
+                                                listen: false);
+                                        if (!auth.isAdmin) {
+                                          return const SizedBox.shrink();
+                                        }
                                         return Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             const SizedBox(width: 8),
                                             IconButton(
-                                              icon: const Icon(Icons.edit, size: 18),
-                                              onPressed: () => _showEditCategoryDialog(category),
+                                              icon: const Icon(Icons.edit,
+                                                  size: 18),
+                                              onPressed: () =>
+                                                  _showEditCategoryDialog(
+                                                      category),
                                               tooltip: 'Edit Category',
                                               padding: EdgeInsets.zero,
-                                              constraints: const BoxConstraints(),
+                                              constraints:
+                                                  const BoxConstraints(),
                                               color: Colors.grey[600],
                                             ),
                                           ],
@@ -1042,26 +1088,42 @@ class _MenuScreenState extends State<MenuScreen> {
                               // Products Grid for this category
                               GridView.builder(
                                 shrinkWrap: true,
-                                physics:
-                                    const NeverScrollableScrollPhysics(),
+                                physics: const NeverScrollableScrollPhysics(),
                                 padding: const EdgeInsets.only(
-                                    left: 8, right: 8, bottom: 16), // FIXED: Add bottom padding to prevent overlap
+                                    left: 8,
+                                    right: 8,
+                                    bottom:
+                                        16), // FIXED: Add bottom padding to prevent overlap
                                 gridDelegate:
                                     SliverGridDelegateWithFixedCrossAxisCount(
                                   // UPDATED: 3 columns for mobile (Android/iOS) as per design reference
                                   crossAxisCount: () {
-                                    final width = MediaQuery.of(context).size.width;
-                                    if (!kIsWeb && width < 900) return 3; // Mobile (Android/iOS): 3 columns
-                                    if (width < 600) return 3; // Mobile web: 3 columns
-                                    if (width < 900) return 4; // Tablet: 4 columns
-                                    if (width < 1200) return 5; // Desktop: 5 columns
+                                    final width =
+                                        MediaQuery.of(context).size.width;
+                                    if (!kIsWeb && width < 900) {
+                                      return 3; // Mobile (Android/iOS): 3 columns
+                                    }
+                                    if (width < 600) {
+                                      return 3; // Mobile web: 3 columns
+                                    }
+                                    if (width < 900) {
+                                      return 4; // Tablet: 4 columns
+                                    }
+                                    if (width < 1200) {
+                                      return 5; // Desktop: 5 columns
+                                    }
                                     return 6; // Large desktop: 6 columns
                                   }(),
                                   // UPDATED: Aspect ratio optimized for 3-column layout - adjusted for better spacing
                                   childAspectRatio: () {
-                                    final width = MediaQuery.of(context).size.width;
-                                    if (!kIsWeb && width < 900) return 0.68; // Mobile (Android/iOS): taller to accommodate all elements
-                                    if (width < 600) return 0.68; // Mobile web: taller to accommodate all elements
+                                    final width =
+                                        MediaQuery.of(context).size.width;
+                                    if (!kIsWeb && width < 900) {
+                                      return 0.68; // Mobile (Android/iOS): taller to accommodate all elements
+                                    }
+                                    if (width < 600) {
+                                      return 0.68; // Mobile web: taller to accommodate all elements
+                                    }
                                     return 0.75; // Web/Tablet: taller cards
                                   }(),
                                   crossAxisSpacing: 8,
@@ -1094,17 +1156,20 @@ class _MenuScreenState extends State<MenuScreen> {
                 final screenWidth = MediaQuery.of(context).size.width;
                 final isMobile = screenWidth < 600;
                 final panelWidth = isMobile ? screenWidth : screenWidth * 0.45;
-                
+
                 return Positioned(
                   left: 0,
                   top: 0,
                   bottom: 0,
-                  right: isMobile ? 0 : panelWidth, // Full screen backdrop on mobile
+                  right: isMobile
+                      ? 0
+                      : panelWidth, // Full screen backdrop on mobile
                   child: IgnorePointer(
                     // UPDATED: Ignore pointer events so menu items remain fully clickable
                     ignoring: true,
                     child: Container(
-                      color: Colors.black.withOpacity(isMobile ? 0.3 : 0.1), // Darker on mobile
+                      color: Colors.black.withOpacity(
+                          isMobile ? 0.3 : 0.1), // Darker on mobile
                     ),
                   ),
                 );
@@ -1117,7 +1182,7 @@ class _MenuScreenState extends State<MenuScreen> {
                 final screenWidth = MediaQuery.of(context).size.width;
                 final isMobile = screenWidth < 600;
                 final panelWidth = isMobile ? screenWidth : screenWidth * 0.45;
-                
+
                 if (isMobile) {
                   // Mobile: Bottom sheet style (takes 70% of screen height)
                   return Positioned(
@@ -1203,52 +1268,57 @@ class _MenuScreenState extends State<MenuScreen> {
             ),
         ],
       ),
-      floatingActionButton: _showOrderOverlay ? null : Consumer<InaraAuthProvider>(
-        builder: (context, auth, _) {
-          // Show "View Order" when cart has items - for BOTH admin and cashier
-          if (_pendingCartItems.isNotEmpty) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: !kIsWeb ? 90 : 24, // Extra space for bottom nav on mobile
-                right: 24,
-              ),
-              child: FloatingActionButton.extended(
-                onPressed: _isAddingToOrder
-                    ? null
-                    : () {
-                        if (mounted && _pendingCartItems.isNotEmpty) {
-                          setState(() {
-                            _showOrderOverlay = true;
-                            _overlayRefreshKey++;
-                          });
-                        }
-                      },
-                backgroundColor: AppTheme.logoPrimary,
-                icon: const Icon(Icons.receipt_long),
-                label: Text(_isAddingToOrder ? 'Please wait…' : 'View Order'),
-              ),
-            );
-          }
+      floatingActionButton: _showOrderOverlay
+          ? null
+          : Consumer<InaraAuthProvider>(
+              builder: (context, auth, _) {
+                // Show "View Order" when cart has items - for BOTH admin and cashier
+                if (_pendingCartItems.isNotEmpty) {
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      bottom: !kIsWeb
+                          ? 90
+                          : 24, // Extra space for bottom nav on mobile
+                      right: 24,
+                    ),
+                    child: FloatingActionButton.extended(
+                      onPressed: _isAddingToOrder
+                          ? null
+                          : () {
+                              if (mounted && _pendingCartItems.isNotEmpty) {
+                                setState(() {
+                                  _showOrderOverlay = true;
+                                  _overlayRefreshKey++;
+                                });
+                              }
+                            },
+                      backgroundColor: AppTheme.logoPrimary,
+                      icon: const Icon(Icons.receipt_long),
+                      label: Text(
+                          _isAddingToOrder ? 'Please wait…' : 'View Order'),
+                    ),
+                  );
+                }
 
-          // Admin only: Add Item for menu management when cart is empty
-          if (auth.isAdmin) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: !kIsWeb ? 90 : 24,
-                right: 24,
-              ),
-              child: FloatingActionButton.extended(
-                onPressed: () => _showAddProductDialog(),
-                backgroundColor: Theme.of(context).primaryColor,
-                icon: const Icon(Icons.add),
-                label: const Text('Add Item'),
-              ),
-            );
-          }
+                // Admin only: Add Item for menu management when cart is empty
+                if (auth.isAdmin) {
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      bottom: !kIsWeb ? 90 : 24,
+                      right: 24,
+                    ),
+                    child: FloatingActionButton.extended(
+                      onPressed: () => _showAddProductDialog(),
+                      backgroundColor: Theme.of(context).primaryColor,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Item'),
+                    ),
+                  );
+                }
 
-          return const SizedBox.shrink();
-        },
-      ),
+                return const SizedBox.shrink();
+              },
+            ),
     );
   }
 
@@ -1258,8 +1328,10 @@ class _MenuScreenState extends State<MenuScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
       ),
-      clipBehavior: Clip.antiAlias, // FIXED: Clip to prevent overflow while keeping edit button visible
-      margin: EdgeInsets.zero, // FIXED: Remove default margin to prevent spacing issues
+      clipBehavior: Clip
+          .antiAlias, // FIXED: Clip to prevent overflow while keeping edit button visible
+      margin: EdgeInsets
+          .zero, // FIXED: Remove default margin to prevent spacing issues
       child: Stack(
         children: [
           InkWell(
@@ -1278,7 +1350,8 @@ class _MenuScreenState extends State<MenuScreen> {
               children: [
                 // UPDATED: Square/near-square product image (inspired by design reference)
                 AspectRatio(
-                  aspectRatio: 1.0, // Square image for consistent 3-column layout
+                  aspectRatio:
+                      1.0, // Square image for consistent 3-column layout
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: Colors.grey[200],
@@ -1300,10 +1373,16 @@ class _MenuScreenState extends State<MenuScreen> {
                 // FIXED: Content area - show name and price within card frame, shifted up for visibility
                 Container(
                   constraints: const BoxConstraints(minHeight: 80),
-                  padding: const EdgeInsets.only(left: 6, right: 6, top: 6, bottom: 8), // FIXED: Reduced top padding to shift text up
-                  alignment: Alignment.topCenter, // FIXED: Align to top instead of center
+                  padding: const EdgeInsets.only(
+                      left: 6,
+                      right: 6,
+                      top: 6,
+                      bottom: 8), // FIXED: Reduced top padding to shift text up
+                  alignment: Alignment
+                      .topCenter, // FIXED: Align to top instead of center
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.start, // FIXED: Start from top
+                    mainAxisAlignment:
+                        MainAxisAlignment.start, // FIXED: Start from top
                     crossAxisAlignment: CrossAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1315,8 +1394,12 @@ class _MenuScreenState extends State<MenuScreen> {
                           style: TextStyle(
                             fontSize: () {
                               final width = MediaQuery.of(context).size.width;
-                              if (!kIsWeb && width < 900) return 11.0; // Mobile (Android/iOS): decreased
-                              if (width < 600) return 11.0; // Mobile web: decreased
+                              if (!kIsWeb && width < 900) {
+                                return 11.0; // Mobile (Android/iOS): decreased
+                              }
+                              if (width < 600) {
+                                return 11.0; // Mobile web: decreased
+                              }
                               return 13.0; // Web: decreased
                             }(),
                             fontWeight: FontWeight.w700,
@@ -1335,13 +1418,18 @@ class _MenuScreenState extends State<MenuScreen> {
                         style: TextStyle(
                           fontSize: () {
                             final width = MediaQuery.of(context).size.width;
-                            if (!kIsWeb && width < 900) return 12.0; // Mobile (Android/iOS): decreased
-                            if (width < 600) return 12.0; // Mobile web: decreased
+                            if (!kIsWeb && width < 900) {
+                              return 12.0; // Mobile (Android/iOS): decreased
+                            }
+                            if (width < 600) {
+                              return 12.0; // Mobile web: decreased
+                            }
                             return 14.0; // Web: decreased
                           }(),
                           fontWeight: FontWeight.w700,
                           color: Colors.black,
-                          height: 1.0, // FIXED: Reduced line height to prevent overflow
+                          height:
+                              1.0, // FIXED: Reduced line height to prevent overflow
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1396,43 +1484,45 @@ class _MenuScreenState extends State<MenuScreen> {
         debugPrint('MenuScreen: Product ID is null for ${product.name}');
         return 0.0;
       }
-      
+
       if (!mounted) return 0.0;
-      
-      final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      
+
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+
       // UPDATED: Check if database is available before querying
       if (!dbProvider.isAvailable) {
         debugPrint('MenuScreen: Database not available for stock query');
         return 0.0;
       }
-      
+
       await dbProvider.init();
-      
+
       final productData = await dbProvider.query(
         'products',
         where: kIsWeb ? 'documentId = ?' : 'id = ?',
         whereArgs: [productId],
       );
-      
+
       if (productData.isEmpty) {
         debugPrint('MenuScreen: Product data not found for ID: $productId');
         return 0.0;
       }
-      
+
       final stockValue = productData.first['stock_quantity'];
       if (stockValue == null) return 0.0;
-      
+
       // UPDATED: Safe type conversion
       if (stockValue is num) {
         return stockValue.toDouble();
       } else if (stockValue is String) {
         return double.tryParse(stockValue) ?? 0.0;
       }
-      
+
       return 0.0;
     } catch (e, stackTrace) {
-      debugPrint('MenuScreen: Error getting product stock for ${product.name}: $e');
+      debugPrint(
+          'MenuScreen: Error getting product stock for ${product.name}: $e');
       debugPrint('MenuScreen: Stack trace: $stackTrace');
       return 0.0; // Return 0 on error to prevent UI crashes
     }
@@ -1546,7 +1636,8 @@ class _MenuScreenState extends State<MenuScreen> {
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         final now = DateTime.now().millisecondsSinceEpoch;
-        final categoryNameValue = result['name'] as String; // Non-null local variable
+        final categoryNameValue =
+            result['name'] as String; // Non-null local variable
         categoryName = categoryNameValue;
         final categoryIsActive = result['isActive'] as bool;
 
@@ -1597,7 +1688,7 @@ class _MenuScreenState extends State<MenuScreen> {
             updatedAt: now,
           ));
         });
-        
+
         // Reload in background without blocking to sync with database
         _loadData();
 
@@ -1735,7 +1826,7 @@ class _MenuScreenState extends State<MenuScreen> {
         final existingCategories = await dbProvider.query('categories');
         final normalizedNew = _normalizeNameKey(categoryName);
         final categoryId = _getCategoryIdentifier(category);
-        
+
         final isDuplicate = existingCategories.any((c) {
           final existingId = kIsWeb ? c['documentId'] : c['id'];
           // Skip current category
@@ -1743,7 +1834,7 @@ class _MenuScreenState extends State<MenuScreen> {
           final existingName = (c['name'] as String?) ?? '';
           return _normalizeNameKey(existingName) == normalizedNew;
         });
-        
+
         if (isDuplicate) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1770,8 +1861,9 @@ class _MenuScreenState extends State<MenuScreen> {
 
         // Update state optimistically for instant UI update
         setState(() {
-          final index = _categories.indexWhere((c) => 
-            (kIsWeb ? c.documentId : c.id?.toString()) == categoryId.toString());
+          final index = _categories.indexWhere((c) =>
+              (kIsWeb ? c.documentId : c.id?.toString()) ==
+              categoryId.toString());
           if (index != -1) {
             _categories[index] = Category(
               id: _categories[index].id,
@@ -1784,7 +1876,7 @@ class _MenuScreenState extends State<MenuScreen> {
             );
           }
         });
-        
+
         // Reload in background without blocking
         _loadData();
 
@@ -1842,10 +1934,11 @@ class _MenuScreenState extends State<MenuScreen> {
         final dialogWidth = isMobile ? screenSize.width * 0.95 : 700.0;
         final dialogPadding = isMobile ? 16.0 : 24.0;
         final maxDialogHeight = screenSize.height * 0.9;
-        
+
         return StatefulBuilder(
           builder: (context, setDialogState) => Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             insetPadding: EdgeInsets.symmetric(
               horizontal: isMobile ? 8.0 : 24.0,
               vertical: isMobile ? 16.0 : 24.0,
@@ -1871,14 +1964,14 @@ class _MenuScreenState extends State<MenuScreen> {
                     ),
                     SizedBox(height: isMobile ? 16 : 16),
 
-                  // Title
-                  TextField(
-                    controller: nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Title *',
-                      border: OutlineInputBorder(),
+                    // Title
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Title *',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
-                  ),
 
                     SizedBox(height: isMobile ? 12 : 12),
 
@@ -1909,7 +2002,8 @@ class _MenuScreenState extends State<MenuScreen> {
                                   );
                                 }).toList(),
                                 onChanged: (value) {
-                                  setDialogState(() => selectedCategoryId = value);
+                                  setDialogState(
+                                      () => selectedCategoryId = value);
                                 },
                               ),
                             ],
@@ -1942,7 +2036,8 @@ class _MenuScreenState extends State<MenuScreen> {
                                     );
                                   }).toList(),
                                   onChanged: (value) {
-                                    setDialogState(() => selectedCategoryId = value);
+                                    setDialogState(
+                                        () => selectedCategoryId = value);
                                   },
                                 ),
                               ),
@@ -1951,123 +2046,123 @@ class _MenuScreenState extends State<MenuScreen> {
 
                     SizedBox(height: isMobile ? 12 : 16),
 
-                  // Image Upload Section
-                  Text(
-                    'Product Image',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          height: 150,
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey[300]!),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: selectedImageFile != null
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: kIsWeb
-                                      ? Image.network(
-                                          selectedImageFile!.path,
+                    // Image Upload Section
+                    Text(
+                      'Product Image',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            height: 150,
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey[300]!),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: selectedImageFile != null
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: kIsWeb
+                                        ? Image.network(
+                                            selectedImageFile!.path,
+                                            fit: BoxFit.cover,
+                                          )
+                                        : Image.file(
+                                            io.File(selectedImageFile!.path),
+                                            fit: BoxFit.cover,
+                                          ),
+                                  )
+                                : imageUrlController.text.isNotEmpty
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: Image.network(
+                                          imageUrlController.text,
                                           fit: BoxFit.cover,
-                                        )
-                                      : Image.file(
-                                          io.File(selectedImageFile!.path),
-                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (context, error, stackTrace) {
+                                            return const Center(
+                                              child: Icon(Icons.image,
+                                                  size: 48, color: Colors.grey),
+                                            );
+                                          },
                                         ),
-                                )
-                              : imageUrlController.text.isNotEmpty
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(10),
-                                      child: Image.network(
-                                        imageUrlController.text,
-                                        fit: BoxFit.cover,
-                                        errorBuilder:
-                                            (context, error, stackTrace) {
-                                          return const Center(
-                                            child: Icon(Icons.image,
-                                                size: 48, color: Colors.grey),
-                                          );
-                                        },
+                                      )
+                                    : const Center(
+                                        child: Icon(Icons.image,
+                                            size: 48, color: Colors.grey),
                                       ),
-                                    )
-                                  : const Center(
-                                      child: Icon(Icons.image,
-                                          size: 48, color: Colors.grey),
-                                    ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: () async {
-                              final picker = ImagePicker();
-                              final pickedFile = await picker.pickImage(
-                                source: ImageSource.gallery,
-                                maxWidth: 800,
-                                maxHeight: 800,
-                                imageQuality: 85,
-                              );
-                              if (pickedFile != null) {
-                                setDialogState(() {
-                                  selectedImageFile = pickedFile;
-                                  imageUrlController.clear();
-                                });
-                              }
-                            },
-                            icon: const Icon(Icons.photo_library),
-                            label: const Text('Gallery'),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 12),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          ElevatedButton.icon(
-                            onPressed: () async {
-                              final picker = ImagePicker();
-                              final pickedFile = await picker.pickImage(
-                                source: ImageSource.camera,
-                                maxWidth: 800,
-                                maxHeight: 800,
-                                imageQuality: 85,
-                              );
-                              if (pickedFile != null) {
-                                setDialogState(() {
-                                  selectedImageFile = pickedFile;
-                                  imageUrlController.clear();
-                                });
-                              }
-                            },
-                            icon: const Icon(Icons.camera_alt),
-                            label: const Text('Camera'),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 12),
-                            ),
-                          ),
-                          if (selectedImageFile != null ||
-                              imageUrlController.text.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            TextButton.icon(
-                              onPressed: () {
-                                setDialogState(() {
-                                  selectedImageFile = null;
-                                  imageUrlController.clear();
-                                });
+                        const SizedBox(width: 12),
+                        Column(
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: () async {
+                                final picker = ImagePicker();
+                                final pickedFile = await picker.pickImage(
+                                  source: ImageSource.gallery,
+                                  maxWidth: 800,
+                                  maxHeight: 800,
+                                  imageQuality: 85,
+                                );
+                                if (pickedFile != null) {
+                                  setDialogState(() {
+                                    selectedImageFile = pickedFile;
+                                    imageUrlController.clear();
+                                  });
+                                }
                               },
-                              icon: const Icon(Icons.delete),
-                              label: const Text('Remove'),
+                              icon: const Icon(Icons.photo_library),
+                              label: const Text('Gallery'),
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
+                              ),
                             ),
+                            const SizedBox(height: 8),
+                            ElevatedButton.icon(
+                              onPressed: () async {
+                                final picker = ImagePicker();
+                                final pickedFile = await picker.pickImage(
+                                  source: ImageSource.camera,
+                                  maxWidth: 800,
+                                  maxHeight: 800,
+                                  imageQuality: 85,
+                                );
+                                if (pickedFile != null) {
+                                  setDialogState(() {
+                                    selectedImageFile = pickedFile;
+                                    imageUrlController.clear();
+                                  });
+                                }
+                              },
+                              icon: const Icon(Icons.camera_alt),
+                              label: const Text('Camera'),
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
+                              ),
+                            ),
+                            if (selectedImageFile != null ||
+                                imageUrlController.text.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              TextButton.icon(
+                                onPressed: () {
+                                  setDialogState(() {
+                                    selectedImageFile = null;
+                                    imageUrlController.clear();
+                                  });
+                                },
+                                icon: const Icon(Icons.delete),
+                                label: const Text('Remove'),
+                              ),
+                            ],
                           ],
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                      ],
+                    ),
                     SizedBox(height: isMobile ? 12 : 12),
                     TextField(
                       controller: imageUrlController,
@@ -2085,130 +2180,132 @@ class _MenuScreenState extends State<MenuScreen> {
                       },
                     ),
 
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  // Description
-                  TextField(
-                    controller: descController,
-                    decoration: const InputDecoration(
-                      labelText: 'Description',
-                      border: OutlineInputBorder(),
+                    // Description
+                    TextField(
+                      controller: descController,
+                      decoration: const InputDecoration(
+                        labelText: 'Description',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 3,
                     ),
-                    maxLines: 3,
-                  ),
 
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  // Checkboxes
-                  Row(
-                    children: [
-                      Checkbox(
-                        value: isVeg,
-                        onChanged: (value) {
-                          setDialogState(() => isVeg = value ?? true);
-                        },
-                      ),
-                      const Text('Vegetarian'),
-                      const SizedBox(width: 24),
-                      Checkbox(
-                        value: isActive,
-                        onChanged: (value) {
-                          setDialogState(() => isActive = value ?? true);
-                        },
-                      ),
-                      const Text('Available'),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Quick category toggles (Smokes / Drinks) – checkbox + color only
-                  Row(
-                    children: [
-                      Tooltip(
-                        message: 'Smokes',
-                        child: Row(
-                          children: [
-                            Checkbox(
-                              value: selectedCategoryId?.toString() ==
-                                  _categoryIdForName('Smokes')?.toString(),
-                              onChanged: (v) {
-                                final smokesId = _categoryIdForName('Smokes');
-                                if (smokesId == null) return;
-                                setDialogState(() {
-                                  if (v == true) {
-                                    selectedCategoryId = smokesId;
-                                  } else {
-                                    selectedCategoryId = _getCategoryIdentifier(
-                                        _categories.first);
-                                  }
-                                });
-                              },
-                            ),
-                            Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                color: _categoryColorForName('Smokes'),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'SM',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.grey[700],
-                                letterSpacing: 0.4,
-                              ),
-                            ),
-                          ],
+                    // Checkboxes
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: isVeg,
+                          onChanged: (value) {
+                            setDialogState(() => isVeg = value ?? true);
+                          },
                         ),
-                      ),
-                      const SizedBox(width: 18),
-                      Tooltip(
-                        message: 'Drinks',
-                        child: Row(
-                          children: [
-                            Checkbox(
-                              value: selectedCategoryId?.toString() ==
-                                  _categoryIdForName('Drinks')?.toString(),
-                              onChanged: (v) {
-                                final drinksId = _categoryIdForName('Drinks');
-                                if (drinksId == null) return;
-                                setDialogState(() {
-                                  if (v == true) {
-                                    selectedCategoryId = drinksId;
-                                  } else {
-                                    selectedCategoryId = _getCategoryIdentifier(
-                                        _categories.first);
-                                  }
-                                });
-                              },
-                            ),
-                            Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                color: _categoryColorForName('Drinks'),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'DR',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.grey[700],
-                                letterSpacing: 0.4,
-                              ),
-                            ),
-                          ],
+                        const Text('Vegetarian'),
+                        const SizedBox(width: 24),
+                        Checkbox(
+                          value: isActive,
+                          onChanged: (value) {
+                            setDialogState(() => isActive = value ?? true);
+                          },
                         ),
-                      ),
-                    ],
-                  ),
+                        const Text('Available'),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Quick category toggles (Smokes / Drinks) – checkbox + color only
+                    Row(
+                      children: [
+                        Tooltip(
+                          message: 'Smokes',
+                          child: Row(
+                            children: [
+                              Checkbox(
+                                value: selectedCategoryId?.toString() ==
+                                    _categoryIdForName('Smokes')?.toString(),
+                                onChanged: (v) {
+                                  final smokesId = _categoryIdForName('Smokes');
+                                  if (smokesId == null) return;
+                                  setDialogState(() {
+                                    if (v == true) {
+                                      selectedCategoryId = smokesId;
+                                    } else {
+                                      selectedCategoryId =
+                                          _getCategoryIdentifier(
+                                              _categories.first);
+                                    }
+                                  });
+                                },
+                              ),
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: _categoryColorForName('Smokes'),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'SM',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.grey[700],
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 18),
+                        Tooltip(
+                          message: 'Drinks',
+                          child: Row(
+                            children: [
+                              Checkbox(
+                                value: selectedCategoryId?.toString() ==
+                                    _categoryIdForName('Drinks')?.toString(),
+                                onChanged: (v) {
+                                  final drinksId = _categoryIdForName('Drinks');
+                                  if (drinksId == null) return;
+                                  setDialogState(() {
+                                    if (v == true) {
+                                      selectedCategoryId = drinksId;
+                                    } else {
+                                      selectedCategoryId =
+                                          _getCategoryIdentifier(
+                                              _categories.first);
+                                    }
+                                  });
+                                },
+                              ),
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: _categoryColorForName('Drinks'),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'DR',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.grey[700],
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
 
                     SizedBox(height: isMobile ? 16 : 24),
 
@@ -2222,9 +2319,11 @@ class _MenuScreenState extends State<MenuScreen> {
                                 child: ElevatedButton(
                                   onPressed: () => Navigator.pop(context, true),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Theme.of(context).primaryColor,
+                                    backgroundColor:
+                                        Theme.of(context).primaryColor,
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 14),
                                   ),
                                   child: const Text('Add Item'),
                                 ),
@@ -2233,7 +2332,8 @@ class _MenuScreenState extends State<MenuScreen> {
                               SizedBox(
                                 width: double.infinity,
                                 child: TextButton(
-                                  onPressed: () => Navigator.pop(context, false),
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
                                   child: const Text('Cancel'),
                                 ),
                               ),
@@ -2250,7 +2350,8 @@ class _MenuScreenState extends State<MenuScreen> {
                               ElevatedButton(
                                 onPressed: () => Navigator.pop(context, true),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Theme.of(context).primaryColor,
+                                  backgroundColor:
+                                      Theme.of(context).primaryColor,
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 32, vertical: 12),
@@ -2339,25 +2440,29 @@ class _MenuScreenState extends State<MenuScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Database not available. Please check Firebase connection.'),
+                content: Text(
+                    'Database not available. Please check Firebase connection.'),
                 backgroundColor: Colors.red,
               ),
             );
           }
           return;
         }
-        
+
         // Determine if this category allows inventory tracking
         final selectedCategory = _categories.firstWhere(
           (c) => _getCategoryIdentifier(c) == selectedCategoryId,
-          orElse: () => _categories.isNotEmpty ? _categories.first : Category(
-            name: 'Unknown',
-            createdAt: 0,
-            updatedAt: 0,
-          ),
+          orElse: () => _categories.isNotEmpty
+              ? _categories.first
+              : Category(
+                  name: 'Unknown',
+                  createdAt: 0,
+                  updatedAt: 0,
+                ),
         );
-        final trackInventory = canTrackInventoryForCategory(selectedCategory.name);
-        
+        final trackInventory =
+            canTrackInventoryForCategory(selectedCategory.name);
+
         final productId = await dbProvider.insert('products', {
           'category_id': selectedCategoryId,
           'name': newName,
@@ -2372,23 +2477,26 @@ class _MenuScreenState extends State<MenuScreen> {
           'is_purchasable': 0, // Menu items are not purchasable by default
           'is_sellable': 1, // Menu items are sellable
           'track_inventory': trackInventory ? 1 : 0, // Set based on category
-          'stock_quantity': trackInventory ? 0.0 : null, // Initialize to 0 if tracking enabled
+          'stock_quantity': trackInventory
+              ? 0.0
+              : null, // Initialize to 0 if tracking enabled
           'created_at': now,
           'updated_at': now,
         });
-        
+
         if (productId == null) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Failed to add product. Database may not be available.'),
+                content: Text(
+                    'Failed to add product. Database may not be available.'),
                 backgroundColor: Colors.red,
               ),
             );
           }
           return;
         }
-        
+
         debugPrint('MenuScreen: Product added with ID: $productId');
         await _loadData(); // Await to ensure data is loaded
         if (mounted) {
@@ -2417,7 +2525,8 @@ class _MenuScreenState extends State<MenuScreen> {
         TextEditingController(text: product.price.toString());
     final imageUrlController =
         TextEditingController(text: product.imageUrl ?? '');
-    final inventoryQuantityController = TextEditingController(); // NEW: For inventory quantity
+    final inventoryQuantityController =
+        TextEditingController(); // NEW: For inventory quantity
     // Find the category that matches this product's categoryId
     final matchingCategory = _categories.firstWhere(
       (c) {
@@ -2445,11 +2554,13 @@ class _MenuScreenState extends State<MenuScreen> {
         final isMobile = screenSize.width < 600;
         final dialogWidth = isMobile ? screenSize.width * 0.95 : 700.0;
         final dialogPadding = isMobile ? 16.0 : 24.0;
-        final maxDialogHeight = screenSize.height * 0.9; // Use 90% of screen height
-        
+        final maxDialogHeight =
+            screenSize.height * 0.9; // Use 90% of screen height
+
         return StatefulBuilder(
           builder: (context, setDialogState) => Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             insetPadding: EdgeInsets.symmetric(
               horizontal: isMobile ? 8.0 : 24.0,
               vertical: isMobile ? 16.0 : 24.0,
@@ -2475,52 +2586,52 @@ class _MenuScreenState extends State<MenuScreen> {
                     ),
                     SizedBox(height: isMobile ? 16 : 24),
 
-                  // Title
-                  TextField(
-                    controller: nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Title *',
-                      border: OutlineInputBorder(),
+                    // Title
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Title *',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
-                  // Price and Category Row
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: priceController,
-                          decoration: const InputDecoration(
-                            labelText: 'Price (NPR) *',
-                            border: OutlineInputBorder(),
+                    // Price and Category Row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: priceController,
+                            decoration: const InputDecoration(
+                              labelText: 'Price (NPR) *',
+                              border: OutlineInputBorder(),
+                            ),
+                            keyboardType: TextInputType.number,
                           ),
-                          keyboardType: TextInputType.number,
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: DropdownButtonFormField<dynamic>(
-                          value: selectedCategoryId,
-                          decoration: const InputDecoration(
-                            labelText: 'Category *',
-                            border: OutlineInputBorder(),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<dynamic>(
+                            value: selectedCategoryId,
+                            decoration: const InputDecoration(
+                              labelText: 'Category *',
+                              border: OutlineInputBorder(),
+                            ),
+                            items: _categories.map((cat) {
+                              final catId = _getCategoryIdentifier(cat);
+                              return DropdownMenuItem(
+                                value: catId,
+                                child: Text(cat.name),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setDialogState(() => selectedCategoryId = value);
+                            },
                           ),
-                          items: _categories.map((cat) {
-                            final catId = _getCategoryIdentifier(cat);
-                            return DropdownMenuItem(
-                              value: catId,
-                              child: Text(cat.name),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setDialogState(() => selectedCategoryId = value);
-                          },
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
 
                     SizedBox(height: isMobile ? 12 : 16),
 
@@ -2549,22 +2660,25 @@ class _MenuScreenState extends State<MenuScreen> {
                                                 fit: BoxFit.cover,
                                               )
                                             : Image.file(
-                                                io.File(selectedImageFile!.path),
+                                                io.File(
+                                                    selectedImageFile!.path),
                                                 fit: BoxFit.cover,
                                               ),
                                       )
                                     : imageUrlController.text.isNotEmpty
                                         ? ClipRRect(
-                                            borderRadius: BorderRadius.circular(10),
+                                            borderRadius:
+                                                BorderRadius.circular(10),
                                             child: (imageUrlController.text
                                                         .startsWith('http') ||
                                                     imageUrlController.text
-                                                        .startsWith('data:image/'))
+                                                        .startsWith(
+                                                            'data:image/'))
                                                 ? Image.network(
                                                     imageUrlController.text,
                                                     fit: BoxFit.cover,
-                                                    errorBuilder:
-                                                        (context, error, stackTrace) {
+                                                    errorBuilder: (context,
+                                                        error, stackTrace) {
                                                       return const Center(
                                                         child: Icon(Icons.image,
                                                             size: 48,
@@ -2576,25 +2690,30 @@ class _MenuScreenState extends State<MenuScreen> {
                                                     ? Image.network(
                                                         imageUrlController.text,
                                                         fit: BoxFit.cover,
-                                                        errorBuilder: (context, error,
-                                                            stackTrace) {
+                                                        errorBuilder: (context,
+                                                            error, stackTrace) {
                                                           return const Center(
-                                                            child: Icon(Icons.image,
+                                                            child: Icon(
+                                                                Icons.image,
                                                                 size: 48,
-                                                                color: Colors.grey),
+                                                                color: Colors
+                                                                    .grey),
                                                           );
                                                         },
                                                       )
                                                     : Image.file(
                                                         io.File(
-                                                            imageUrlController.text),
+                                                            imageUrlController
+                                                                .text),
                                                         fit: BoxFit.cover,
-                                                        errorBuilder: (context, error,
-                                                            stackTrace) {
+                                                        errorBuilder: (context,
+                                                            error, stackTrace) {
                                                           return const Center(
-                                                            child: Icon(Icons.image,
+                                                            child: Icon(
+                                                                Icons.image,
                                                                 size: 48,
-                                                                color: Colors.grey),
+                                                                color: Colors
+                                                                    .grey),
                                                           );
                                                         },
                                                       ),
@@ -2611,7 +2730,8 @@ class _MenuScreenState extends State<MenuScreen> {
                                     child: ElevatedButton.icon(
                                       onPressed: () async {
                                         final picker = ImagePicker();
-                                        final pickedFile = await picker.pickImage(
+                                        final pickedFile =
+                                            await picker.pickImage(
                                           source: ImageSource.gallery,
                                           maxWidth: 800,
                                           maxHeight: 800,
@@ -2624,10 +2744,12 @@ class _MenuScreenState extends State<MenuScreen> {
                                           });
                                         }
                                       },
-                                      icon: const Icon(Icons.photo_library, size: 18),
+                                      icon: const Icon(Icons.photo_library,
+                                          size: 18),
                                       label: const Text('Gallery'),
                                       style: ElevatedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 12),
                                       ),
                                     ),
                                   ),
@@ -2636,7 +2758,8 @@ class _MenuScreenState extends State<MenuScreen> {
                                     child: ElevatedButton.icon(
                                       onPressed: () async {
                                         final picker = ImagePicker();
-                                        final pickedFile = await picker.pickImage(
+                                        final pickedFile =
+                                            await picker.pickImage(
                                           source: ImageSource.camera,
                                           maxWidth: 800,
                                           maxHeight: 800,
@@ -2649,10 +2772,12 @@ class _MenuScreenState extends State<MenuScreen> {
                                           });
                                         }
                                       },
-                                      icon: const Icon(Icons.camera_alt, size: 18),
+                                      icon: const Icon(Icons.camera_alt,
+                                          size: 18),
                                       label: const Text('Camera'),
                                       style: ElevatedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 12),
                                       ),
                                     ),
                                   ),
@@ -2683,64 +2808,79 @@ class _MenuScreenState extends State<MenuScreen> {
                                 child: Container(
                                   height: 150,
                                   decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.grey[300]!),
+                                    border:
+                                        Border.all(color: Colors.grey[300]!),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: selectedImageFile != null
                                       ? ClipRRect(
-                                          borderRadius: BorderRadius.circular(10),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
                                           child: kIsWeb
                                               ? Image.network(
                                                   selectedImageFile!.path,
                                                   fit: BoxFit.cover,
                                                 )
                                               : Image.file(
-                                                  io.File(selectedImageFile!.path),
+                                                  io.File(
+                                                      selectedImageFile!.path),
                                                   fit: BoxFit.cover,
                                                 ),
                                         )
                                       : imageUrlController.text.isNotEmpty
                                           ? ClipRRect(
-                                              borderRadius: BorderRadius.circular(10),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
                                               child: (imageUrlController.text
                                                           .startsWith('http') ||
                                                       imageUrlController.text
-                                                          .startsWith('data:image/'))
+                                                          .startsWith(
+                                                              'data:image/'))
                                                   ? Image.network(
                                                       imageUrlController.text,
                                                       fit: BoxFit.cover,
-                                                      errorBuilder:
-                                                          (context, error, stackTrace) {
+                                                      errorBuilder: (context,
+                                                          error, stackTrace) {
                                                         return const Center(
-                                                          child: Icon(Icons.image,
+                                                          child: Icon(
+                                                              Icons.image,
                                                               size: 48,
-                                                              color: Colors.grey),
+                                                              color:
+                                                                  Colors.grey),
                                                         );
                                                       },
                                                     )
                                                   : kIsWeb
                                                       ? Image.network(
-                                                          imageUrlController.text,
+                                                          imageUrlController
+                                                              .text,
                                                           fit: BoxFit.cover,
-                                                          errorBuilder: (context, error,
-                                                              stackTrace) {
+                                                          errorBuilder:
+                                                              (context, error,
+                                                                  stackTrace) {
                                                             return const Center(
-                                                              child: Icon(Icons.image,
+                                                              child: Icon(
+                                                                  Icons.image,
                                                                   size: 48,
-                                                                  color: Colors.grey),
+                                                                  color: Colors
+                                                                      .grey),
                                                             );
                                                           },
                                                         )
                                                       : Image.file(
                                                           io.File(
-                                                              imageUrlController.text),
+                                                              imageUrlController
+                                                                  .text),
                                                           fit: BoxFit.cover,
-                                                          errorBuilder: (context, error,
-                                                              stackTrace) {
+                                                          errorBuilder:
+                                                              (context, error,
+                                                                  stackTrace) {
                                                             return const Center(
-                                                              child: Icon(Icons.image,
+                                                              child: Icon(
+                                                                  Icons.image,
                                                                   size: 48,
-                                                                  color: Colors.grey),
+                                                                  color: Colors
+                                                                      .grey),
                                                             );
                                                           },
                                                         ),
@@ -2820,21 +2960,21 @@ class _MenuScreenState extends State<MenuScreen> {
                             ],
                           ),
                     SizedBox(height: isMobile ? 12 : 12),
-                  TextField(
-                    controller: imageUrlController,
-                    decoration: const InputDecoration(
-                      labelText: 'Or enter Image URL',
-                      hintText: 'https://...',
-                      border: OutlineInputBorder(),
+                    TextField(
+                      controller: imageUrlController,
+                      decoration: const InputDecoration(
+                        labelText: 'Or enter Image URL',
+                        hintText: 'https://...',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (value) {
+                        if (value.isNotEmpty) {
+                          setDialogState(() {
+                            selectedImageFile = null;
+                          });
+                        }
+                      },
                     ),
-                    onChanged: (value) {
-                      if (value.isNotEmpty) {
-                        setDialogState(() {
-                          selectedImageFile = null;
-                        });
-                      }
-                    },
-                  ),
 
                     SizedBox(height: isMobile ? 12 : 16),
 
@@ -2883,93 +3023,95 @@ class _MenuScreenState extends State<MenuScreen> {
                     ),
                     SizedBox(height: isMobile ? 8 : 10),
 
-                  // Quick category toggles (Smokes / Drinks) – checkbox + color only
-                  Row(
-                    children: [
-                      Tooltip(
-                        message: 'Smokes',
-                        child: Row(
-                          children: [
-                            Checkbox(
-                              value: selectedCategoryId?.toString() ==
-                                  _categoryIdForName('Smokes')?.toString(),
-                              onChanged: (v) {
-                                final smokesId = _categoryIdForName('Smokes');
-                                if (smokesId == null) return;
-                                setDialogState(() {
-                                  if (v == true) {
-                                    selectedCategoryId = smokesId;
-                                  } else {
-                                    selectedCategoryId = _getCategoryIdentifier(
-                                        _categories.first);
-                                  }
-                                });
-                              },
-                            ),
-                            Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                color: _categoryColorForName('Smokes'),
-                                shape: BoxShape.circle,
+                    // Quick category toggles (Smokes / Drinks) – checkbox + color only
+                    Row(
+                      children: [
+                        Tooltip(
+                          message: 'Smokes',
+                          child: Row(
+                            children: [
+                              Checkbox(
+                                value: selectedCategoryId?.toString() ==
+                                    _categoryIdForName('Smokes')?.toString(),
+                                onChanged: (v) {
+                                  final smokesId = _categoryIdForName('Smokes');
+                                  if (smokesId == null) return;
+                                  setDialogState(() {
+                                    if (v == true) {
+                                      selectedCategoryId = smokesId;
+                                    } else {
+                                      selectedCategoryId =
+                                          _getCategoryIdentifier(
+                                              _categories.first);
+                                    }
+                                  });
+                                },
                               ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'SM',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.grey[700],
-                                letterSpacing: 0.4,
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: _categoryColorForName('Smokes'),
+                                  shape: BoxShape.circle,
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 6),
+                              Text(
+                                'SM',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.grey[700],
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 18),
-                      Tooltip(
-                        message: 'Drinks',
-                        child: Row(
-                          children: [
-                            Checkbox(
-                              value: selectedCategoryId?.toString() ==
-                                  _categoryIdForName('Drinks')?.toString(),
-                              onChanged: (v) {
-                                final drinksId = _categoryIdForName('Drinks');
-                                if (drinksId == null) return;
-                                setDialogState(() {
-                                  if (v == true) {
-                                    selectedCategoryId = drinksId;
-                                  } else {
-                                    selectedCategoryId = _getCategoryIdentifier(
-                                        _categories.first);
-                                  }
-                                });
-                              },
-                            ),
-                            Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                color: _categoryColorForName('Drinks'),
-                                shape: BoxShape.circle,
+                        const SizedBox(width: 18),
+                        Tooltip(
+                          message: 'Drinks',
+                          child: Row(
+                            children: [
+                              Checkbox(
+                                value: selectedCategoryId?.toString() ==
+                                    _categoryIdForName('Drinks')?.toString(),
+                                onChanged: (v) {
+                                  final drinksId = _categoryIdForName('Drinks');
+                                  if (drinksId == null) return;
+                                  setDialogState(() {
+                                    if (v == true) {
+                                      selectedCategoryId = drinksId;
+                                    } else {
+                                      selectedCategoryId =
+                                          _getCategoryIdentifier(
+                                              _categories.first);
+                                    }
+                                  });
+                                },
                               ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'DR',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.grey[700],
-                                letterSpacing: 0.4,
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: _categoryColorForName('Drinks'),
+                                  shape: BoxShape.circle,
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 6),
+                              Text(
+                                'DR',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.grey[700],
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
                     ),
 
                     SizedBox(height: isMobile ? 12 : 16),
@@ -2979,7 +3121,8 @@ class _MenuScreenState extends State<MenuScreen> {
                     SizedBox(height: isMobile ? 8 : 8),
                     Row(
                       children: [
-                        const Icon(Icons.inventory_2, size: 20, color: Colors.blue),
+                        const Icon(Icons.inventory_2,
+                            size: 20, color: Colors.blue),
                         const SizedBox(width: 8),
                         Text(
                           'Inventory Management',
@@ -3026,8 +3169,8 @@ class _MenuScreenState extends State<MenuScreen> {
                                       style: TextStyle(
                                         fontSize: isMobile ? 16 : 18,
                                         fontWeight: FontWeight.bold,
-                                        color: currentStock > 0 
-                                            ? Colors.green[700] 
+                                        color: currentStock > 0
+                                            ? Colors.green[700]
                                             : Colors.red[700],
                                       ),
                                     ),
@@ -3048,35 +3191,45 @@ class _MenuScreenState extends State<MenuScreen> {
                     SizedBox(height: isMobile ? 12 : 12),
                     FutureBuilder<Map<String, dynamic>>(
                       future: () async {
-                        final dbProvider = Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+                        final dbProvider = Provider.of<UnifiedDatabaseProvider>(
+                            context,
+                            listen: false);
                         await dbProvider.init();
-                        final productId = kIsWeb ? product.documentId : product.id;
+                        final productId =
+                            kIsWeb ? product.documentId : product.id;
                         if (productId == null) return <String, dynamic>{};
                         final productData = await dbProvider.query(
                           'products',
                           where: kIsWeb ? 'documentId = ?' : 'id = ?',
                           whereArgs: [productId],
                         );
-                        return productData.isNotEmpty ? productData.first : <String, dynamic>{};
+                        return productData.isNotEmpty
+                            ? productData.first
+                            : <String, dynamic>{};
                       }(),
                       builder: (context, snapshot) {
-                        final currentCategoryAllows = canTrackInventoryForCategory(matchingCategory.name);
+                        final currentCategoryAllows =
+                            canTrackInventoryForCategory(matchingCategory.name);
                         final selectedCategory = _categories.firstWhere(
-                          (c) => _getCategoryIdentifier(c) == selectedCategoryId,
+                          (c) =>
+                              _getCategoryIdentifier(c) == selectedCategoryId,
                           orElse: () => matchingCategory,
                         );
-                        final selectedCategoryAllows = canTrackInventoryForCategory(selectedCategory.name);
-                        final trackInventory = currentCategoryAllows || selectedCategoryAllows;
-                        
+                        final selectedCategoryAllows =
+                            canTrackInventoryForCategory(selectedCategory.name);
+                        final trackInventory =
+                            currentCategoryAllows || selectedCategoryAllows;
+
                         return TextField(
                           controller: inventoryQuantityController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                           decoration: InputDecoration(
                             labelText: 'Add Inventory Quantity',
                             hintText: 'Enter quantity to add (optional)',
                             border: const OutlineInputBorder(),
                             prefixIcon: const Icon(Icons.add_box),
-                            helperText: trackInventory 
+                            helperText: trackInventory
                                 ? 'Allowed for Food, Cold Drinks, Cigarettes, Smokes, and Snacks'
                                 : 'Inventory tracking not available for "${matchingCategory.name}" category. Only Food, Cold Drinks, Cigarettes, Smokes, and Snacks can have inventory.',
                             helperMaxLines: isMobile ? 2 : 1,
@@ -3096,26 +3249,33 @@ class _MenuScreenState extends State<MenuScreen> {
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton(
-                                  onPressed: () => Navigator.pop(context, 'save'),
+                                  onPressed: () =>
+                                      Navigator.pop(context, 'save'),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Theme.of(context).primaryColor,
+                                    backgroundColor:
+                                        Theme.of(context).primaryColor,
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 14),
                                   ),
                                   child: const Text('Save'),
                                 ),
                               ),
                               const SizedBox(height: 8),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   TextButton(
-                                    onPressed: () => Navigator.pop(context, null),
+                                    onPressed: () =>
+                                        Navigator.pop(context, null),
                                     child: const Text('Cancel'),
                                   ),
                                   TextButton.icon(
-                                    onPressed: () => Navigator.pop(context, 'delete'),
-                                    icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+                                    onPressed: () =>
+                                        Navigator.pop(context, 'delete'),
+                                    icon: const Icon(Icons.delete,
+                                        color: Colors.red, size: 18),
                                     label: const Text(
                                       'Delete',
                                       style: TextStyle(color: Colors.red),
@@ -3133,8 +3293,10 @@ class _MenuScreenState extends State<MenuScreen> {
                               ),
                               const Spacer(),
                               TextButton.icon(
-                                onPressed: () => Navigator.pop(context, 'delete'),
-                                icon: const Icon(Icons.delete, color: Colors.red),
+                                onPressed: () =>
+                                    Navigator.pop(context, 'delete'),
+                                icon:
+                                    const Icon(Icons.delete, color: Colors.red),
                                 label: const Text(
                                   'Delete',
                                   style: TextStyle(color: Colors.red),
@@ -3144,7 +3306,8 @@ class _MenuScreenState extends State<MenuScreen> {
                               ElevatedButton(
                                 onPressed: () => Navigator.pop(context, 'save'),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Theme.of(context).primaryColor,
+                                  backgroundColor:
+                                      Theme.of(context).primaryColor,
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 32, vertical: 12),
@@ -3244,25 +3407,28 @@ class _MenuScreenState extends State<MenuScreen> {
         // Only Food, Cold Drinks, and Cigarettes can have inventory
         final selectedCategory = _categories.firstWhere(
           (c) => _getCategoryIdentifier(c) == selectedCategoryId,
-          orElse: () => _categories.isNotEmpty ? _categories.first : Category(
-            name: 'Unknown',
-            createdAt: 0,
-            updatedAt: 0,
-          ),
+          orElse: () => _categories.isNotEmpty
+              ? _categories.first
+              : Category(
+                  name: 'Unknown',
+                  createdAt: 0,
+                  updatedAt: 0,
+                ),
         );
-        final trackInventory = canTrackInventoryForCategory(selectedCategory.name);
-        
+        final trackInventory =
+            canTrackInventoryForCategory(selectedCategory.name);
+
         // Get current product data
         final currentProduct = await dbProvider.query(
           'products',
           where: kIsWeb ? 'documentId = ?' : 'id = ?',
           whereArgs: [kIsWeb ? product.documentId : product.id],
         );
-        
+
         final currentStock = currentProduct.isNotEmpty
             ? (currentProduct.first['stock_quantity'] as num?)?.toDouble()
             : null;
-        
+
         // Prepare update values
         final updateValues = <String, dynamic>{
           'category_id': selectedCategoryId,
@@ -3278,7 +3444,7 @@ class _MenuScreenState extends State<MenuScreen> {
           'track_inventory': trackInventory ? 1 : 0,
           'updated_at': DateTime.now().millisecondsSinceEpoch,
         };
-        
+
         // UPDATED: Handle stock_quantity based on category
         // If category allows inventory (Food, Cold Drinks, Cigarettes), preserve or set to 0
         // If category doesn't allow inventory, set to null and clear tracking
@@ -3288,14 +3454,14 @@ class _MenuScreenState extends State<MenuScreen> {
           // UPDATED: Clear stock_quantity if category doesn't allow inventory
           updateValues['stock_quantity'] = null;
         }
-        
+
         await dbProvider.update(
           'products',
           values: updateValues,
           where: kIsWeb ? 'documentId = ?' : 'id = ?',
           whereArgs: [kIsWeb ? product.documentId : product.id],
         );
-        
+
         // NEW: Handle inventory quantity if provided
         // IMPORTANT: Only allows inventory for countable items (Food, Cold Drinks, Cigarettes)
         // Uses stockQuantity field directly instead of ledger entries
@@ -3312,21 +3478,24 @@ class _MenuScreenState extends State<MenuScreen> {
                   dbProvider: dbProvider,
                   productId: productId,
                 );
-                
+
                 // Get current stock
                 final currentProduct = await dbProvider.query(
                   'products',
                   where: kIsWeb ? 'documentId = ?' : 'id = ?',
                   whereArgs: [productId],
                 );
-                
+
                 if (currentProduct.isEmpty) {
                   throw Exception('Product not found');
                 }
-                
-                final currentStock = (currentProduct.first['stock_quantity'] as num?)?.toDouble() ?? 0.0;
+
+                final currentStock =
+                    (currentProduct.first['stock_quantity'] as num?)
+                            ?.toDouble() ??
+                        0.0;
                 final newStock = currentStock + inventoryQuantity;
-                
+
                 // Update stockQuantity directly
                 await dbProvider.update(
                   'products',
@@ -3338,8 +3507,9 @@ class _MenuScreenState extends State<MenuScreen> {
                   where: kIsWeb ? 'documentId = ?' : 'id = ?',
                   whereArgs: [productId],
                 );
-                
-                debugPrint('MenuScreen: Added ${inventoryQuantity} to inventory for ${newName}. Stock: $currentStock -> $newStock');
+
+                debugPrint(
+                    'MenuScreen: Added ${inventoryQuantity} to inventory for ${newName}. Stock: $currentStock -> $newStock');
               }
             } catch (e) {
               debugPrint('Error adding inventory: $e');
@@ -3356,7 +3526,7 @@ class _MenuScreenState extends State<MenuScreen> {
             }
           }
         }
-        
+
         await _loadData(); // Await to ensure data is loaded
         if (mounted) {
           final inventoryMsg = inventoryQuantityText.isNotEmpty

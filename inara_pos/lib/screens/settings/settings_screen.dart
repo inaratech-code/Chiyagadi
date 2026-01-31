@@ -22,7 +22,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _selectedDefaultDiscount;
   String? _selectedMaxDiscount;
   bool _discountEnabled = true;
-  bool _isLoading = true;
+  bool _isLoading = false;
   String _lockMode = 'timeout'; // 'always' | 'timeout'
 
   // Discount options (0% to 100%)
@@ -37,18 +37,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         // Backwards-compatible: if caller asks for user management, open the unified screen.
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const UsersAndRolesManagementScreen()),
+          MaterialPageRoute(
+              builder: (_) => const UsersAndRolesManagementScreen()),
         );
       });
     }
   }
 
   Future<void> _loadSettings() async {
-    setState(() => _isLoading = true);
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
+      final authProvider =
+          Provider.of<InaraAuthProvider>(context, listen: false);
       await dbProvider.init();
       final settings = await dbProvider.query('settings');
 
@@ -94,7 +95,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
+      final authProvider =
+          Provider.of<InaraAuthProvider>(context, listen: false);
       final now = DateTime.now().millisecondsSinceEpoch;
 
       // Update or insert settings
@@ -201,8 +203,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               padding: EdgeInsets.only(top: 8),
                               child: Text(
                                 'Admin only',
-                                style: TextStyle(
-                                    color: Colors.grey, fontSize: 12),
+                                style:
+                                    TextStyle(color: Colors.grey, fontSize: 12),
                               ),
                             ),
                         ],
@@ -391,7 +393,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.lock, color: Color(0xFFFFC107)),
+                                const Icon(Icons.lock,
+                                    color: Color(0xFFFFC107)),
                                 const SizedBox(width: 8),
                                 Text(
                                   'Change Password',
@@ -470,7 +473,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 icon: const Icon(Icons.settings_applications),
                                 label: const Text('Manage Users & Roles'),
                                 style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 16),
                                   backgroundColor: AppTheme.logoPrimary,
                                   foregroundColor: Colors.white,
                                 ),
@@ -751,7 +755,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
 
       try {
-        final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
+        final authProvider =
+            Provider.of<InaraAuthProvider>(context, listen: false);
         final success = await authProvider.changePassword(oldPin, newPin);
 
         if (mounted) {

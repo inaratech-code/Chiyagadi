@@ -67,8 +67,9 @@ class _LoginScreenState extends State<LoginScreen>
     // Run after first frame to avoid blocking UI
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      
-      final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
+
+      final authProvider =
+          Provider.of<InaraAuthProvider>(context, listen: false);
       // Set context for AuthProvider to access UnifiedDatabaseProvider
       authProvider.setContext(context);
 
@@ -124,14 +125,15 @@ class _LoginScreenState extends State<LoginScreen>
     });
 
     try {
-      final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
-      
+      final authProvider =
+          Provider.of<InaraAuthProvider>(context, listen: false);
+
       // Ensure context is set for database access
       authProvider.setContext(context);
 
       // Login using Firebase Auth
       final success = await authProvider.login(email, password);
-      
+
       if (success && mounted) {
         // AuthWrapper's Consumer will rebuild and show HomeScreen; no navigation needed.
       } else {
@@ -140,7 +142,7 @@ class _LoginScreenState extends State<LoginScreen>
           _isLoading = false;
         });
       }
-    } on FirebaseAuthException catch (e) {
+    } on FirebaseAuthException {
       setState(() {
         _errorMessage = 'Invalid email or password. Please try again.';
         _isLoading = false;
@@ -367,12 +369,15 @@ class _LoginScreenState extends State<LoginScreen>
                                         controller: _emailController,
                                         keyboardType:
                                             TextInputType.emailAddress,
-                                        autofillHints: const [AutofillHints.email],
+                                        autofillHints: const [
+                                          AutofillHints.email
+                                        ],
                                         textInputAction: TextInputAction.next,
                                         decoration: InputDecoration(
                                           labelText: 'Email',
                                           hintText: 'Enter your email',
-                                          helperText: 'Use the email set by your admin',
+                                          helperText:
+                                              'Use the email set by your admin',
                                           prefixIcon: const Icon(
                                             Icons.email_outlined,
                                             color: Color(0xFFFFC107),
@@ -400,8 +405,7 @@ class _LoginScreenState extends State<LoginScreen>
                                           fillColor: Colors.grey[50],
                                           contentPadding:
                                               const EdgeInsets.symmetric(
-                                                  horizontal: 16,
-                                                  vertical: 16),
+                                                  horizontal: 16, vertical: 16),
                                         ),
                                       ),
                                     ),
@@ -426,13 +430,16 @@ class _LoginScreenState extends State<LoginScreen>
                                         obscureText: _obscurePin,
                                         keyboardType: TextInputType.text,
                                         maxLength: 20,
-                                        autofillHints: const [AutofillHints.password],
+                                        autofillHints: const [
+                                          AutofillHints.password
+                                        ],
                                         textInputAction: TextInputAction.done,
                                         onSubmitted: (_) => _handleLogin(),
                                         decoration: InputDecoration(
                                           labelText: 'Password',
                                           hintText: 'Enter your password',
-                                          helperText: 'Use the password set by your admin',
+                                          helperText:
+                                              'Use the password set by your admin',
                                           prefixIcon: const Icon(
                                               Icons.lock_outline,
                                               color: Color(0xFFFFC107)),

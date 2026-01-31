@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/unified_database_provider.dart';
-import '../../providers/auth_provider.dart' show InaraAuthProvider;
-import '../../services/inventory_ledger_service.dart';
 import '../../models/product.dart';
 import '../../models/inventory_ledger_model.dart';
 import '../../utils/theme.dart';
@@ -22,12 +20,11 @@ class InventoryScreen extends StatefulWidget {
 }
 
 class _InventoryScreenState extends State<InventoryScreen> {
-  final InventoryLedgerService _ledgerService = InventoryLedgerService();
   // UPDATED: Keep the full list and apply filters without losing data.
   List<Map<String, dynamic>> _allInventory = [];
   List<Map<String, dynamic>> _inventory = [];
   List<Map<String, dynamic>> _lowStockItems = [];
-  bool _isLoading = true;
+  bool _isLoading = false;
   String _viewMode = 'inventory'; // 'inventory' or 'movement' or 'report'
 
   // NEW: Inventory category filter (requested)
@@ -58,7 +55,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
       return 'cold_drinks';
     }
     // Cookies
-    if (n.contains('cookie') || n.contains('cookies') || n.contains('biscuit')) {
+    if (n.contains('cookie') ||
+        n.contains('cookies') ||
+        n.contains('biscuit')) {
       return 'cookies';
     }
     return 'other';
@@ -91,7 +90,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
   /// FIXED: Load inventory using ledger-based stock calculation
   /// Stock is calculated from inventory_ledger, not from inventory table
   Future<void> _loadInventory() async {
-    setState(() => _isLoading = true);
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
@@ -151,7 +149,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
           (p) => (kIsWeb ? p['id'] : p['id']) == productId,
           orElse: () => <String, dynamic>{},
         );
-        final currentStock = (productMap['stock_quantity'] as num?)?.toDouble() ?? 0.0;
+        final currentStock =
+            (productMap['stock_quantity'] as num?)?.toDouble() ?? 0.0;
 
         // UPDATED: Default min stock level (no manual editing; can be configured later)
         const minStockLevel = 5.0;
@@ -590,11 +589,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
       try {
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-        final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
         await dbProvider.init();
 
         final productId = item['product_id'];
-        final productName = item['product_name'] as String;
 
         // Validate that this product's category allows inventory tracking
         await validateInventoryAllowed(
@@ -613,7 +610,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
           throw Exception('Product not found');
         }
 
-        final currentStock = (productData.first['stock_quantity'] as num?)?.toDouble() ?? 0.0;
+        final currentStock =
+            (productData.first['stock_quantity'] as num?)?.toDouble() ?? 0.0;
 
         if (currentStock <= 0) {
           if (mounted) {
@@ -667,11 +665,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
         // UPDATED: Validate category allows inventory tracking
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-        final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
         await dbProvider.init();
 
         final productId = item['product_id'];
-        final productName = item['product_name'] as String;
 
         // Validate that this product's category allows inventory tracking
         await validateInventoryAllowed(
@@ -690,7 +686,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
           throw Exception('Product not found');
         }
 
-        final currentStock = (productData.first['stock_quantity'] as num?)?.toDouble() ?? 0.0;
+        final currentStock =
+            (productData.first['stock_quantity'] as num?)?.toDouble() ?? 0.0;
 
         if (newQuantity == currentStock) {
           // No change needed
@@ -704,7 +701,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
         // UPDATED: Update stockQuantity directly (not via ledger)
         final now = DateTime.now().millisecondsSinceEpoch;
-        
+
         await dbProvider.update(
           'products',
           values: {

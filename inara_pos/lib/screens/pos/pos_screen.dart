@@ -143,7 +143,8 @@ class _POSScreenState extends State<POSScreen> {
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
+      final authProvider =
+          Provider.of<InaraAuthProvider>(context, listen: false);
       await dbProvider.init();
 
       // If an order is already open, delete it so we truly start fresh.

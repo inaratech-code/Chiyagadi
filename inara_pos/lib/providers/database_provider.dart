@@ -416,7 +416,7 @@ class DatabaseProvider with ChangeNotifier {
               'ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1))');
           debugPrint('Database: Added is_active column to users');
         }
-        
+
         // Add email column if it doesn't exist
         if (!userColumnNames.contains('email')) {
           await db.execute('ALTER TABLE users ADD COLUMN email TEXT');
@@ -631,7 +631,7 @@ CREATE TABLE IF NOT EXISTS expenses (
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     debugPrint('Database: Upgrading from version $oldVersion to $newVersion');
     await _addMissingColumns(db);
-    
+
     // UPDATED: Add roles table migration
     if (oldVersion < 3) {
       try {
@@ -649,7 +649,7 @@ CREATE TABLE IF NOT EXISTS expenses (
           )
         ''');
         debugPrint('Database: Created roles table');
-        
+
         // Insert default system roles (admin and cashier)
         final now = DateTime.now().millisecondsSinceEpoch;
         await db.insert('roles', {
@@ -664,14 +664,15 @@ CREATE TABLE IF NOT EXISTS expenses (
         await db.insert('roles', {
           'name': 'cashier',
           'description': 'Sales and order management',
-          'permissions': '[0,1,2,3,4,5,7,9]', // All except Inventory (6) and Purchases (8)
+          'permissions':
+              '[0,1,2,3,4,5,7,9]', // All except Inventory (6) and Purchases (8)
           'is_system_role': 1,
           'is_active': 1,
           'created_at': now,
           'updated_at': now,
         });
         debugPrint('Database: Inserted default system roles');
-        
+
         // Remove role constraint from users table (if it exists)
         // SQLite doesn't support DROP CONSTRAINT, so we need to recreate the table
         // But we'll keep the existing data and just allow any role name
@@ -801,7 +802,8 @@ CREATE TABLE IF NOT EXISTS expenses (
     );
   }
 
-  Future<int> insert(String table, Map<String, dynamic> values, {String? documentId}) async {
+  Future<int> insert(String table, Map<String, dynamic> values,
+      {String? documentId}) async {
     // documentId parameter is ignored for SQLite (only used for Firestore)
     final db = await database;
     return await db.insert(table, values);

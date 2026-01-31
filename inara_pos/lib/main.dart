@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
-import 'dart:ui' show PlatformDispatcher;
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'providers/auth_provider.dart' show InaraAuthProvider;
@@ -17,18 +15,14 @@ import 'utils/add_admin_user.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Global error handler to catch all unhandled errors
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
     debugPrint('FlutterError: ${details.exception}');
     debugPrint('Stack: ${details.stack}');
   };
-  
-  // Note: PlatformDispatcher.instance.onError is not available in web builds
-  // FlutterError.onError above handles most errors for web
-  // For mobile platforms, async errors are typically caught by try-catch blocks
-  
+
   // CRITICAL: Do not block first frame on Firebase/DB init.
   // We warm these up asynchronously after the UI is on screen.
   final databaseProvider = UnifiedDatabaseProvider();
@@ -102,7 +96,7 @@ class _WarmStartState extends State<_WarmStart> {
       try {
         final dbProvider = context.read<UnifiedDatabaseProvider>();
         await dbProvider.init();
-        
+
         // Add admin user with specific document ID if on web
         if (kIsWeb) {
           final authProvider = context.read<InaraAuthProvider>();
@@ -115,7 +109,7 @@ class _WarmStartState extends State<_WarmStart> {
               where: 'documentId = ?',
               whereArgs: [adminDocumentId],
             );
-            
+
             if (existing.isEmpty) {
               // Create admin user with this document ID
               await addAdminUserWithId(
@@ -126,12 +120,15 @@ class _WarmStartState extends State<_WarmStart> {
                 pin: 'Chiyagadi15@', // Admin password
                 email: 'chiyagadi@gmail.com', // Admin email
               );
-              debugPrint('Main: Created admin user with document ID: $adminDocumentId');
+              debugPrint(
+                  'Main: Created admin user with document ID: $adminDocumentId');
             } else {
-              debugPrint('Main: Admin user with document ID $adminDocumentId already exists');
+              debugPrint(
+                  'Main: Admin user with document ID $adminDocumentId already exists');
             }
           } catch (e) {
-            debugPrint('Main: Error creating admin user with ID $adminDocumentId: $e');
+            debugPrint(
+                'Main: Error creating admin user with ID $adminDocumentId: $e');
           }
         }
       } catch (e) {
@@ -199,7 +196,8 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
         state == AppLifecycleState.paused) {
       final auth = context.read<InaraAuthProvider>();
       if (auth.lockMode == 'always') {
-        auth.logout(storeForAutoLogin: true); // Allow quick re-login after background
+        auth.logout(
+            storeForAutoLogin: true); // Allow quick re-login after background
       }
     }
   }
@@ -209,15 +207,16 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
     try {
       final auth = FirebaseAuth.instance;
       final authProvider = context.read<InaraAuthProvider>();
-      
+
       // Load lock mode preference (non-blocking)
       authProvider.loadLockMode().catchError((e) {
         debugPrint('Error loading lock mode: $e');
       });
-      
+
       // If user is already signed in with Firebase Auth, restore session
       if (auth.currentUser != null && mounted) {
-        debugPrint('AuthWrapper: Firebase Auth user already signed in: ${auth.currentUser!.email}');
+        debugPrint(
+            'AuthWrapper: Firebase Auth user already signed in: ${auth.currentUser!.email}');
         // Restore session by checking Firestore document
         final email = auth.currentUser!.email;
         if (email != null && email.toLowerCase() == 'chiyagadi@gmail.com') {
@@ -232,12 +231,13 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _restoreAdminSession(InaraAuthProvider authProvider, String email) async {
+  Future<void> _restoreAdminSession(
+      InaraAuthProvider authProvider, String email) async {
     try {
       final dbProvider = context.read<UnifiedDatabaseProvider>();
       // Init won't throw - it handles errors internally
       await dbProvider.init();
-      
+
       // Only restore if database is available
       if (dbProvider.isAvailable && mounted) {
         // Check for admin document ID: dSc8mQzHPsftOpqb200d7xPhS7K2
@@ -247,20 +247,22 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
           where: 'documentId = ?',
           whereArgs: [adminDocumentId],
         );
-        
+
         if (adminUsers.isNotEmpty) {
           final adminUser = adminUsers.first;
           final adminEmail = adminUser['email'] as String?;
-          
+
           if (adminEmail?.toLowerCase() == email.toLowerCase() && mounted) {
             authProvider.setContext(context);
             debugPrint('AuthWrapper: Restoring admin session for $email');
           }
         } else {
-          debugPrint('AuthWrapper: Admin document not found, will be created on login');
+          debugPrint(
+              'AuthWrapper: Admin document not found, will be created on login');
         }
       } else {
-        debugPrint('AuthWrapper: Database not available, cannot restore session');
+        debugPrint(
+            'AuthWrapper: Database not available, cannot restore session');
       }
     } catch (e) {
       debugPrint('AuthWrapper: Error restoring session: $e');

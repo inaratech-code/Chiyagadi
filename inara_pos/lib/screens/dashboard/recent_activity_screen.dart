@@ -17,11 +17,6 @@ class _RecentActivityScreenState extends State<RecentActivityScreen> {
   List<_ActivityItem> _allActivity = [];
   bool _isLoading = true;
 
-  bool _isPaidOrPartial(dynamic paymentStatus) {
-    final s = (paymentStatus ?? '').toString();
-    return s == 'paid' || s == 'partial';
-  }
-
   @override
   void initState() {
     super.initState();
@@ -208,7 +203,8 @@ class _RecentActivityScreenState extends State<RecentActivityScreen> {
         ? DateTime.fromMillisecondsSinceEpoch(activity.createdAt)
         : null;
 
-    final isOrder = activity.icon == Icons.receipt_long && activity.orderId != null;
+    final isOrder =
+        activity.icon == Icons.receipt_long && activity.orderId != null;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),

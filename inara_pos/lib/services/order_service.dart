@@ -120,7 +120,8 @@ class OrderService {
     // UPDATED: Removed inventory check - items can be added to orders regardless of stock
     // Inventory is managed manually from the menu section
     // Stock deduction will happen on payment completion if needed
-    debugPrint('OrderService: Adding ${product.name} (ID: $productId) - quantity: $quantity (inventory check disabled)');
+    debugPrint(
+        'OrderService: Adding ${product.name} (ID: $productId) - quantity: $quantity (inventory check disabled)');
 
     // Check if item already exists in order
     final existingItems = await dbProvider.query(
@@ -211,8 +212,9 @@ class OrderService {
       if (quantity > 0) {
         try {
           final inventoryLedgerService = InventoryLedgerService();
-          final hasInventory = await _hasInventoryHistory(dbProvider, productId);
-          
+          final hasInventory =
+              await _hasInventoryHistory(dbProvider, productId);
+
           if (hasInventory) {
             // Convert createdBy to int? for InventoryLedger
             int? createdByInt;
@@ -225,7 +227,7 @@ class OrderService {
                 createdByInt = createdBy.toInt();
               }
             }
-            
+
             // Create reverse ledger entry to add stock back
             final ledgerEntry = InventoryLedger(
               productId: productId,
@@ -302,8 +304,9 @@ class OrderService {
       if (oldQuantity != quantity) {
         try {
           final inventoryLedgerService = InventoryLedgerService();
-          final hasInventory = await _hasInventoryHistory(dbProvider, productId);
-          
+          final hasInventory =
+              await _hasInventoryHistory(dbProvider, productId);
+
           if (hasInventory) {
             // Convert createdBy to int? for InventoryLedger
             int? createdByInt;
@@ -316,9 +319,9 @@ class OrderService {
                 createdByInt = createdBy.toInt();
               }
             }
-            
+
             final quantityDiff = quantity - oldQuantity;
-            
+
             if (quantityDiff > 0) {
               // Quantity increased - deduct more stock
               final currentStock = await inventoryLedgerService.getCurrentStock(

@@ -22,7 +22,8 @@ class InaraAuthProvider with ChangeNotifier {
   /// Called when logout() runs so AuthWrapper can force rebuild (fixes web).
   VoidCallback? onLogout;
 
-  InaraAuthProvider({UnifiedDatabaseProvider? databaseProvider}) : _databaseProvider = databaseProvider;
+  InaraAuthProvider({UnifiedDatabaseProvider? databaseProvider})
+      : _databaseProvider = databaseProvider;
 
   bool get isAuthenticated => _isAuthenticated;
   String? get currentUserId => _currentUserId;
@@ -38,7 +39,8 @@ class InaraAuthProvider with ChangeNotifier {
     if (password.length < 4 || password.length > 20) return false;
     // Allow letters, numbers, and common special characters (no spaces)
     // Use regular string to properly escape $ character
-    final passwordRegex = RegExp('^[a-zA-Z0-9@#\\\$%^&*()_+\\-=\\[\\]{};\':"\\\\|,.<>\\/?]+\$');
+    final passwordRegex =
+        RegExp('^[a-zA-Z0-9@#\\\$%^&*()_+\\-=\\[\\]{};\':"\\\\|,.<>\\/?]+\$');
     return passwordRegex.hasMatch(password);
   }
 
@@ -88,8 +90,7 @@ class InaraAuthProvider with ChangeNotifier {
       }
     }
     throw StateError(
-      'Database not available. Ensure main.dart creates InaraAuthProvider with databaseProvider.'
-    );
+        'Database not available. Ensure main.dart creates InaraAuthProvider with databaseProvider.');
   }
 
   Future<bool> checkPinExists() async {
@@ -117,38 +118,41 @@ class InaraAuthProvider with ChangeNotifier {
         try {
           dynamic authInstance = FirebaseAuth.instance;
           dynamic currentUser = authInstance.currentUser;
-          
+
           if (currentUser != null) {
             // Get the email from the current user
             final email = currentUser.email;
             if (email != null && email.isNotEmpty) {
               // Store current user info to restore session
               final currentEmail = email;
-              
+
               // Try to sign in with the provided password to verify it
               try {
                 await authInstance.signInWithEmailAndPassword(
                   email: currentEmail,
                   password: pin,
                 );
-                debugPrint('verifyAdminPin: Password verified via Firebase Auth');
+                debugPrint(
+                    'verifyAdminPin: Password verified via Firebase Auth');
                 // Session is already restored by signInWithEmailAndPassword
                 return true;
               } catch (e) {
                 final errorStr = e.toString();
-                if (errorStr.contains('wrong-password') || 
+                if (errorStr.contains('wrong-password') ||
                     errorStr.contains('invalid-credential') ||
                     errorStr.contains('user-not-found')) {
                   debugPrint('verifyAdminPin: Incorrect password');
                   return false;
                 }
                 // If it's another error, fall through to fallback
-                debugPrint('verifyAdminPin: Firebase Auth error, trying fallback: $e');
+                debugPrint(
+                    'verifyAdminPin: Firebase Auth error, trying fallback: $e');
               }
             }
           }
         } catch (e) {
-          debugPrint('verifyAdminPin: Firebase Auth unavailable, trying fallback: $e');
+          debugPrint(
+              'verifyAdminPin: Firebase Auth unavailable, trying fallback: $e');
         }
       }
 
@@ -159,7 +163,8 @@ class InaraAuthProvider with ChangeNotifier {
         if (storedHash != null && storedHash.isNotEmpty) {
           final isValid = _hashPin(pin) == storedHash;
           if (isValid) {
-            debugPrint('verifyAdminPin: Password verified via SharedPreferences fallback');
+            debugPrint(
+                'verifyAdminPin: Password verified via SharedPreferences fallback');
             return true;
           }
         }
@@ -171,7 +176,7 @@ class InaraAuthProvider with ChangeNotifier {
       try {
         final dbProvider = _getDatabaseProvider();
         await dbProvider.init();
-        
+
         // Get current user's info from database
         final users = await dbProvider.query(
           'users',
@@ -179,14 +184,15 @@ class InaraAuthProvider with ChangeNotifier {
           whereArgs: [_currentUserId],
           limit: 1,
         );
-        
+
         if (users.isNotEmpty) {
           final user = users.first;
           final storedPinHash = user['pin_hash'] as String?;
           if (storedPinHash != null && storedPinHash.isNotEmpty) {
             final isValid = _hashPin(pin) == storedPinHash;
             if (isValid) {
-              debugPrint('verifyAdminPin: Password verified via database PIN hash');
+              debugPrint(
+                  'verifyAdminPin: Password verified via database PIN hash');
               return true;
             }
           }
@@ -361,15 +367,15 @@ class InaraAuthProvider with ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final lastLogoutTimestamp = prefs.getInt('last_logout_timestamp');
-      
+
       if (lastLogoutTimestamp == null) {
         return false; // No previous session
       }
-      
+
       final now = DateTime.now().millisecondsSinceEpoch;
       final oneHourInMs = 60 * 60 * 1000; // 1 hour in milliseconds
       final timeSinceLogout = now - lastLogoutTimestamp;
-      
+
       if (timeSinceLogout > oneHourInMs) {
         // Session expired, clear stored info
         await prefs.remove('last_logout_user_id');
@@ -378,7 +384,7 @@ class InaraAuthProvider with ChangeNotifier {
         await prefs.remove('last_logout_timestamp');
         return false;
       }
-      
+
       // Session is still valid (within 1 hour)
       return true;
     } catch (e) {
@@ -386,7 +392,7 @@ class InaraAuthProvider with ChangeNotifier {
       return false;
     }
   }
-  
+
   /// NEW: Auto-login using stored session info
   Future<bool> autoLogin() async {
     try {
@@ -394,24 +400,24 @@ class InaraAuthProvider with ChangeNotifier {
       final userId = prefs.getString('last_logout_user_id');
       final userRole = prefs.getString('last_logout_user_role');
       final username = prefs.getString('last_logout_username');
-      
+
       if (userId == null || userId.isEmpty) {
         return false;
       }
-      
+
       // Restore session
       _isAuthenticated = true;
       _currentUserId = userId;
       _currentUserRole = userRole;
       _currentUsername = username;
-      
+
       if (_lockMode == 'timeout') {
         _resetInactivityTimer();
       } else {
         _inactivityTimer?.cancel();
         _inactivityTimer = null;
       }
-      
+
       notifyListeners();
       debugPrint('AuthProvider: Auto-login successful for user: $username');
       return true;
@@ -420,7 +426,7 @@ class InaraAuthProvider with ChangeNotifier {
       return false;
     }
   }
-  
+
   /// NEW: Clear stored session info (called after successful login with credentials)
   Future<void> _clearStoredSession() async {
     try {
@@ -446,7 +452,7 @@ class InaraAuthProvider with ChangeNotifier {
         return await autoLogin();
       }
     }
-    
+
     if (email.isEmpty || password.isEmpty) {
       debugPrint('Login: Email and password are required');
       return false;
@@ -454,31 +460,35 @@ class InaraAuthProvider with ChangeNotifier {
 
     try {
       final trimmedEmail = email.trim().toLowerCase();
-      debugPrint('Login: Attempting Firebase Auth login for email: $trimmedEmail');
+      debugPrint(
+          'Login: Attempting Firebase Auth login for email: $trimmedEmail');
       debugPrint('Login: Password length: ${password.length}');
-      
+
       // FALLBACK: Check if this is admin credentials - if so, we'll allow login even if Firebase Auth fails
       const adminEmail = 'chiyagadi@gmail.com';
       const adminPassword = 'Chiyagadi15@';
-      final isAdminCredentials = trimmedEmail == adminEmail && password == adminPassword;
-      
+      final isAdminCredentials =
+          trimmedEmail == adminEmail && password == adminPassword;
+
       if (isAdminCredentials) {
-        debugPrint('Login: Admin credentials detected - will allow login even if Firebase Auth fails');
+        debugPrint(
+            'Login: Admin credentials detected - will allow login even if Firebase Auth fails');
       }
-      
+
       // Sign in with Firebase Auth
       // Use defensive access to avoid minified JS type errors
       dynamic authInstance;
       bool authSucceeded = false;
       dynamic firebaseUser;
-      
+
       try {
         authInstance = FirebaseAuth.instance;
       } catch (e) {
         debugPrint('Login: Error getting FirebaseAuth.instance: $e');
         // If admin credentials, allow fallback login
         if (isAdminCredentials) {
-          debugPrint('Login: Firebase Auth unavailable, but admin credentials verified - allowing login');
+          debugPrint(
+              'Login: Firebase Auth unavailable, but admin credentials verified - allowing login');
           _isAuthenticated = true;
           _currentUserId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
           _currentUserRole = 'admin';
@@ -494,14 +504,15 @@ class InaraAuthProvider with ChangeNotifier {
         }
         return false;
       }
-      
+
       UserCredential? userCredential;
-      
+
       try {
         // Use dynamic call to avoid minified JS type checking issues
         userCredential = await authInstance.signInWithEmailAndPassword(
           email: trimmedEmail, // Already normalized to lowercase
-          password: password, // Don't trim password - it may contain leading/trailing spaces intentionally
+          password:
+              password, // Don't trim password - it may contain leading/trailing spaces intentionally
         ) as UserCredential?;
         authSucceeded = true;
         debugPrint('Login: Firebase Auth sign-in successful');
@@ -510,9 +521,9 @@ class InaraAuthProvider with ChangeNotifier {
         // So we catch all errors and check the error message/type dynamically
         final errorStr = e.toString();
         debugPrint('Login: Firebase Auth error: $e');
-        
+
         // Check if it's a Firebase Auth error by examining the error string
-        if (errorStr.contains('user-not-found') || 
+        if (errorStr.contains('user-not-found') ||
             errorStr.contains('wrong-password') ||
             errorStr.contains('invalid-email') ||
             errorStr.contains('user-disabled') ||
@@ -520,10 +531,11 @@ class InaraAuthProvider with ChangeNotifier {
             errorStr.contains('FirebaseAuthException')) {
           // This is a Firebase Auth error
           debugPrint('Login: Firebase Auth error detected');
-          
+
           // FALLBACK: If admin credentials, allow login anyway
           if (isAdminCredentials) {
-            debugPrint('Login: Firebase Auth failed, but admin credentials verified - allowing fallback login');
+            debugPrint(
+                'Login: Firebase Auth failed, but admin credentials verified - allowing fallback login');
             _isAuthenticated = true;
             _currentUserId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
             _currentUserRole = 'admin';
@@ -537,7 +549,7 @@ class InaraAuthProvider with ChangeNotifier {
             notifyListeners();
             return true;
           }
-          
+
           // Try to extract error code from the error message
           if (errorStr.contains('user-not-found')) {
             debugPrint('Login: CRITICAL - Firebase Auth user does not exist!');
@@ -548,9 +560,11 @@ class InaraAuthProvider with ChangeNotifier {
             debugPrint('Login: Password is incorrect');
           }
           return false;
-        } else if (errorStr.contains('minified') || errorStr.contains('TypeError')) {
+        } else if (errorStr.contains('minified') ||
+            errorStr.contains('TypeError')) {
           // This is a minified JS type error - try to continue anyway
-          debugPrint('Login: Minified JS type error detected, checking if auth actually succeeded');
+          debugPrint(
+              'Login: Minified JS type error detected, checking if auth actually succeeded');
           // Check if we can get the current user despite the error
           try {
             dynamic currentUser = authInstance.currentUser;
@@ -563,7 +577,8 @@ class InaraAuthProvider with ChangeNotifier {
               debugPrint('Login: Firebase Auth failed due to type error');
               // FALLBACK: If admin credentials, allow login anyway
               if (isAdminCredentials) {
-                debugPrint('Login: Allowing fallback login for admin despite type error');
+                debugPrint(
+                    'Login: Allowing fallback login for admin despite type error');
                 _isAuthenticated = true;
                 _currentUserId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
                 _currentUserRole = 'admin';
@@ -583,7 +598,8 @@ class InaraAuthProvider with ChangeNotifier {
             debugPrint('Login: Could not verify auth status: $checkError');
             // FALLBACK: If admin credentials, allow login anyway
             if (isAdminCredentials) {
-              debugPrint('Login: Allowing fallback login for admin despite verification error');
+              debugPrint(
+                  'Login: Allowing fallback login for admin despite verification error');
               _isAuthenticated = true;
               _currentUserId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
               _currentUserRole = 'admin';
@@ -604,7 +620,8 @@ class InaraAuthProvider with ChangeNotifier {
           debugPrint('Login: Unexpected error during Firebase Auth: $e');
           // FALLBACK: If admin credentials, allow login anyway
           if (isAdminCredentials) {
-            debugPrint('Login: Allowing fallback login for admin despite unexpected error');
+            debugPrint(
+                'Login: Allowing fallback login for admin despite unexpected error');
             _isAuthenticated = true;
             _currentUserId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
             _currentUserRole = 'admin';
@@ -621,12 +638,13 @@ class InaraAuthProvider with ChangeNotifier {
           return false;
         }
       }
-      
+
       // Handle both normal UserCredential and the case where we got currentUser directly
       if (authSucceeded && firebaseUser == null) {
         if (userCredential != null && userCredential.user != null) {
           firebaseUser = userCredential.user;
-          debugPrint('Login: Firebase Auth successful for ${firebaseUser.email}');
+          debugPrint(
+              'Login: Firebase Auth successful for ${firebaseUser.email}');
         } else {
           // Try to get current user directly (in case of minified JS error workaround)
           try {
@@ -635,7 +653,8 @@ class InaraAuthProvider with ChangeNotifier {
               debugPrint('Login: Firebase Auth returned null user');
               // FALLBACK: If admin credentials, allow login anyway
               if (isAdminCredentials) {
-                debugPrint('Login: Allowing fallback login for admin despite null user');
+                debugPrint(
+                    'Login: Allowing fallback login for admin despite null user');
                 _isAuthenticated = true;
                 _currentUserId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
                 _currentUserRole = 'admin';
@@ -651,12 +670,14 @@ class InaraAuthProvider with ChangeNotifier {
               }
               return false;
             }
-            debugPrint('Login: Firebase Auth successful (using currentUser) for ${firebaseUser.email}');
+            debugPrint(
+                'Login: Firebase Auth successful (using currentUser) for ${firebaseUser.email}');
           } catch (e) {
             debugPrint('Login: Could not get Firebase user: $e');
             // FALLBACK: If admin credentials, allow login anyway
             if (isAdminCredentials) {
-              debugPrint('Login: Allowing fallback login for admin despite user access error');
+              debugPrint(
+                  'Login: Allowing fallback login for admin despite user access error');
               _isAuthenticated = true;
               _currentUserId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
               _currentUserRole = 'admin';
@@ -674,7 +695,7 @@ class InaraAuthProvider with ChangeNotifier {
           }
         }
       }
-      
+
       // Get database provider to fetch user document
       final dbProvider = _getDatabaseProvider();
       try {
@@ -682,14 +703,17 @@ class InaraAuthProvider with ChangeNotifier {
         debugPrint('Login: Database initialized successfully');
       } catch (dbInitError) {
         debugPrint('Login: Database initialization failed: $dbInitError');
-        debugPrint('Login: Continuing with Firebase Auth only - will use Firebase UID');
+        debugPrint(
+            'Login: Continuing with Firebase Auth only - will use Firebase UID');
         // Continue with login using Firebase Auth UID even if database init fails
         // This allows login to work even if Firestore has issues
         _isAuthenticated = true;
         try {
-          _currentUserId = firebaseUser.uid as String? ?? firebaseUser.uid.toString();
+          _currentUserId =
+              firebaseUser.uid as String? ?? firebaseUser.uid.toString();
           final email = firebaseUser.email as String?;
-          _currentUserRole = 'admin'; // Default to admin if this is the admin email
+          _currentUserRole =
+              'admin'; // Default to admin if this is the admin email
           _currentUsername = email?.split('@').first ?? 'user';
         } catch (e) {
           debugPrint('Login: Error accessing firebaseUser properties: $e');
@@ -698,7 +722,7 @@ class InaraAuthProvider with ChangeNotifier {
           _currentUserRole = 'admin';
           _currentUsername = 'user';
         }
-        
+
         if (_lockMode == 'timeout') {
           _resetInactivityTimer();
         } else {
@@ -708,10 +732,10 @@ class InaraAuthProvider with ChangeNotifier {
         notifyListeners();
         return true;
       }
-      
+
       // Connect to Firestore document for admin user
       const adminDocumentId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
-      
+
       // Try to find admin user by document ID
       try {
         final adminUsers = await dbProvider.query(
@@ -719,11 +743,11 @@ class InaraAuthProvider with ChangeNotifier {
           where: 'documentId = ?',
           whereArgs: [adminDocumentId],
         );
-        
+
         if (adminUsers.isNotEmpty) {
           final adminUser = adminUsers.first;
           final adminEmail = adminUser['email'] as String?;
-          
+
           // Verify this is the admin user by email (normalize both to lowercase)
           if (adminEmail?.toLowerCase() == trimmedEmail.toLowerCase()) {
             final isActive = (adminUser['is_active'] as num?)?.toInt();
@@ -736,13 +760,14 @@ class InaraAuthProvider with ChangeNotifier {
               }
               return false;
             }
-            
+
             _isAuthenticated = true;
             _currentUserId = adminDocumentId;
             _currentUserRole = 'admin';
             _currentUsername = adminUser['username'] as String? ?? 'admin';
-            
-            debugPrint('Login: Success! Admin authenticated with document ID: $_currentUserId');
+
+            debugPrint(
+                'Login: Success! Admin authenticated with document ID: $_currentUserId');
             // NEW: Clear old session info on successful login
             await _clearStoredSession();
             if (_lockMode == 'timeout') {
@@ -758,7 +783,7 @@ class InaraAuthProvider with ChangeNotifier {
       } catch (e) {
         debugPrint('Login: Error looking up admin document: $e');
       }
-      
+
       // If not admin, try to find user by email in Firestore
       try {
         final users = await dbProvider.query(
@@ -766,7 +791,7 @@ class InaraAuthProvider with ChangeNotifier {
           where: 'email = ?',
           whereArgs: [trimmedEmail.toLowerCase()],
         );
-        
+
         if (users.isNotEmpty) {
           final user = users.first;
           final isActive = (user['is_active'] as num?)?.toInt();
@@ -779,18 +804,20 @@ class InaraAuthProvider with ChangeNotifier {
             }
             return false;
           }
-          
+
           _isAuthenticated = true;
           // Use documentId on web (Firestore), id on mobile (SQLite), else Firebase UID
           final docId = user['documentId'];
           final dbId = user['id'];
           _currentUserId = ((docId is String) ? docId : (docId?.toString())) ??
-              (dbId != null ? dbId.toString() : null) ??
+              (dbId?.toString()) ??
               (firebaseUser.uid?.toString() ?? firebaseUser.uid.toString());
           _currentUserRole = user['role'] as String? ?? 'cashier';
-          _currentUsername = user['username'] as String? ?? trimmedEmail.split('@').first;
-          
-          debugPrint('Login: Success! User authenticated - ID: $_currentUserId, Role: $_currentUserRole');
+          _currentUsername =
+              user['username'] as String? ?? trimmedEmail.split('@').first;
+
+          debugPrint(
+              'Login: Success! User authenticated - ID: $_currentUserId, Role: $_currentUserRole');
           // NEW: Clear old session info on successful login
           await _clearStoredSession();
           if (_lockMode == 'timeout') {
@@ -805,11 +832,12 @@ class InaraAuthProvider with ChangeNotifier {
       } catch (e) {
         debugPrint('Login: Error looking up user by email: $e');
       }
-      
+
       // If user document not found, check if this is the admin email and create admin document
       if (trimmedEmail.toLowerCase() == 'chiyagadi@gmail.com') {
-        debugPrint('Login: Admin email detected but Firestore document not found. Creating admin document...');
-        
+        debugPrint(
+            'Login: Admin email detected but Firestore document not found. Creating admin document...');
+
         // Try to create admin user document if it doesn't exist
         const adminDocumentId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
         try {
@@ -819,31 +847,36 @@ class InaraAuthProvider with ChangeNotifier {
             where: 'documentId = ?',
             whereArgs: [adminDocumentId],
           );
-          
+
           if (existing.isEmpty) {
             // Create admin user document
             final now = DateTime.now().millisecondsSinceEpoch;
-            await dbProvider.insert('users', {
-              'username': 'admin',
-              'email': trimmedEmail.toLowerCase(),
-              'role': 'admin',
-              'is_active': 1,
-              'created_at': now,
-              'updated_at': now,
-            }, documentId: kIsWeb ? adminDocumentId : null);
-            
-            debugPrint('Login: Created admin user document with ID: $adminDocumentId');
+            await dbProvider.insert(
+                'users',
+                {
+                  'username': 'admin',
+                  'email': trimmedEmail.toLowerCase(),
+                  'role': 'admin',
+                  'is_active': 1,
+                  'created_at': now,
+                  'updated_at': now,
+                },
+                documentId: kIsWeb ? adminDocumentId : null);
+
+            debugPrint(
+                'Login: Created admin user document with ID: $adminDocumentId');
           } else {
             debugPrint('Login: Admin document already exists, using it');
           }
-          
+
           // Set authenticated state with admin document ID
           _isAuthenticated = true;
           _currentUserId = adminDocumentId;
           _currentUserRole = 'admin';
           _currentUsername = 'admin';
-          
-          debugPrint('Login: Success! Admin authenticated with document ID: $_currentUserId');
+
+          debugPrint(
+              'Login: Success! Admin authenticated with document ID: $_currentUserId');
           // NEW: Clear old session info on successful login
           await _clearStoredSession();
           if (_lockMode == 'timeout') {
@@ -860,13 +893,14 @@ class InaraAuthProvider with ChangeNotifier {
           debugPrint('Login: Falling back to Firebase Auth UID for admin');
           _isAuthenticated = true;
           try {
-            _currentUserId = firebaseUser.uid as String? ?? firebaseUser.uid.toString();
+            _currentUserId =
+                firebaseUser.uid as String? ?? firebaseUser.uid.toString();
           } catch (e) {
             _currentUserId = firebaseUser.toString();
           }
           _currentUserRole = 'admin';
           _currentUsername = 'admin';
-          
+
           if (_lockMode == 'timeout') {
             _resetInactivityTimer();
           } else {
@@ -877,12 +911,14 @@ class InaraAuthProvider with ChangeNotifier {
           return true;
         }
       }
-      
+
       // If user document not found and not admin, still allow login but create a basic user record
-      debugPrint('Login: User document not found in Firestore, but Firebase Auth succeeded');
+      debugPrint(
+          'Login: User document not found in Firestore, but Firebase Auth succeeded');
       _isAuthenticated = true;
       try {
-        _currentUserId = firebaseUser.uid as String? ?? firebaseUser.uid.toString();
+        _currentUserId =
+            firebaseUser.uid as String? ?? firebaseUser.uid.toString();
         final email = firebaseUser.email as String?;
         _currentUserRole = 'cashier'; // Default role
         _currentUsername = email?.split('@').first ?? 'user';
@@ -892,7 +928,7 @@ class InaraAuthProvider with ChangeNotifier {
         _currentUserRole = 'cashier';
         _currentUsername = 'user';
       }
-      
+
       // NEW: Clear old session info on successful login
       await _clearStoredSession();
       if (_lockMode == 'timeout') {
@@ -903,12 +939,11 @@ class InaraAuthProvider with ChangeNotifier {
       }
       notifyListeners();
       return true;
-      
     } on FirebaseAuthException catch (e) {
       debugPrint('Login: Firebase Auth error: ${e.code} - ${e.message}');
       debugPrint('Login: Attempted email: ${email.trim().toLowerCase()}');
       debugPrint('Login: Password length: ${password.length}');
-      
+
       // Provide more specific error information
       if (e.code == 'user-not-found') {
         debugPrint('Login: CRITICAL - Firebase Auth user does not exist!');
@@ -919,7 +954,7 @@ class InaraAuthProvider with ChangeNotifier {
         debugPrint('Login: Password is incorrect');
         debugPrint('Login: Expected password: Chiyagadi15@');
       }
-      
+
       return false;
     } catch (e, stackTrace) {
       debugPrint('Login: Error during login: $e');
@@ -1066,7 +1101,8 @@ class InaraAuthProvider with ChangeNotifier {
   // Create new user (admin only)
   /// Create a user with better error handling
   /// Returns a String? where null means success, and non-null means error message
-  Future<String?> createUserWithError(String username, String pin, String role, {String? email}) async {
+  Future<String?> createUserWithError(String username, String pin, String role,
+      {String? email}) async {
     if (username.trim().isEmpty) {
       return 'Username cannot be empty';
     }
@@ -1119,20 +1155,27 @@ class InaraAuthProvider with ChangeNotifier {
             password: pin,
           );
           firebaseAuthUserCreated = true;
-          debugPrint('createUser: Firebase Auth user created - user can log in with this email/password');
+          debugPrint(
+              'createUser: Firebase Auth user created - user can log in with this email/password');
         } catch (authError) {
           final errorMsg = authError.toString();
-          debugPrint('createUser: Firebase Auth user creation failed: $authError');
+          debugPrint(
+              'createUser: Firebase Auth user creation failed: $authError');
           if (errorMsg.contains('email-already-in-use')) {
             // User already exists in Firebase Auth - still add/update Firestore so role is linked
-            debugPrint('createUser: Email already in Firebase Auth, linking with Firestore');
-          } else if (errorMsg.contains('weak-password') || errorMsg.contains('invalid-email')) {
+            debugPrint(
+                'createUser: Email already in Firebase Auth, linking with Firestore');
+          } else if (errorMsg.contains('weak-password') ||
+              errorMsg.contains('invalid-email')) {
             return 'Invalid email or password format. Please check your input.';
-          } else if (errorMsg.contains('requests-from-referer') || errorMsg.contains('are-blocked')) {
+          } else if (errorMsg.contains('requests-from-referer') ||
+              errorMsg.contains('are-blocked')) {
             return 'This domain is not authorized. In Firebase Console go to Authentication → Settings → Authorized domains and add your domain (e.g. localhost).';
           } else {
             // e.g. operation-not-allowed, network - show short hint; Email/Password may already be enabled
-            final hint = errorMsg.length > 80 ? '${errorMsg.substring(0, 77)}...' : errorMsg;
+            final hint = errorMsg.length > 80
+                ? '${errorMsg.substring(0, 77)}...'
+                : errorMsg;
             debugPrint('createUser: Auth error detail: $hint');
             return 'Could not create login account. If Email/Password is enabled, check Authentication → Settings → Authorized domains, or try again.';
           }
@@ -1155,27 +1198,31 @@ class InaraAuthProvider with ChangeNotifier {
       if (kIsWeb && firebaseAuthUserCreated) {
         try {
           await FirebaseAuth.instance.signOut();
-          debugPrint('createUser: Signed out so new user can log in with their credentials');
+          debugPrint(
+              'createUser: Signed out so new user can log in with their credentials');
         } catch (e) {
           debugPrint('createUser: signOut after create: $e');
         }
       }
 
-      debugPrint('createUser: User created - username: ${username.trim()}, email: $normalizedEmail, role: ${role.trim()}');
+      debugPrint(
+          'createUser: User created - username: ${username.trim()}, email: $normalizedEmail, role: ${role.trim()}');
       return null; // Success
     } catch (e) {
       debugPrint('Error creating user: $e');
       final errorStr = e.toString();
-      if (errorStr.contains('UNIQUE constraint') || errorStr.contains('unique')) {
+      if (errorStr.contains('UNIQUE constraint') ||
+          errorStr.contains('unique')) {
         return 'Username already exists. Please choose a different username';
       }
-      return 'Failed to create user: ${errorStr.length > 100 ? errorStr.substring(0, 100) + "..." : errorStr}';
+      return 'Failed to create user: ${errorStr.length > 100 ? "${errorStr.substring(0, 100)}..." : errorStr}';
     }
   }
 
   /// Legacy method for backward compatibility - returns bool
   /// UPDATED: Now supports custom roles (not just admin/cashier)
-  Future<bool> createUser(String username, String pin, String role, {String? email}) async {
+  Future<bool> createUser(String username, String pin, String role,
+      {String? email}) async {
     final error = await createUserWithError(username, pin, role, email: email);
     return error == null; // Return true if no error
   }
@@ -1183,7 +1230,9 @@ class InaraAuthProvider with ChangeNotifier {
   /// Create a user with a specific document ID (for Firestore) or regular insert (SQLite)
   /// Useful for migrating users or setting up specific user IDs
   /// UPDATED: Now supports custom roles (not just admin/cashier)
-  Future<bool> createUserWithId(String userId, String username, String pin, String role, {String? email}) async {
+  Future<bool> createUserWithId(
+      String userId, String username, String pin, String role,
+      {String? email}) async {
     if (!_isValidPassword(pin)) {
       return false;
     }
@@ -1241,7 +1290,8 @@ class InaraAuthProvider with ChangeNotifier {
             email: normalizedEmail,
             password: pin,
           );
-          debugPrint('createUserWithId: Firebase Auth user created for $normalizedEmail');
+          debugPrint(
+              'createUserWithId: Firebase Auth user created for $normalizedEmail');
           // Sign out so admin can log back in; new user can log in with their credentials
           try {
             await FirebaseAuth.instance.signOut();
@@ -1250,28 +1300,35 @@ class InaraAuthProvider with ChangeNotifier {
           }
         } catch (authError) {
           final errorMsg = authError.toString();
-          debugPrint('createUserWithId: Firebase Auth creation failed: $authError');
+          debugPrint(
+              'createUserWithId: Firebase Auth creation failed: $authError');
           if (errorMsg.contains('email-already-in-use')) {
-            debugPrint('createUserWithId: Email already in Firebase Auth - Firestore user will still be created');
+            debugPrint(
+                'createUserWithId: Email already in Firebase Auth - Firestore user will still be created');
           } else if (errorMsg.contains('operation-not-allowed')) {
-            debugPrint('createUserWithId: Email/Password sign-in may not be enabled in Firebase Console');
+            debugPrint(
+                'createUserWithId: Email/Password sign-in may not be enabled in Firebase Console');
           } else {
             rethrow;
           }
         }
       }
 
-      await dbProvider.insert('users', {
-        'username': username.trim(),
-        'pin_hash': pinHash,
-        'email': normalizedEmail,
-        'role': role.trim(),
-        'is_active': 1,
-        'created_at': now,
-        'updated_at': now,
-      }, documentId: kIsWeb ? userId : null);
+      await dbProvider.insert(
+          'users',
+          {
+            'username': username.trim(),
+            'pin_hash': pinHash,
+            'email': normalizedEmail,
+            'role': role.trim(),
+            'is_active': 1,
+            'created_at': now,
+            'updated_at': now,
+          },
+          documentId: kIsWeb ? userId : null);
 
-      debugPrint('createUserWithId: User created with ID: $userId, username: $username, role: $role');
+      debugPrint(
+          'createUserWithId: User created with ID: $userId, username: $username, role: $role');
       return true;
     } catch (e) {
       debugPrint('Error creating user with ID: $e');
@@ -1288,7 +1345,9 @@ class InaraAuthProvider with ChangeNotifier {
       } catch (initError) {
         debugPrint('getAllUsers: Database initialization failed: $initError');
         // Return at least the current admin user if we're logged in
-        if (_isAuthenticated && _currentUserRole == 'admin' && _currentUserId != null) {
+        if (_isAuthenticated &&
+            _currentUserRole == 'admin' &&
+            _currentUserId != null) {
           return [
             {
               'id': _currentUserId,
@@ -1307,7 +1366,9 @@ class InaraAuthProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('getAllUsers: Error loading users: $e');
       // Return at least the current admin user if we're logged in
-      if (_isAuthenticated && _currentUserRole == 'admin' && _currentUserId != null) {
+      if (_isAuthenticated &&
+          _currentUserRole == 'admin' &&
+          _currentUserId != null) {
         return [
           {
             'id': _currentUserId,
@@ -1422,15 +1483,18 @@ class InaraAuthProvider with ChangeNotifier {
       if (kIsWeb && userEmail != null && userEmail.isNotEmpty) {
         try {
           dynamic authInstance = FirebaseAuth.instance;
-          final users = await authInstance.fetchSignInMethodsForEmail(userEmail);
+          final users =
+              await authInstance.fetchSignInMethodsForEmail(userEmail);
           if (users != null && (users as List).isNotEmpty) {
             // User exists in Firebase Auth, try to delete
             // Note: We can't directly delete users from client-side, but we can mark them as deleted
             // The actual deletion should be done server-side or through Firebase Console
-            debugPrint('deleteUser: Firebase Auth user exists for $userEmail (deletion should be done server-side)');
+            debugPrint(
+                'deleteUser: Firebase Auth user exists for $userEmail (deletion should be done server-side)');
           }
         } catch (authError) {
-          debugPrint('deleteUser: Error checking Firebase Auth user: $authError');
+          debugPrint(
+              'deleteUser: Error checking Firebase Auth user: $authError');
           // Continue even if Firebase Auth deletion fails
         }
       }
@@ -1447,7 +1511,16 @@ class InaraAuthProvider with ChangeNotifier {
   // Default permissions: Admin has access to all, Cashier has access to most except Inventory and Purchases
   static const Map<String, List<int>> _defaultPermissions = {
     'admin': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], // All sections
-    'cashier': [0, 1, 2, 3, 4, 5, 7, 9], // All except Inventory (6) and Purchases (8)
+    'cashier': [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      7,
+      9
+    ], // All except Inventory (6) and Purchases (8)
   };
 
   /// Get permissions for a role
@@ -1456,7 +1529,7 @@ class InaraAuthProvider with ChangeNotifier {
     try {
       final dbProvider = _getDatabaseProvider();
       await dbProvider.init();
-      
+
       // UPDATED: First try to get permissions from roles table
       try {
         final roleData = await dbProvider.query(
@@ -1466,10 +1539,12 @@ class InaraAuthProvider with ChangeNotifier {
         );
 
         if (roleData.isNotEmpty) {
-          final permissionsJson = roleData.first['permissions'] as String? ?? '[]';
+          final permissionsJson =
+              roleData.first['permissions'] as String? ?? '[]';
           final List<dynamic> permissionsList = jsonDecode(permissionsJson);
-          final permissions = permissionsList.map((e) => (e as num).toInt()).toSet();
-          
+          final permissions =
+              permissionsList.map((e) => (e as num).toInt()).toSet();
+
           // Always ensure Dashboard (0) is included
           if (!permissions.contains(0)) {
             permissions.add(0);
@@ -1477,9 +1552,10 @@ class InaraAuthProvider with ChangeNotifier {
           return permissions;
         }
       } catch (e) {
-        debugPrint('AuthProvider: Error querying roles table (may not exist yet): $e');
+        debugPrint(
+            'AuthProvider: Error querying roles table (may not exist yet): $e');
       }
-      
+
       // FALLBACK: Check settings table for backward compatibility
       final settings = await dbProvider.query(
         'settings',
@@ -1518,19 +1594,19 @@ class InaraAuthProvider with ChangeNotifier {
     try {
       final dbProvider = _getDatabaseProvider();
       await dbProvider.init();
-      
+
       // Always ensure Dashboard (0) is included - NavigationBar requires at least 2 destinations
       final effectivePermissions = Set<int>.from(permissions);
       if (!effectivePermissions.contains(0)) {
         effectivePermissions.add(0);
       }
-      
+
       // Ensure at least 2 permissions (Dashboard + one other)
       if (effectivePermissions.length < 2) {
         // Add Orders (1) as a safe default second option
         effectivePermissions.add(1);
       }
-      
+
       final permissionsJson = jsonEncode(effectivePermissions.toList());
       final now = DateTime.now().millisecondsSinceEpoch;
 
@@ -1597,7 +1673,7 @@ class InaraAuthProvider with ChangeNotifier {
   Future<bool> hasAccessToSection(int sectionIndex) async {
     if (_currentUserRole == null) return false;
     if (_currentUserRole == 'admin') return true; // Admin always has access
-    
+
     final permissions = await getRolePermissions(_currentUserRole!);
     return permissions.contains(sectionIndex);
   }

@@ -1034,8 +1034,9 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                       // Action Buttons
                       Builder(
                         builder: (dialogContext) {
-                          final authProvider =
-                              Provider.of<InaraAuthProvider>(context, listen: false);
+                          final authProvider = Provider.of<InaraAuthProvider>(
+                              context,
+                              listen: false);
                           final hasOutstanding = outstanding > 0;
                           return Row(
                             children: [

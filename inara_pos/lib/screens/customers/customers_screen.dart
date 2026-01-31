@@ -19,7 +19,7 @@ class CustomersScreen extends StatefulWidget {
 class _CustomersScreenState extends State<CustomersScreen> {
   List<Customer> _customers = [];
   List<Map<String, dynamic>> _creditTransactions = [];
-  bool _isLoading = true;
+  bool _isLoading = false;
   dynamic _selectedCustomerId;
   String _viewMode = 'list'; // 'list' or 'credits'
   int _customersLimit = 200;
@@ -34,7 +34,6 @@ class _CustomersScreenState extends State<CustomersScreen> {
   }
 
   Future<void> _loadCustomers() async {
-    setState(() => _isLoading = true);
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
@@ -192,13 +191,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                          Icon(Icons.search_off,
+                              size: 64, color: Colors.grey[400]),
                           const SizedBox(height: 16),
                           Text('No customers match your search',
                               style: TextStyle(color: Colors.grey[600])),
                           const SizedBox(height: 8),
                           TextButton.icon(
-                            onPressed: () => setState(() => _customerSearch = ''),
+                            onPressed: () =>
+                                setState(() => _customerSearch = ''),
                             icon: const Icon(Icons.clear),
                             label: const Text('Clear search'),
                           ),
@@ -208,7 +209,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: _filteredCustomers.length +
-                          (_canLoadMoreCustomers && _customerSearch.isEmpty ? 1 : 0),
+                          (_canLoadMoreCustomers && _customerSearch.isEmpty
+                              ? 1
+                              : 0),
                       itemBuilder: (context, index) {
                         if (_canLoadMoreCustomers &&
                             _customerSearch.isEmpty &&
@@ -269,17 +272,21 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                         color: brand,
                                       ),
                                     ),
-                                    side: BorderSide(color: brand.withOpacity(0.35)),
+                                    side: BorderSide(
+                                        color: brand.withOpacity(0.35)),
                                     backgroundColor: Colors.white,
                                   ),
                                 IconButton(
                                   icon: const Icon(Icons.edit),
-                                  onPressed: () => _showEditCustomerDialog(customer),
+                                  onPressed: () =>
+                                      _showEditCustomerDialog(customer),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.account_balance_wallet),
+                                  icon:
+                                      const Icon(Icons.account_balance_wallet),
                                   onPressed: () {
-                                    final customerId = customer.documentId ?? customer.id;
+                                    final customerId =
+                                        customer.documentId ?? customer.id;
                                     setState(() {
                                       _selectedCustomerId = customerId;
                                       _viewMode = 'credits';
@@ -293,8 +300,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                             ),
                           ),
                         );
-            },
-          ),
+                      },
+                    ),
         ),
       ],
     );
@@ -983,7 +990,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
       try {
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-        final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
+        final authProvider =
+            Provider.of<InaraAuthProvider>(context, listen: false);
         final customerId = customer.documentId ?? customer.id;
         if (customerId == null) return;
 
@@ -1256,7 +1264,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
       try {
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-        final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
+        final authProvider =
+            Provider.of<InaraAuthProvider>(context, listen: false);
         final customerId =
             kIsWeb ? (customer.documentId ?? customer.id) : customer.id;
         if (customerId == null) return;

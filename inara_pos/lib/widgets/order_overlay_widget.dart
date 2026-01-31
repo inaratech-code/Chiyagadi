@@ -12,11 +12,13 @@ import '../screens/orders/orders_screen.dart';
 class OrderOverlayWidget extends StatefulWidget {
   final dynamic orderId;
   final String orderNumber;
+
   /// Pending items from menu cart - when provided, order is NOT in DB until Create Order
   final List<Map<String, dynamic>>? pendingItems;
   final VoidCallback? onClose;
   final VoidCallback? onOrderUpdated;
-  final VoidCallback? onOrderCreated; // Called when order created from pending items
+  final VoidCallback?
+      onOrderCreated; // Called when order created from pending items
   /// Callback to sync pending items back when overlay closes without creating
   final void Function(List<Map<String, dynamic>>)? onPendingItemsChanged;
   final int refreshKey;
@@ -42,7 +44,7 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
   List<Map<String, dynamic>> _orderItems = [];
   Map<String, dynamic>? _order;
   List<Product> _products = [];
-  bool _isLoading = true;
+  bool _isLoading = false;
   final TextEditingController _discountController = TextEditingController();
 
   @override
@@ -61,7 +63,8 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
     }
   }
 
-  bool get _isPendingMode => widget.pendingItems != null && widget.orderId == null;
+  bool get _isPendingMode =>
+      widget.pendingItems != null && widget.orderId == null;
 
   @override
   void dispose() {
@@ -76,20 +79,21 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
-      
-      final items = await _orderService.getOrderItems(dbProvider, widget.orderId!);
+
+      final items =
+          await _orderService.getOrderItems(dbProvider, widget.orderId!);
       final orders = await dbProvider.query(
         'orders',
         where: kIsWeb ? 'documentId = ?' : 'id = ?',
         whereArgs: [widget.orderId],
       );
-      
+
       if (orders.isEmpty) return false;
-      
+
       final order = orders.first;
       final status = order['status'] as String? ?? 'pending';
       final hasItems = items.isNotEmpty;
-      
+
       // Delete if order has no items and is in pending/confirmed status (not paid)
       return !hasItems && (status == 'pending' || status == 'confirmed');
     } catch (e) {
@@ -101,25 +105,36 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
   // Handle close with order deletion if needed
   Future<void> _handleClose() async {
     if (_isPendingMode) {
-      final items = _orderItems.where((i) => ((i['quantity'] as num?)?.toInt() ?? 0) > 0).map((i) {
-        final product = i['product'] as Product?;
-        if (product != null) {
-          return {'product': product, 'quantity': (i['quantity'] as num?)?.toInt() ?? 1};
-        }
-        try {
-          final p = _products.firstWhere((p) =>
-              (kIsWeb ? p.documentId : p.id)?.toString() == i['product_id']?.toString());
-          return {'product': p, 'quantity': (i['quantity'] as num?)?.toInt() ?? 1};
-        } catch (_) {
-          return null;
-        }
-      }).whereType<Map<String, dynamic>>().toList();
+      final items = _orderItems
+          .where((i) => ((i['quantity'] as num?)?.toInt() ?? 0) > 0)
+          .map((i) {
+            final product = i['product'] as Product?;
+            if (product != null) {
+              return {
+                'product': product,
+                'quantity': (i['quantity'] as num?)?.toInt() ?? 1
+              };
+            }
+            try {
+              final p = _products.firstWhere((p) =>
+                  (kIsWeb ? p.documentId : p.id)?.toString() ==
+                  i['product_id']?.toString());
+              return {
+                'product': p,
+                'quantity': (i['quantity'] as num?)?.toInt() ?? 1
+              };
+            } catch (_) {
+              return null;
+            }
+          })
+          .whereType<Map<String, dynamic>>()
+          .toList();
       widget.onPendingItemsChanged?.call(items);
       widget.onClose?.call();
       return;
     }
     final shouldDelete = await _shouldDeleteOnCancel();
-    
+
     if (shouldDelete) {
       try {
         final dbProvider =
@@ -129,18 +144,18 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
           context: context,
           orderId: widget.orderId,
         );
-        debugPrint('OrderOverlay: Deleted empty order ${widget.orderNumber} on cancel');
+        debugPrint(
+            'OrderOverlay: Deleted empty order ${widget.orderNumber} on cancel');
       } catch (e) {
         debugPrint('OrderOverlay: Error deleting order on cancel: $e');
         // Continue to close even if deletion fails
       }
     }
-    
+
     widget.onClose?.call();
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
@@ -152,7 +167,7 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
         _discountController.text = '0';
         _orderItems = widget.pendingItems!.map((item) {
           final product = item['product'] as Product;
-          final qty = (item['quantity'] as int) ?? 1;
+          final qty = (item['quantity'] as num?)?.toInt() ?? 1;
           final productId = kIsWeb ? product.documentId : product.id;
           return {
             'product_id': productId,
@@ -179,7 +194,8 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
               (_order!['discount_percent'] as num? ?? 0.0).toStringAsFixed(1);
         }
 
-        final items = await _orderService.getOrderItems(dbProvider, widget.orderId!);
+        final items =
+            await _orderService.getOrderItems(dbProvider, widget.orderId!);
         _orderItems = items;
       }
 
@@ -192,7 +208,8 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
             )
           : await dbProvider.query(
               'products',
-              where: 'is_sellable = ? OR (is_sellable IS NULL OR is_sellable = 1)',
+              where:
+                  'is_sellable = ? OR (is_sellable IS NULL OR is_sellable = 1)',
               whereArgs: [1],
             );
       _products = productMaps
@@ -211,7 +228,6 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
     }
   }
 
-
   Future<void> _updateItemQuantity(Product product, int newQuantity) async {
     try {
       final productId = kIsWeb ? product.documentId : product.id;
@@ -219,11 +235,11 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
       if (_isPendingMode) {
         // Pending mode: update local _orderItems only
         if (newQuantity <= 0) {
-          _orderItems.removeWhere(
-              (item) => item['product_id']?.toString() == productId?.toString());
+          _orderItems.removeWhere((item) =>
+              item['product_id']?.toString() == productId?.toString());
         } else {
-          final idx = _orderItems.indexWhere(
-              (item) => item['product_id']?.toString() == productId?.toString());
+          final idx = _orderItems.indexWhere((item) =>
+              item['product_id']?.toString() == productId?.toString());
           if (idx >= 0) {
             _orderItems[idx]['quantity'] = newQuantity;
             _orderItems[idx]['total_price'] = product.price * newQuantity;
@@ -246,7 +262,7 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
       // Order mode: update in DB
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      
+
       if (newQuantity <= 0) {
         final item = _orderItems.firstWhere(
           (item) => item['product_id']?.toString() == productId?.toString(),
@@ -256,7 +272,9 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
           final itemId = item['id'] ?? item['documentId'];
           final auth = Provider.of<InaraAuthProvider>(context, listen: false);
           final createdBy = auth.currentUserId != null
-              ? (kIsWeb ? auth.currentUserId! : int.tryParse(auth.currentUserId!))
+              ? (kIsWeb
+                  ? auth.currentUserId!
+                  : int.tryParse(auth.currentUserId!))
               : null;
           await _orderService.removeItemFromOrder(
             dbProvider: dbProvider,
@@ -274,7 +292,7 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
         final createdBy = auth.currentUserId != null
             ? (kIsWeb ? auth.currentUserId! : int.tryParse(auth.currentUserId!))
             : null;
-        
+
         if (item.isEmpty) {
           await _orderService.addItemToOrder(
             dbProvider: dbProvider,
@@ -301,7 +319,9 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(newQuantity > 0 ? 'Updated ${product.name}' : 'Removed ${product.name}'),
+            content: Text(newQuantity > 0
+                ? 'Updated ${product.name}'
+                : 'Removed ${product.name}'),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 1),
           ),
@@ -490,21 +510,20 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
     }
   }
 
-  
   // UPDATED: Save order updates (VAT, discount) before payment
   Future<void> _saveOrderUpdates() async {
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
-      
+
       final discountPercent = double.tryParse(_discountController.text) ?? 0.0;
-      
+
       // Calculate totals
       final subtotal = _subtotal;
       final discountAmount = (subtotal * discountPercent / 100);
       final total = subtotal - discountAmount;
-      
+
       // Update order with current totals
       await dbProvider.update(
         'orders',
@@ -520,7 +539,7 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
         where: kIsWeb ? 'documentId = ?' : 'id = ?',
         whereArgs: [widget.orderId],
       );
-      
+
       debugPrint('OrderOverlay: Saved order updates for ${widget.orderNumber}');
     } catch (e) {
       debugPrint('OrderOverlay: Error saving order updates: $e');
@@ -541,253 +560,266 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
       child: Material(
         color: Colors.white,
         child: Column(
-        children: [
-          // UPDATED: Header matching 2nd image - "Create Order" with X button
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(
-                bottom: BorderSide(color: Colors.grey[300]!),
+          children: [
+            // UPDATED: Header matching 2nd image - "Create Order" with X button
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey[300]!),
+                ),
               ),
-            ),
-            child: Row(
-              children: [
-                const Text(
-                  'Create Order',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: _handleClose,
-                ),
-              ],
-            ),
-          ),
-
-          // Scrollable content
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              child: Row(
                 children: [
-                  // UPDATED: Order Type and Table dropdowns matching 2nd image
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey[300]!),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: 'dine_in',
-                              isExpanded: true,
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'dine_in',
-                                  child: Text('Dine-In'),
-                                ),
-                              ],
-                              onChanged: null, // Disabled - only Dine-In
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey[300]!),
-                                borderRadius: BorderRadius.circular(4),
-                                color: Colors.grey[200],
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  value: 'no_table',
-                                  isExpanded: true,
-                                  items: const [
-                                    DropdownMenuItem(
-                                      value: 'no_table',
-                                      child: Text('No Table'),
-                                    ),
-                                  ],
-                                  onChanged: null, // Disabled for now
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Only for Dine-In',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Discount input
-                  TextField(
-                    controller: _discountController,
-                    decoration: InputDecoration(
-                      labelText: 'Discount %',
-                      border: const OutlineInputBorder(),
-                      suffixText: '%',
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    onChanged: (_) => _updateVATAndDiscount(),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // UPDATED: Show only items that are in the order (quantity > 0)
                   const Text(
-                    'Order Items',
+                    'Create Order',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Builder(
-                    builder: (context) {
-                      final itemsWithQuantity = _orderItems.where((item) {
-                        final quantity = (item['quantity'] as num?)?.toInt() ?? 0;
-                        return quantity > 0;
-                      }).toList();
-                      
-                      debugPrint('OrderOverlay: Rendering - total items: ${_orderItems.length}, items with quantity > 0: ${itemsWithQuantity.length}');
-                      
-                      if (itemsWithQuantity.isEmpty) {
-                        return Container(
-                          padding: const EdgeInsets.all(32),
-                          child: const Center(
-                            child: Text(
-                              'No items in order',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                          ),
-                        );
-                      }
-                      
-                      return Column(
-                        children: itemsWithQuantity.map((item) {
-                          Product product;
-                          if (item['product'] != null) {
-                            product = item['product'] as Product;
-                          } else {
-                            try {
-                              product = _products.firstWhere((p) =>
-                                  (kIsWeb ? p.documentId : p.id)?.toString() ==
-                                  item['product_id']?.toString());
-                            } catch (_) {
-                              product = Product(
-                                categoryId: 0,
-                                name: item['product_name'] as String? ?? 'Unknown',
-                                price: (item['unit_price'] as num?)?.toDouble() ?? 0,
-                                createdAt: 0,
-                                updatedAt: 0,
-                              );
-                            }
-                          }
-                          final quantity = (item['quantity'] as num?)?.toInt() ?? 0;
-                          return _buildMenuItemRow(product, quantity);
-                        }).toList(),
-                      );
-                    },
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: _handleClose,
                   ),
+                ],
+              ),
+            ),
 
-                  const SizedBox(height: 16),
-
-                  // UPDATED: Order summary matching 2nd image
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      children: [
-                        _buildSummaryRow('Subtotal', _subtotal),
-                        _buildSummaryRow(
-                          'Discount (${double.tryParse(_discountController.text)?.toStringAsFixed(1) ?? '0.0'}%)',
-                          -_discountAmount,
-                        ),
-                        const Divider(),
-                        _buildSummaryRow('Total', _total, isTotal: true),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // UPDATED: Cancel and Create Order buttons matching 2nd image
-                  // Added bottom padding to prevent overlap with bottom navigation
-                  Padding(
-                    padding: EdgeInsets.only(
-                      bottom: MediaQuery.of(context).padding.bottom + 16, // Account for bottom nav and safe area
-                    ),
-                    child: Row(
+            // Scrollable content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // UPDATED: Order Type and Table dropdowns matching 2nd image
+                    Row(
                       children: [
                         Expanded(
-                          child: OutlinedButton(
-                            onPressed: _handleClose,
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              side: BorderSide(color: Colors.grey[400]!),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey[300]!),
+                              borderRadius: BorderRadius.circular(4),
                             ),
-                            child: const Text(
-                              'Cancel',
-                              style: TextStyle(fontSize: 16),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: 'dine_in',
+                                isExpanded: true,
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'dine_in',
+                                    child: Text('Dine-In'),
+                                  ),
+                                ],
+                                onChanged: null, // Disabled - only Dine-In
+                              ),
                             ),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: ElevatedButton(
-                            onPressed: _orderItems.isEmpty ? null : _createOrder,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFFFC107), // Yellow/orange
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                            ),
-                            child: const Text(
-                              'Create Order',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 12),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey[300]!),
+                                  borderRadius: BorderRadius.circular(4),
+                                  color: Colors.grey[200],
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: 'no_table',
+                                    isExpanded: true,
+                                    items: const [
+                                      DropdownMenuItem(
+                                        value: 'no_table',
+                                        child: Text('No Table'),
+                                      ),
+                                    ],
+                                    onChanged: null, // Disabled for now
+                                  ),
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Only for Dine-In',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ],
+
+                    const SizedBox(height: 12),
+
+                    // Discount input
+                    TextField(
+                      controller: _discountController,
+                      decoration: InputDecoration(
+                        labelText: 'Discount %',
+                        border: const OutlineInputBorder(),
+                        suffixText: '%',
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (_) => _updateVATAndDiscount(),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // UPDATED: Show only items that are in the order (quantity > 0)
+                    const Text(
+                      'Order Items',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Builder(
+                      builder: (context) {
+                        final itemsWithQuantity = _orderItems.where((item) {
+                          final quantity =
+                              (item['quantity'] as num?)?.toInt() ?? 0;
+                          return quantity > 0;
+                        }).toList();
+
+                        debugPrint(
+                            'OrderOverlay: Rendering - total items: ${_orderItems.length}, items with quantity > 0: ${itemsWithQuantity.length}');
+
+                        if (itemsWithQuantity.isEmpty) {
+                          return Container(
+                            padding: const EdgeInsets.all(32),
+                            child: const Center(
+                              child: Text(
+                                'No items in order',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ),
+                          );
+                        }
+
+                        return Column(
+                          children: itemsWithQuantity.map((item) {
+                            Product product;
+                            if (item['product'] != null) {
+                              product = item['product'] as Product;
+                            } else {
+                              try {
+                                product = _products.firstWhere((p) =>
+                                    (kIsWeb ? p.documentId : p.id)
+                                        ?.toString() ==
+                                    item['product_id']?.toString());
+                              } catch (_) {
+                                product = Product(
+                                  categoryId: 0,
+                                  name: item['product_name'] as String? ??
+                                      'Unknown',
+                                  price: (item['unit_price'] as num?)
+                                          ?.toDouble() ??
+                                      0,
+                                  createdAt: 0,
+                                  updatedAt: 0,
+                                );
+                              }
+                            }
+                            final quantity =
+                                (item['quantity'] as num?)?.toInt() ?? 0;
+                            return _buildMenuItemRow(product, quantity);
+                          }).toList(),
+                        );
+                      },
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // UPDATED: Order summary matching 2nd image
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        children: [
+                          _buildSummaryRow('Subtotal', _subtotal),
+                          _buildSummaryRow(
+                            'Discount (${double.tryParse(_discountController.text)?.toStringAsFixed(1) ?? '0.0'}%)',
+                            -_discountAmount,
+                          ),
+                          const Divider(),
+                          _buildSummaryRow('Total', _total, isTotal: true),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // UPDATED: Cancel and Create Order buttons matching 2nd image
+                    // Added bottom padding to prevent overlap with bottom navigation
+                    Padding(
+                      padding: EdgeInsets.only(
+                        bottom: MediaQuery.of(context).padding.bottom +
+                            16, // Account for bottom nav and safe area
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _handleClose,
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                                side: BorderSide(color: Colors.grey[400]!),
+                              ),
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(fontSize: 16),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed:
+                                  _orderItems.isEmpty ? null : _createOrder,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    const Color(0xFFFFC107), // Yellow/orange
+                                foregroundColor: Colors.white,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                              ),
+                              child: const Text(
+                                'Create Order',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
         ),
       ),
     );

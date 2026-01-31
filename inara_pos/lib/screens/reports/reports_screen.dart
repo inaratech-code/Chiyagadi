@@ -91,8 +91,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         whereArgs: [start, end],
       );
       final creditTransactions = creditTransactionsRaw
-          .where(
-              (t) => (t['transaction_type'] ?? '').toString() == 'payment')
+          .where((t) => (t['transaction_type'] ?? '').toString() == 'payment')
           .toList();
       final creditCollected = creditTransactions.fold(
           0.0, (sum, t) => sum + (t['amount'] as num? ?? 0).toDouble());

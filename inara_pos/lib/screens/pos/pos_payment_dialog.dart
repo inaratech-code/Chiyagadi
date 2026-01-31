@@ -163,7 +163,8 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
     });
 
     try {
-      final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
+      final authProvider =
+          Provider.of<InaraAuthProvider>(context, listen: false);
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       final createdBy = authProvider.currentUserId != null

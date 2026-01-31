@@ -1,6 +1,11 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart'
-    show ChangeNotifier, debugPrint, defaultTargetPlatform, kIsWeb, TargetPlatform;
+    show
+        ChangeNotifier,
+        debugPrint,
+        defaultTargetPlatform,
+        kIsWeb,
+        TargetPlatform;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../utils/chiyagaadi_menu_seed.dart';
@@ -28,7 +33,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
           throw StateError('Firestore not initialized. Call init() first.');
         }
       } catch (e) {
-        throw StateError('Firestore not initialized. Call init() first. Error: $e');
+        throw StateError(
+            'Firestore not initialized. Call init() first. Error: $e');
       }
     }
     return _firestore!;
@@ -48,109 +54,115 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       // CRITICAL: Ensure Firebase is initialized before accessing Firestore
       if (Firebase.apps.isEmpty) {
         throw StateError(
-          'Firebase is not initialized. Please ensure Firebase.initializeApp() is called first.\n\n'
-          'This should be done in UnifiedDatabaseProvider.init() before calling FirestoreDatabaseProvider.init().'
-        );
+            'Firebase is not initialized. Please ensure Firebase.initializeApp() is called first.\n\n'
+            'This should be done in UnifiedDatabaseProvider.init() before calling FirestoreDatabaseProvider.init().');
       }
 
-      debugPrint('FirestoreDatabase: Firebase apps count: ${Firebase.apps.length}');
+      debugPrint(
+          'FirestoreDatabase: Firebase apps count: ${Firebase.apps.length}');
 
       // Get Firestore instance with defensive error handling and retries
       // iOS Safari sometimes needs multiple delays after Firebase.initializeApp()
-      FirebaseFirestore? firestoreInstance;
       int maxRetries = 3;
-      int retryDelayMs = 50; // FIXED: Reduced from 200ms to 50ms for faster startup
-      
+      int retryDelayMs = 0;
+
       for (int attempt = 0; attempt < maxRetries; attempt++) {
         try {
           // Progressive delay: shorter wait on each retry for faster startup
           if (attempt > 0) {
             final delayMs = retryDelayMs * (attempt + 1);
-            debugPrint('FirestoreDatabase: Retry attempt $attempt, waiting ${delayMs}ms...');
+            debugPrint(
+                'FirestoreDatabase: Retry attempt $attempt, waiting ${delayMs}ms...');
             await Future.delayed(Duration(milliseconds: delayMs));
           } else if (kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-            // FIXED: Reduced initial delay for iOS Safari
-            await Future.delayed(const Duration(milliseconds: 50));
+            await Future.delayed(Duration.zero);
           }
-          
+
           // Verify Firebase is still initialized
           if (Firebase.apps.isEmpty) {
-            throw StateError('Firebase apps became empty during initialization');
+            throw StateError(
+                'Firebase apps became empty during initialization');
           }
-          
+
           // Try to get Firestore instance using dynamic access to avoid minified JS errors
           try {
             dynamic firestoreInstance;
             try {
               firestoreInstance = FirebaseFirestore.instance;
             } catch (e) {
-              debugPrint('FirestoreDatabase: Error accessing FirebaseFirestore.instance: $e');
+              debugPrint(
+                  'FirestoreDatabase: Error accessing FirebaseFirestore.instance: $e');
               // If it's a minified JS error, wait and retry
-              if (e.toString().contains('minified') || e.toString().contains('TypeError')) {
-                debugPrint('FirestoreDatabase: Minified JS error detected, waiting longer before retry...');
-                // FIXED: Reduced delay for faster retry
-                await Future.delayed(Duration(milliseconds: 50 * (attempt + 1)));
+              if (e.toString().contains('minified') ||
+                  e.toString().contains('TypeError')) {
+                debugPrint(
+                    'FirestoreDatabase: Minified JS error detected, waiting longer before retry...');
+                await Future.delayed(Duration.zero);
                 // Try again
                 firestoreInstance = FirebaseFirestore.instance;
               } else {
                 rethrow;
               }
             }
-            
+
             // Verify instance is not null
             if (firestoreInstance == null) {
               throw StateError('FirebaseFirestore.instance returned null');
             }
-            
+
             // Try a simple operation to verify it's actually working
             // This will catch any underlying initialization issues
             try {
               // Just check if we can access the instance without error
               final _ = firestoreInstance.collection('_test').limit(0);
             } catch (testError) {
-              debugPrint('FirestoreDatabase: Test access failed (non-critical): $testError');
+              debugPrint(
+                  'FirestoreDatabase: Test access failed (non-critical): $testError');
               // Don't fail on test - might be permission issue, but instance is valid
             }
-            
+
             // Success!
             _firestore = firestoreInstance;
-            debugPrint('FirestoreDatabase: Firestore instance obtained successfully on attempt ${attempt + 1}');
+            debugPrint(
+                'FirestoreDatabase: Firestore instance obtained successfully on attempt ${attempt + 1}');
             break; // Exit retry loop
           } catch (instanceError) {
             final instanceErrorMsg = instanceError.toString();
-            debugPrint('FirestoreDatabase: Attempt ${attempt + 1} failed: $instanceError');
-            
+            debugPrint(
+                'FirestoreDatabase: Attempt ${attempt + 1} failed: $instanceError');
+
             // If this is the last attempt, throw the error
             if (attempt == maxRetries - 1) {
-              if (instanceErrorMsg.contains('Null check operator') || 
+              if (instanceErrorMsg.contains('Null check operator') ||
                   instanceErrorMsg.contains('null value') ||
                   instanceErrorMsg.contains('NoSuchMethodError') ||
                   instanceErrorMsg.contains('minified') ||
                   instanceErrorMsg.contains('TypeError')) {
                 // For minified JS errors, try one more time with a shorter delay
-                debugPrint('FirestoreDatabase: Minified JS/null check error on final attempt, trying one more time...');
-                await Future.delayed(const Duration(milliseconds: 200)); // FIXED: Reduced from 1000ms to 200ms
+                debugPrint(
+                    'FirestoreDatabase: Minified JS/null check error on final attempt, trying one more time...');
+                await Future.delayed(Duration.zero);
                 try {
                   final lastAttempt = FirebaseFirestore.instance;
                   _firestore = lastAttempt;
-                  debugPrint('FirestoreDatabase: Firestore instance obtained on final retry');
+                  debugPrint(
+                      'FirestoreDatabase: Firestore instance obtained on final retry');
                   break;
                 } catch (finalError) {
                   throw StateError(
-                    'Firestore initialization failed after $maxRetries attempts + final retry.\n\n'
-                    'This is often caused by:\n'
-                    '1. Firebase not fully initialized on iOS Safari\n'
-                    '2. Firestore Database not enabled in Firebase Console\n'
-                    '3. Browser compatibility issue\n'
-                    '4. Firestore security rules require authentication\n\n'
-                    'Try:\n'
-                    '1. Hard refresh the page (Cmd+Shift+R on Mac, Ctrl+Shift+R on Windows)\n'
-                    '2. Clear browser cache\n'
-                    '3. Check Firebase Console to ensure Firestore is enabled\n'
-                    '4. Update Firestore rules to allow public access temporarily\n\n'
-                    'Original error: $instanceError\n'
-                    'Final retry error: $finalError'
-                  );
+                      'Firestore initialization failed after $maxRetries attempts + final retry.\n\n'
+                      'This is often caused by:\n'
+                      '1. Firebase not fully initialized on iOS Safari\n'
+                      '2. Firestore Database not enabled in Firebase Console\n'
+                      '3. Browser compatibility issue\n'
+                      '4. Firestore security rules require authentication\n\n'
+                      'Try:\n'
+                      '1. Hard refresh the page (Cmd+Shift+R on Mac, Ctrl+Shift+R on Windows)\n'
+                      '2. Clear browser cache\n'
+                      '3. Check Firebase Console to ensure Firestore is enabled\n'
+                      '4. Update Firestore rules to allow public access temporarily\n\n'
+                      'Original error: $instanceError\n'
+                      'Final retry error: $finalError');
                 }
               }
               rethrow;
@@ -160,30 +172,31 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         } catch (e) {
           final errorMsg = e.toString();
           debugPrint('FirestoreDatabase: Failed on attempt ${attempt + 1}: $e');
-          
+
           // If this is the last attempt, throw
           if (attempt == maxRetries - 1) {
-            if (errorMsg.contains('Null check operator') || errorMsg.contains('null value')) {
+            if (errorMsg.contains('Null check operator') ||
+                errorMsg.contains('null value')) {
               throw StateError(
-                'Firestore initialization failed after $maxRetries attempts.\n\n'
-                'This may be due to:\n'
-                '1. Firebase not fully initialized (try refreshing)\n'
-                '2. Firestore not enabled in Firebase Console\n'
-                '3. Browser compatibility issue\n\n'
-                'Original error: $e'
-              );
+                  'Firestore initialization failed after $maxRetries attempts.\n\n'
+                  'This may be due to:\n'
+                  '1. Firebase not fully initialized (try refreshing)\n'
+                  '2. Firestore not enabled in Firebase Console\n'
+                  '3. Browser compatibility issue\n\n'
+                  'Original error: $e');
             }
-            throw StateError('Failed to get Firestore instance after $maxRetries attempts: $e');
+            throw StateError(
+                'Failed to get Firestore instance after $maxRetries attempts: $e');
           }
           // Continue to next retry
         }
       }
-      
+
       // Final check
       if (_firestore == null) {
         throw StateError('Firestore instance is null after all retry attempts');
       }
-      
+
       debugPrint('FirestoreDatabase: Firestore instance obtained');
 
       // Web/iOS Safari often fails (or behaves inconsistently) with persistence enabled.
@@ -227,22 +240,25 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       // Test Firestore connectivity with a simple read operation
       try {
         debugPrint('FirestoreDatabase: Testing Firestore connectivity...');
-        final testQuery = await _firestore!.collection('_connectivity_test').limit(1).get();
-        debugPrint('FirestoreDatabase: Connectivity test successful - Firestore is accessible');
+        await _firestore!.collection('_connectivity_test').limit(1).get();
+        debugPrint(
+            'FirestoreDatabase: Connectivity test successful - Firestore is accessible');
       } catch (testError) {
         final testErrorMsg = testError.toString();
         debugPrint('FirestoreDatabase: Connectivity test failed: $testError');
-        
+
         // If it's a permissions error, that's okay - Firestore is initialized
-        if (testErrorMsg.contains('permission') || 
+        if (testErrorMsg.contains('permission') ||
             testErrorMsg.contains('PERMISSION_DENIED') ||
             testErrorMsg.contains('Missing or insufficient permissions')) {
-          debugPrint('FirestoreDatabase: Permission error (expected if rules require auth) - Firestore is initialized');
+          debugPrint(
+              'FirestoreDatabase: Permission error (expected if rules require auth) - Firestore is initialized');
         } else {
-          debugPrint('FirestoreDatabase: Warning - Connectivity test failed but continuing anyway');
+          debugPrint(
+              'FirestoreDatabase: Warning - Connectivity test failed but continuing anyway');
         }
       }
-      
+
       _isInitialized = true;
       debugPrint('FirestoreDatabase: Firestore initialized successfully');
 
@@ -258,7 +274,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
             debugPrint('FirestoreDatabase: Background connection test ok');
           }
         } catch (e) {
-          debugPrint('FirestoreDatabase: Background connection test failed: $e');
+          debugPrint(
+              'FirestoreDatabase: Background connection test failed: $e');
         }
 
         // Best-effort default data init
@@ -321,7 +338,6 @@ class FirestoreDatabaseProvider with ChangeNotifier {
           'updated_at': now,
         });
 
-
         await firestore.collection('settings').doc('discount_enabled').set({
           'key': 'discount_enabled',
           'value': '1',
@@ -368,7 +384,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       final rolesSnapshot = await firestore.collection('roles').limit(1).get();
       if (rolesSnapshot.docs.isNotEmpty) return;
 
-      debugPrint('FirestoreDatabase: Seeding default roles (admin, cashier)...');
+      debugPrint(
+          'FirestoreDatabase: Seeding default roles (admin, cashier)...');
       final now = DateTime.now().millisecondsSinceEpoch;
 
       // Admin: all sections (0-9)
@@ -416,7 +433,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       // Ensure categories exist (by exact name match first, then normalized as fallback)
       final Map<String, String> categoryIdByNormName = {};
       int categoriesToAdd = 0;
-      
+
       for (final cat in chiyagaadiSeedCategories) {
         final snap = await firestore
             .collection('categories')
@@ -425,7 +442,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
             .get();
         if (snap.docs.isNotEmpty) {
           categoryIdByNormName[norm(cat.name)] = snap.docs.first.id;
-          debugPrint('FirestoreDatabase: Category "${cat.name}" already exists (ID: ${snap.docs.first.id})');
+          debugPrint(
+              'FirestoreDatabase: Category "${cat.name}" already exists (ID: ${snap.docs.first.id})');
           continue;
         }
 
@@ -433,7 +451,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         if (operationsInCurrentBatch >= maxBatchSize) {
           // Commit current batch before creating new one
           await batches[currentBatchIndex].commit();
-          debugPrint('FirestoreDatabase: Committed batch ${currentBatchIndex + 1} (had $operationsInCurrentBatch operations)');
+          debugPrint(
+              'FirestoreDatabase: Committed batch ${currentBatchIndex + 1} (had $operationsInCurrentBatch operations)');
           currentBatchIndex++;
           batches.add(firestore.batch());
           operationsInCurrentBatch = 0;
@@ -451,10 +470,12 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         });
         operationsInCurrentBatch++;
         categoriesToAdd++;
-        debugPrint('FirestoreDatabase: Will create category "${cat.name}" in batch ${currentBatchIndex + 1}');
+        debugPrint(
+            'FirestoreDatabase: Will create category "${cat.name}" in batch ${currentBatchIndex + 1}');
       }
-      
-      debugPrint('FirestoreDatabase: Categories processed - ${categoryIdByNormName.length} total, $categoriesToAdd to add, operations in current batch: $operationsInCurrentBatch');
+
+      debugPrint(
+          'FirestoreDatabase: Categories processed - ${categoryIdByNormName.length} total, $categoriesToAdd to add, operations in current batch: $operationsInCurrentBatch');
 
       // Create products (menu items). Inventory is handled separately using
       // purchasable items + purchases, not menu sales.
@@ -463,7 +484,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       for (final p in chiyagaadiSeedProducts) {
         final categoryId = categoryIdByNormName[norm(p.categoryName)];
         if (categoryId == null) {
-          debugPrint('FirestoreDatabase: Skipping product "${p.name}" - category "${p.categoryName}" not found');
+          debugPrint(
+              'FirestoreDatabase: Skipping product "${p.name}" - category "${p.categoryName}" not found');
           continue;
         }
 
@@ -474,7 +496,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
             .get();
         if (existing.docs.isNotEmpty) {
           productsSkipped++;
-          debugPrint('FirestoreDatabase: Product "${p.name}" already exists, skipping');
+          debugPrint(
+              'FirestoreDatabase: Product "${p.name}" already exists, skipping');
           continue;
         }
 
@@ -502,51 +525,65 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         });
         operationsInCurrentBatch++;
         productsAdded++;
-        debugPrint('FirestoreDatabase: Will create product "${p.name}" (Rs ${p.price})');
+        debugPrint(
+            'FirestoreDatabase: Will create product "${p.name}" (Rs ${p.price})');
       }
 
       // Commit all batches that have operations
       int batchesCommitted = 0;
-      
+
       // Determine how many batches need to be committed
       // If currentBatchIndex is 0 and operationsInCurrentBatch is 0, no batches need committing
       // Otherwise, commit all batches up to currentBatchIndex
-      final batchesToCommit = (operationsInCurrentBatch > 0 || currentBatchIndex > 0) ? currentBatchIndex + 1 : 0;
-      
-      debugPrint('FirestoreDatabase: Committing $batchesToCommit batches (currentBatchIndex: $currentBatchIndex, operationsInCurrentBatch: $operationsInCurrentBatch)...');
-      
+      final batchesToCommit =
+          (operationsInCurrentBatch > 0 || currentBatchIndex > 0)
+              ? currentBatchIndex + 1
+              : 0;
+
+      debugPrint(
+          'FirestoreDatabase: Committing $batchesToCommit batches (currentBatchIndex: $currentBatchIndex, operationsInCurrentBatch: $operationsInCurrentBatch)...');
+
       if (batchesToCommit > 0) {
         // Commit all batches (including the one we're currently using if it has operations)
         for (int i = 0; i < batchesToCommit; i++) {
           try {
             await batches[i].commit();
             batchesCommitted++;
-            debugPrint('FirestoreDatabase: Successfully committed batch ${i + 1}/$batchesToCommit');
+            debugPrint(
+                'FirestoreDatabase: Successfully committed batch ${i + 1}/$batchesToCommit');
           } catch (e) {
-            debugPrint('FirestoreDatabase: Error committing batch ${i + 1}: $e');
+            debugPrint(
+                'FirestoreDatabase: Error committing batch ${i + 1}: $e');
             rethrow; // Re-throw to show error to user
           }
         }
       } else {
-        debugPrint('FirestoreDatabase: No batches to commit (all items may already exist)');
+        debugPrint(
+            'FirestoreDatabase: No batches to commit (all items may already exist)');
       }
-      
-      debugPrint('FirestoreDatabase: Chiyagaadi menu seed completed - Added: $productsAdded products, Skipped: $productsSkipped products, Batches committed: $batchesCommitted');
-      
+
+      debugPrint(
+          'FirestoreDatabase: Chiyagaadi menu seed completed - Added: $productsAdded products, Skipped: $productsSkipped products, Batches committed: $batchesCommitted');
+
       // Wait a moment for Firestore to propagate writes
       // Removed delay for faster operation
-      
+
       // Verify data was saved by querying directly from Firestore
       try {
-        final verifyCategories = await firestore.collection('categories').limit(10).get();
-        final verifyProducts = await firestore.collection('products').limit(10).get();
-        debugPrint('FirestoreDatabase: Verification - Found ${verifyCategories.docs.length} categories and ${verifyProducts.docs.length} products in Firestore');
-        
+        final verifyCategories =
+            await firestore.collection('categories').limit(10).get();
+        final verifyProducts =
+            await firestore.collection('products').limit(10).get();
+        debugPrint(
+            'FirestoreDatabase: Verification - Found ${verifyCategories.docs.length} categories and ${verifyProducts.docs.length} products in Firestore');
+
         if (verifyCategories.docs.isNotEmpty) {
-          debugPrint('FirestoreDatabase: Sample categories: ${verifyCategories.docs.map((d) => d.data()['name']).join(', ')}');
+          debugPrint(
+              'FirestoreDatabase: Sample categories: ${verifyCategories.docs.map((d) => d.data()['name']).join(', ')}');
         }
         if (verifyProducts.docs.isNotEmpty) {
-          debugPrint('FirestoreDatabase: Sample products: ${verifyProducts.docs.map((d) => d.data()['name']).join(', ')}');
+          debugPrint(
+              'FirestoreDatabase: Sample products: ${verifyProducts.docs.map((d) => d.data()['name']).join(', ')}');
         }
       } catch (e) {
         debugPrint('FirestoreDatabase: Error verifying saved data: $e');
@@ -963,7 +1000,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
     });
   }
 
-  Future<String> insert(String collection, Map<String, dynamic> data, {String? documentId}) async {
+  Future<String> insert(String collection, Map<String, dynamic> data,
+      {String? documentId}) async {
     if (!_isInitialized) {
       await init();
     }

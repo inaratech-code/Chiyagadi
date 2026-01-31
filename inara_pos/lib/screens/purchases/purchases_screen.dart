@@ -26,7 +26,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
   final SupplierService _supplierService = SupplierService();
   List<Map<String, dynamic>> _purchases = [];
   List<Map<String, dynamic>> _purchasePayments = []; // Payment history
-  bool _isLoading = true;
+  bool _isLoading = false;
   bool _isCreatingPurchase = false; // Prevent duplicate submissions
   int _purchasesLimit = 50;
   bool _canLoadMore = false;
@@ -47,7 +47,6 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
 
   Future<void> _loadPurchases() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
@@ -437,7 +436,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                     }
                     // Sync changes from autocomplete controller to main controller
                     textEditingController.addListener(() {
-                      if (supplierController.text != textEditingController.text) {
+                      if (supplierController.text !=
+                          textEditingController.text) {
                         supplierController.text = textEditingController.text;
                       }
                     });
@@ -463,7 +463,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                         elevation: 4.0,
                         borderRadius: BorderRadius.circular(8),
                         child: SizedBox(
-                          width: 250, // UPDATED: Fixed smaller width for dropdown
+                          width:
+                              250, // UPDATED: Fixed smaller width for dropdown
                           child: ConstrainedBox(
                             constraints: const BoxConstraints(
                               maxHeight: 200,
@@ -603,7 +604,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
             // UPDATED: First try to find ANY existing product by name (case-insensitive)
             // This ensures purchases add inventory to the same product used in orders
             Product? matchedProduct;
-            
+
             if (kIsWeb) {
               // Firestore: Get all products and match in-memory (case-insensitive)
               final allProducts = await dbProvider.query('products');
@@ -622,7 +623,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                 where: 'name = ?',
                 whereArgs: [productName],
               );
-              
+
               if (allProducts.isEmpty) {
                 // Try case-insensitive match
                 allProducts = await dbProvider.query('products');
@@ -635,7 +636,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                   }
                 }
               }
-              
+
               if (allProducts.isNotEmpty) {
                 matchedProduct = Product.fromMap(allProducts.first);
               }
@@ -643,11 +644,13 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
 
             if (matchedProduct != null) {
               // Use existing product (whether sellable or not) to ensure inventory matches
-              productId = kIsWeb ? matchedProduct.documentId : matchedProduct.id;
+              productId =
+                  kIsWeb ? matchedProduct.documentId : matchedProduct.id;
               productName = matchedProduct.name;
-              
-              debugPrint('Purchase: Matched existing product "$productName" (ID: $productId) for purchase item');
-              
+
+              debugPrint(
+                  'Purchase: Matched existing product "$productName" (ID: $productId) for purchase item');
+
               // UPDATED: If product exists but isn't purchasable, mark it as purchasable
               if (!matchedProduct.isPurchasable) {
                 final now = DateTime.now().millisecondsSinceEpoch;
@@ -661,20 +664,22 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                   where: kIsWeb ? 'documentId = ?' : 'id = ?',
                   whereArgs: [productId],
                 );
-                debugPrint('Purchase: Updated product "$productName" to be purchasable');
+                debugPrint(
+                    'Purchase: Updated product "$productName" to be purchasable');
               }
             } else {
-              debugPrint('Purchase: No existing product found for "$productName", creating new product');
+              debugPrint(
+                  'Purchase: No existing product found for "$productName", creating new product');
               // Create a new product that can be both purchased and sold
               // UPDATED: Check if this might be a menu item by looking for similar names
               final now = DateTime.now().millisecondsSinceEpoch;
-              
+
               // Try to find a category (default to first category or 0)
               final categories = await dbProvider.query('categories', limit: 1);
-              final categoryId = categories.isNotEmpty 
+              final categoryId = categories.isNotEmpty
                   ? (kIsWeb ? categories.first['id'] : categories.first['id'])
                   : 0;
-              
+
               productId = await dbProvider.insert('products', {
                 'category_id': categoryId,
                 'name': productName,
@@ -685,7 +690,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                 'is_veg': 1,
                 'is_active': 1,
                 'is_purchasable': 1, // Can be purchased
-                'is_sellable': 1, // UPDATED: Can also be sold (inventory items like drinks)
+                'is_sellable':
+                    1, // UPDATED: Can also be sold (inventory items like drinks)
                 'created_at': now,
                 'updated_at': now,
               });
@@ -1016,7 +1022,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
               (totalAmount - paidAmount);
       final hasOutstanding = outstandingAmount > 0;
 
-      final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
+      final authProvider =
+          Provider.of<InaraAuthProvider>(context, listen: false);
 
       await showDialog(
         context: context,
@@ -1370,7 +1377,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
       try {
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-        final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
+        final authProvider =
+            Provider.of<InaraAuthProvider>(context, listen: false);
         final purchaseId = kIsWeb
             ? (purchase['documentId'] ?? purchase['id'])
             : purchase['id'];

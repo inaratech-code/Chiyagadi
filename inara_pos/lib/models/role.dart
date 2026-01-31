@@ -52,7 +52,8 @@ class Role {
         final list = jsonDecode(rawPermissions);
         if (list is List) {
           permissions = list
-              .map((e) => (e is num ? e : int.tryParse(e.toString()) ?? 0).toInt())
+              .map((e) =>
+                  (e is num ? e : int.tryParse(e.toString()) ?? 0).toInt())
               .toSet();
         } else {
           permissions = {};
@@ -72,7 +73,7 @@ class Role {
     dynamic id = map['id'];
     String? documentId = map['documentId'] as String?;
     if (documentId == null && id != null && id is String) {
-      documentId = id as String;
+      documentId = id;
       id = null;
     }
 

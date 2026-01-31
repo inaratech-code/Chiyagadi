@@ -14,7 +14,7 @@ class SalesScreen extends StatefulWidget {
 
 class _SalesScreenState extends State<SalesScreen> {
   List<Map<String, dynamic>> _sales = [];
-  bool _isLoading = true;
+  bool _isLoading = false;
   DateTime _selectedDate = DateTime.now();
   int _salesLimit = 50;
   bool _canLoadMore = false;
@@ -32,7 +32,6 @@ class _SalesScreenState extends State<SalesScreen> {
   }
 
   Future<void> _loadSales() async {
-    setState(() => _isLoading = true);
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
@@ -50,7 +49,8 @@ class _SalesScreenState extends State<SalesScreen> {
         orderBy: 'created_at DESC',
         limit: _salesLimit,
       );
-      _sales = rows.where((o) => _isPaidOrPartial(o['payment_status'])).toList();
+      _sales =
+          rows.where((o) => _isPaidOrPartial(o['payment_status'])).toList();
       _canLoadMore = rows.length >= _salesLimit;
 
       // PERF: Batch load all order_items for these orders (avoids N+1 queries).
@@ -214,8 +214,8 @@ class _SalesScreenState extends State<SalesScreen> {
                             itemBuilder: (context, index) {
                               if (_canLoadMore && index == _sales.length) {
                                 return Padding(
-                                  padding: const EdgeInsets.only(
-                                      top: 8, bottom: 24),
+                                  padding:
+                                      const EdgeInsets.only(top: 8, bottom: 24),
                                   child: OutlinedButton(
                                     onPressed: () {
                                       setState(() {

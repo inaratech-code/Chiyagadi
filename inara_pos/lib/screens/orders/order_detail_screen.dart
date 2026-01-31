@@ -33,7 +33,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Map<String, dynamic>? _order;
   List<Product> _products = [];
   List<Map<String, dynamic>> _categories = [];
-  bool _isLoading = true;
+  bool _isLoading = false;
   final TextEditingController _discountController = TextEditingController();
   bool _didAutoOpenAddItems = false;
 
@@ -45,7 +45,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    if (mounted) setState(() => _isLoading = true);
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
@@ -201,7 +201,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ),
         ],
       ),
-      body: _isLoading
+      body: _isLoading || _order == null
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               child: Column(
@@ -327,8 +327,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 8),
                             ),
-                            keyboardType: TextInputType.numberWithOptions(
-                                decimal: true),
+                            keyboardType:
+                                TextInputType.numberWithOptions(decimal: true),
                             onChanged: (value) => _updateVATAndDiscount(),
                           ),
                           const SizedBox(height: 12),
@@ -1405,39 +1405,40 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         obscurePassword = !obscurePassword;
                       });
                     },
-                    tooltip: obscurePassword ? 'Show password' : 'Hide password',
+                    tooltip:
+                        obscurePassword ? 'Show password' : 'Hide password',
                   ),
                 ),
               ),
             ],
           ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final pin = pinController.text.trim();
-              final valid = await auth.verifyAdminPin(pin);
-              if (!valid) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Invalid Password'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final pin = pinController.text.trim();
+                final valid = await auth.verifyAdminPin(pin);
+                if (!valid) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Invalid Password'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                  return;
                 }
-                return;
-              }
-              if (context.mounted) Navigator.pop(context, true);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
+                if (context.mounted) Navigator.pop(context, true);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
       ),
     );
 
@@ -1812,7 +1813,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     if (result == true) {
       try {
-        final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
+        final authProvider =
+            Provider.of<InaraAuthProvider>(context, listen: false);
 
         // Calculate payment amounts
         double? partialAmount;
@@ -1964,7 +1966,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           throw Exception('Invalid amount');
         }
 
-        final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
+        final authProvider =
+            Provider.of<InaraAuthProvider>(context, listen: false);
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         await _orderService.payCredit(

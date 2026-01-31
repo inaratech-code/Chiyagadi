@@ -44,7 +44,8 @@ class InventoryLedgerService {
       }
 
       final stock = totalIn - totalOut;
-      debugPrint('InventoryLedgerService: Stock for product $productId - In: $totalIn, Out: $totalOut, Stock: $stock');
+      debugPrint(
+          'InventoryLedgerService: Stock for product $productId - In: $totalIn, Out: $totalOut, Stock: $stock');
       return stock;
     } catch (e) {
       debugPrint('Error calculating current stock for product $productId: $e');

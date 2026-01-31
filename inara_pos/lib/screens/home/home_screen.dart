@@ -26,6 +26,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   static const int _maxAliveScreens = 3;
+
   /// When Orders "New Order" is used, we bump this and switch to Menu so the
   /// new order is created from the Menu section (inventory is handled there).
   int _newOrderRequestKey = 0;
@@ -67,11 +68,12 @@ class _HomeScreenState extends State<HomeScreen> {
     // Role-based access control using permissions
     final auth = context.read<InaraAuthProvider>();
     final hasAccess = await auth.hasAccessToSection(index);
-    
+
     if (!hasAccess) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Access denied: You do not have permission to access this section'),
+          content: Text(
+              'Access denied: You do not have permission to access this section'),
           backgroundColor: Colors.red,
         ),
       );
@@ -191,40 +193,40 @@ class _HomeScreenState extends State<HomeScreen> {
                   tooltip: 'Back to Dashboard',
                 ),
                 title: Row(
-                children: [
-                  Container(
-                    width: 30,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(
-                          color: Colors.white.withOpacity(0.7), width: 1),
-                    ),
-                    child: ClipOval(
-                      child: Image.asset(
-                        'assets/images/logo.jpeg',
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            const Icon(Icons.local_cafe, size: 18),
+                  children: [
+                    Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(
+                            color: Colors.white.withOpacity(0.7), width: 1),
+                      ),
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/images/logo.jpeg',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              const Icon(Icons.local_cafe, size: 18),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    _screenTitles[_selectedIndex],
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    const SizedBox(width: 10),
+                    Text(
+                      _screenTitles[_selectedIndex],
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    onPressed: _refreshCurrentScreen,
+                    tooltip: 'Refresh',
                   ),
                 ],
               ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: _refreshCurrentScreen,
-                  tooltip: 'Refresh',
-                ),
-              ],
-            ),
         drawer: isCompact ? _buildDrawer(context, authProvider) : null,
         body: kIsWeb
             ? ResponsiveWrapper(
@@ -259,10 +261,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildDrawer(BuildContext context, InaraAuthProvider authProvider) {
     return Drawer(
       child: FutureBuilder<Set<int>>(
-        future: authProvider.getRolePermissions(authProvider.currentUserRole ?? 'cashier'),
+        future: authProvider
+            .getRolePermissions(authProvider.currentUserRole ?? 'cashier'),
         builder: (context, snapshot) {
           final permissions = snapshot.data ?? <int>{0, 1, 2, 3, 4, 5, 7, 9};
-          
+
           return ListView(
             padding: EdgeInsets.zero,
             children: [
@@ -342,7 +345,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   leading: const Icon(Icons.logout, color: Colors.red),
                   title: const Text(
                     'Logout',
-                    style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red),
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600, color: Colors.red),
                   ),
                   onTap: () {
                     Navigator.pop(context);
@@ -380,26 +384,28 @@ class _HomeScreenState extends State<HomeScreen> {
     // In our screen list: 0=Dashboard, 1=Orders, 2=Tables, 3=Menu, 4+=More screens.
     // Mobile bottom nav shows: Home, Orders (if permitted), Menu (if permitted), More.
     return FutureBuilder<Set<int>>(
-      future: authProvider.getRolePermissions(authProvider.currentUserRole ?? 'cashier'),
+      future: authProvider
+          .getRolePermissions(authProvider.currentUserRole ?? 'cashier'),
       builder: (context, snapshot) {
-        final permissions = snapshot.data ?? <int>{0, 1, 3}; // Default: Home, Orders, Menu
-        
+        final permissions =
+            snapshot.data ?? <int>{0, 1, 3}; // Default: Home, Orders, Menu
+
         // Ensure Dashboard (0) is always accessible
         final effectivePermissions = Set<int>.from(permissions);
         if (!effectivePermissions.contains(0)) {
           effectivePermissions.add(0);
         }
-        
+
         // Determine if current selection is in "More" category
-        final isMoreSelected = !effectivePermissions.contains(_selectedIndex) || 
-                               (_selectedIndex == 2) || 
-                               (_selectedIndex > 3);
+        final isMoreSelected = !effectivePermissions.contains(_selectedIndex) ||
+            (_selectedIndex == 2) ||
+            (_selectedIndex > 3);
 
         // Build destinations based on permissions
         final destinations = <NavigationDestination>[];
         final indexMap = <int, int>{}; // Map navigation index to section index
         int navIndex = 0;
-        
+
         // Always add Home (Dashboard) - index 0
         destinations.add(const NavigationDestination(
           icon: Icon(Icons.dashboard),
@@ -408,7 +414,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ));
         indexMap[navIndex] = 0;
         navIndex++;
-        
+
         // Add Orders if permitted - index 1
         if (effectivePermissions.contains(1)) {
           destinations.add(const NavigationDestination(
@@ -419,7 +425,7 @@ class _HomeScreenState extends State<HomeScreen> {
           indexMap[navIndex] = 1;
           navIndex++;
         }
-        
+
         // Add Menu if permitted - index 3
         if (effectivePermissions.contains(3)) {
           destinations.add(const NavigationDestination(
@@ -430,7 +436,7 @@ class _HomeScreenState extends State<HomeScreen> {
           indexMap[navIndex] = 3;
           navIndex++;
         }
-        
+
         // Always add More button (NavigationBar requires at least 2, and we have Home + More minimum)
         destinations.add(const NavigationDestination(
           icon: Icon(Icons.more_horiz),
@@ -450,7 +456,7 @@ class _HomeScreenState extends State<HomeScreen> {
             }
           }
         }
-        
+
         // Ensure selected index is valid
         selectedNavIndex = selectedNavIndex.clamp(0, destinations.length - 1);
 
@@ -476,17 +482,19 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showMoreOptionsSheet(BuildContext context, InaraAuthProvider authProvider) {
+  void _showMoreOptionsSheet(
+      BuildContext context, InaraAuthProvider authProvider) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => FutureBuilder<Set<int>>(
-        future: authProvider.getRolePermissions(authProvider.currentUserRole ?? 'cashier'),
+        future: authProvider
+            .getRolePermissions(authProvider.currentUserRole ?? 'cashier'),
         builder: (context, snapshot) {
           final permissions = snapshot.data ?? <int>{};
-          
+
           return SafeArea(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -501,17 +509,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 if (permissions.contains(2))
-                  _buildMoreOptionTile(context, Icons.table_restaurant, 'Tables', 2),
+                  _buildMoreOptionTile(
+                      context, Icons.table_restaurant, 'Tables', 2),
                 if (permissions.contains(4))
-                  _buildMoreOptionTile(context, Icons.shopping_cart, 'Sales', 4),
+                  _buildMoreOptionTile(
+                      context, Icons.shopping_cart, 'Sales', 4),
                 if (permissions.contains(5))
                   _buildMoreOptionTile(context, Icons.analytics, 'Reports', 5),
                 if (permissions.contains(6))
-                  _buildMoreOptionTile(context, Icons.inventory_2, 'Inventory', 6),
+                  _buildMoreOptionTile(
+                      context, Icons.inventory_2, 'Inventory', 6),
                 if (permissions.contains(7))
                   _buildMoreOptionTile(context, Icons.people, 'Customers', 7),
                 if (permissions.contains(8))
-                  _buildMoreOptionTile(context, Icons.shopping_bag, 'Purchases', 8),
+                  _buildMoreOptionTile(
+                      context, Icons.shopping_bag, 'Purchases', 8),
                 if (permissions.contains(9))
                   _buildMoreOptionTile(context, Icons.payments, 'Expenses', 9),
                 _buildMoreOptionTile(context, Icons.settings, 'Settings', -1,
@@ -551,18 +563,19 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildWebBottomNav(InaraAuthProvider authProvider) {
     // Web: Show items based on permissions
     return FutureBuilder<Set<int>>(
-      future: authProvider.getRolePermissions(authProvider.currentUserRole ?? 'cashier'),
+      future: authProvider
+          .getRolePermissions(authProvider.currentUserRole ?? 'cashier'),
       builder: (context, snapshot) {
         final permissions = snapshot.data ?? <int>{};
-        
+
         // Ensure Dashboard (0) is always accessible
-        final effectivePermissions = permissions.isEmpty 
+        final effectivePermissions = permissions.isEmpty
             ? {0, 1, 2, 3, 4, 5, 7, 9} // Default cashier permissions
             : permissions;
         if (!effectivePermissions.contains(0)) {
           effectivePermissions.add(0); // Always include Dashboard
         }
-        
+
         // Build destinations based on permissions
         final destinations = <NavigationDestination>[];
         final sectionData = [
@@ -577,11 +590,11 @@ class _HomeScreenState extends State<HomeScreen> {
           {'icon': Icons.shopping_bag, 'label': 'Purchases', 'index': 8},
           {'icon': Icons.payments, 'label': 'Expenses', 'index': 9},
         ];
-        
+
         // Map original index to filtered index
         final indexMap = <int, int>{};
         int filteredIndex = 0;
-        
+
         for (final section in sectionData) {
           final index = section['index'] as int;
           if (effectivePermissions.contains(index)) {
@@ -593,7 +606,7 @@ class _HomeScreenState extends State<HomeScreen> {
             filteredIndex++;
           }
         }
-        
+
         // NavigationBar requires at least 2 destinations
         // If we have fewer, ensure Dashboard and at least one other
         if (destinations.length < 2) {
@@ -605,7 +618,7 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Home',
           ));
           indexMap[0] = 0;
-          
+
           // Add Orders if available, otherwise add Menu
           final fallbackIndex = effectivePermissions.contains(1) ? 1 : 3;
           if (fallbackIndex == 1) {
@@ -629,7 +642,7 @@ class _HomeScreenState extends State<HomeScreen> {
             indexMap[1] = 1;
           }
         }
-        
+
         // Find the selected index in the filtered list
         int selectedFilteredIndex = 0;
         for (int i = 0; i < destinations.length; i++) {
@@ -638,9 +651,10 @@ class _HomeScreenState extends State<HomeScreen> {
             break;
           }
         }
-        
+
         return NavigationBar(
-          selectedIndex: selectedFilteredIndex.clamp(0, destinations.length - 1),
+          selectedIndex:
+              selectedFilteredIndex.clamp(0, destinations.length - 1),
           onDestinationSelected: (index) {
             final actualIndex = indexMap[index];
             if (actualIndex != null) {
@@ -654,7 +668,6 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
   }
-
 
   void _refreshCurrentScreen() {
     // Recreate the current screen to trigger refresh.
