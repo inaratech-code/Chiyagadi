@@ -14,7 +14,7 @@ class CreditSummaryWidget extends StatefulWidget {
 class _CreditSummaryWidgetState extends State<CreditSummaryWidget> {
   double _totalCredits = 0.0;
   int _customersWithCredit = 0;
-  bool _isLoading = true;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -23,7 +23,6 @@ class _CreditSummaryWidgetState extends State<CreditSummaryWidget> {
   }
 
   Future<void> _loadCreditSummary() async {
-    setState(() => _isLoading = true);
     try {
       final dbProvider = Provider.of<DatabaseProvider>(context, listen: false);
       await dbProvider.init();

@@ -20,7 +20,7 @@ class SuppliersScreen extends StatefulWidget {
 class _SuppliersScreenState extends State<SuppliersScreen> {
   final SupplierService _supplierService = SupplierService();
   List<Supplier> _suppliers = [];
-  bool _isLoading = true;
+  bool _isLoading = false;
   String _searchQuery = '';
 
   @override
@@ -32,7 +32,6 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
 
   Future<void> _loadSuppliers() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
     try {
       final suppliers = await _supplierService.getAllSuppliers(
         context: context,
@@ -334,8 +333,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                 ],
               ),
               onTap: () {
-                Future.delayed(const Duration(milliseconds: 100), () {
-                  _showEditSupplierDialog(supplier);
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) _showEditSupplierDialog(supplier);
                 });
               },
             ),
@@ -351,8 +350,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                 ],
               ),
               onTap: () {
-                Future.delayed(const Duration(milliseconds: 100), () {
-                  _toggleSupplierStatus(supplier);
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) _toggleSupplierStatus(supplier);
                 });
               },
             ),

@@ -36,7 +36,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   Future<void> _loadReport() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);

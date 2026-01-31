@@ -14,7 +14,7 @@ class ExpensesScreen extends StatefulWidget {
 
 class _ExpensesScreenState extends State<ExpensesScreen> {
   final ExpenseService _expenseService = ExpenseService();
-  bool _isLoading = true;
+  bool _isLoading = false;
   List<Expense> _expenses = [];
   int _expensesLimit = 50;
   bool _canLoadMore = false;
@@ -22,13 +22,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   @override
   void initState() {
     super.initState();
-    // PERF: Let the screen render first.
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadExpenses());
   }
 
   Future<void> _loadExpenses() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
     try {
       final expenses = await _expenseService.getExpenses(
         context: context,

@@ -16,7 +16,7 @@ class TablesScreen extends StatefulWidget {
 
 class _TablesScreenState extends State<TablesScreen> {
   List<CafeTable> _tables = [];
-  bool _isLoading = true;
+  bool _isLoading = false;
   bool _isCreatingTable = false; // Prevent duplicate submissions
 
   @override
@@ -30,7 +30,6 @@ class _TablesScreenState extends State<TablesScreen> {
 
   Future<void> _loadTables() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);

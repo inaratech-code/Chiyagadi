@@ -23,7 +23,7 @@ class _POSProductGridState extends State<POSProductGrid> {
   List<Category> _categories = [];
   List<Product> _products = [];
   int? _selectedCategoryId;
-  bool _isLoading = true;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -33,10 +33,6 @@ class _POSProductGridState extends State<POSProductGrid> {
   }
 
   Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-    });
-
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);

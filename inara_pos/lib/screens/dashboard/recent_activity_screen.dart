@@ -15,7 +15,7 @@ class RecentActivityScreen extends StatefulWidget {
 
 class _RecentActivityScreenState extends State<RecentActivityScreen> {
   List<_ActivityItem> _allActivity = [];
-  bool _isLoading = true;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -27,7 +27,7 @@ class _RecentActivityScreenState extends State<RecentActivityScreen> {
 
   Future<void> _loadAllActivity() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (_allActivity.isEmpty) setState(() => _isLoading = true);
 
     try {
       final dbProvider =

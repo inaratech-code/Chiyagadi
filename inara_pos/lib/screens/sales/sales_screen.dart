@@ -32,6 +32,7 @@ class _SalesScreenState extends State<SalesScreen> {
   }
 
   Future<void> _loadSales() async {
+    if (!mounted) return;
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
