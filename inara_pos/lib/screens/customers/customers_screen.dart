@@ -24,6 +24,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
   String _viewMode = 'list'; // 'list' or 'credits'
   int _customersLimit = 200;
   bool _canLoadMoreCustomers = false;
+  String _customerSearch = '';
 
   @override
   void initState() {
@@ -66,6 +67,17 @@ class _CustomersScreenState extends State<CustomersScreen> {
     } catch (e) {
       debugPrint('Error loading credit transactions: $e');
     }
+  }
+
+  List<Customer> get _filteredCustomers {
+    final q = _customerSearch.trim().toLowerCase();
+    if (q.isEmpty) return _customers;
+    return _customers.where((c) {
+      final name = (c.name).toLowerCase();
+      final phone = (c.phone ?? '').toLowerCase();
+      final email = (c.email ?? '').toLowerCase();
+      return name.contains(q) || phone.contains(q) || email.contains(q);
+    }).toList();
   }
 
   Future<List<Map<String, dynamic>>> _loadCustomerOrders(
@@ -131,112 +143,161 @@ class _CustomersScreenState extends State<CustomersScreen> {
   }
 
   Widget _buildCustomersList() {
-    return _customers.isEmpty
-        ? Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.people, size: 64, color: Colors.grey[400]),
-                const SizedBox(height: 16),
-                Text('No customers found',
-                    style: TextStyle(color: Colors.grey[600])),
-                const SizedBox(height: 8),
-                ElevatedButton.icon(
-                  onPressed: () => _showAddCustomerDialog(),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add Customer'),
-                ),
-              ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: 'Search customers by name, phone or email...',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              filled: true,
+              suffixIcon: _customerSearch.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        setState(() => _customerSearch = '');
+                      },
+                    )
+                  : null,
             ),
-          )
-        : ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: _customers.length + (_canLoadMoreCustomers ? 1 : 0),
-            itemBuilder: (context, index) {
-              if (_canLoadMoreCustomers && index == _customers.length) {
-                return Padding(
-                  padding: const EdgeInsets.only(top: 8, bottom: 24),
-                  child: OutlinedButton(
-                    onPressed: () {
-                      setState(() {
-                        _customersLimit += 200;
-                      });
-                      _loadCustomers();
-                    },
-                    child: const Text('Load more'),
-                  ),
-                );
-              }
-              final customer = _customers[index];
-              final hasCredit = customer.creditBalance > 0;
-              final brand = AppTheme.logoPrimary;
-
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                // Keep UI clean/neutral; use brand color only as subtle accents.
-                color: hasCredit ? brand.withOpacity(0.04) : null,
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: brand,
-                    child: Text(
-                      customer.name.substring(0, 1).toUpperCase(),
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                  title: Text(customer.name),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            onChanged: (value) => setState(() => _customerSearch = value),
+          ),
+        ),
+        Expanded(
+          child: _customers.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      if (customer.phone != null)
-                        Text('Phone: ${customer.phone}'),
-                      Text(
-                        'Credit: ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditBalance)} / ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditLimit)}',
-                        style: TextStyle(
-                          color: hasCredit ? brand : Colors.grey[700],
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Icon(Icons.people, size: 64, color: Colors.grey[400]),
+                      const SizedBox(height: 16),
+                      Text('No customers found',
+                          style: TextStyle(color: Colors.grey[600])),
+                      const SizedBox(height: 8),
+                      ElevatedButton.icon(
+                        onPressed: () => _showAddCustomerDialog(),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add Customer'),
                       ),
                     ],
                   ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (hasCredit)
-                        Chip(
-                          label: Text(
-                            'Credit',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: brand,
+                )
+              : _filteredCustomers.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                          const SizedBox(height: 16),
+                          Text('No customers match your search',
+                              style: TextStyle(color: Colors.grey[600])),
+                          const SizedBox(height: 8),
+                          TextButton.icon(
+                            onPressed: () => setState(() => _customerSearch = ''),
+                            icon: const Icon(Icons.clear),
+                            label: const Text('Clear search'),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _filteredCustomers.length +
+                          (_canLoadMoreCustomers && _customerSearch.isEmpty ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (_canLoadMoreCustomers &&
+                            _customerSearch.isEmpty &&
+                            index == _filteredCustomers.length) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8, bottom: 24),
+                            child: OutlinedButton(
+                              onPressed: () {
+                                setState(() {
+                                  _customersLimit += 200;
+                                });
+                                _loadCustomers();
+                              },
+                              child: const Text('Load more'),
+                            ),
+                          );
+                        }
+                        final customer = _filteredCustomers[index];
+                        final hasCredit = customer.creditBalance > 0;
+                        final brand = AppTheme.logoPrimary;
+
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          color: hasCredit ? brand.withOpacity(0.04) : null,
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: brand,
+                              child: Text(
+                                customer.name.substring(0, 1).toUpperCase(),
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                            ),
+                            title: Text(customer.name),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (customer.phone != null)
+                                  Text('Phone: ${customer.phone}'),
+                                Text(
+                                  'Credit: ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditBalance)} / ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditLimit)}',
+                                  style: TextStyle(
+                                    color: hasCredit ? brand : Colors.grey[700],
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (hasCredit)
+                                  Chip(
+                                    label: Text(
+                                      'Credit',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: brand,
+                                      ),
+                                    ),
+                                    side: BorderSide(color: brand.withOpacity(0.35)),
+                                    backgroundColor: Colors.white,
+                                  ),
+                                IconButton(
+                                  icon: const Icon(Icons.edit),
+                                  onPressed: () => _showEditCustomerDialog(customer),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.account_balance_wallet),
+                                  onPressed: () {
+                                    final customerId = customer.documentId ?? customer.id;
+                                    setState(() {
+                                      _selectedCustomerId = customerId;
+                                      _viewMode = 'credits';
+                                    });
+                                    if (customerId != null) {
+                                      _loadCreditTransactions(customerId);
+                                    }
+                                  },
+                                ),
+                              ],
                             ),
                           ),
-                          side: BorderSide(color: brand.withOpacity(0.35)),
-                          backgroundColor: Colors.white,
-                        ),
-                      IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: () => _showEditCustomerDialog(customer),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.account_balance_wallet),
-                        onPressed: () {
-                          final customerId = customer.documentId ?? customer.id;
-                          setState(() {
-                            _selectedCustomerId = customerId;
-                            _viewMode = 'credits';
-                          });
-                          if (customerId != null) {
-                            _loadCreditTransactions(customerId);
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              );
+                        );
             },
-          );
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildCreditsView() {

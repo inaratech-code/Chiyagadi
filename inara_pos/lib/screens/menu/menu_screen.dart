@@ -492,18 +492,14 @@ class _MenuScreenState extends State<MenuScreen> {
       if (mounted) {
         // UPDATED: Don't reload active order - we already have the correct order ID
         // The order ID is set when creating/loading the order above
-        
-        // UPDATED: Always increment refresh key to ensure overlay shows latest items
-        // Also ensure overlay is shown if items are being added
+        //
+        // FIXED: Do NOT auto-show overlay when adding items. User must click
+        // "View Order" button to open the Create Order section.
         setState(() {
-          _overlayRefreshKey++; // Increment to force overlay refresh
-          // Auto-show overlay when items are added (if not already shown)
-          if (!_showOrderOverlay && _activeOrderId != null) {
-            _showOrderOverlay = true;
-          }
+          _overlayRefreshKey++; // Increment so overlay shows latest items when opened
         });
         
-        debugPrint('MenuScreen: After adding item - Order ID: $_activeOrderId, Overlay shown: $_showOrderOverlay');
+        debugPrint('MenuScreen: After adding item - Order ID: $_activeOrderId');
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
