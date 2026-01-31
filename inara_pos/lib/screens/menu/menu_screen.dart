@@ -1205,13 +1205,12 @@ class _MenuScreenState extends State<MenuScreen> {
       ),
       floatingActionButton: _showOrderOverlay ? null : Consumer<InaraAuthProvider>(
         builder: (context, auth, _) {
-          // FIXED: Show "View Order" only when cart has items. Order is NOT created
-          // in DB until user clicks "Create Order" in the overlay.
-          if (_isOrderMode(auth) && _pendingCartItems.isNotEmpty) {
+          // Show "View Order" when cart has items - for BOTH admin and cashier
+          if (_pendingCartItems.isNotEmpty) {
             return Padding(
               padding: EdgeInsets.only(
-                bottom: !kIsWeb ? 80 : 0,
-                right: !kIsWeb ? 8 : 0,
+                bottom: !kIsWeb ? 90 : 24, // Extra space for bottom nav on mobile
+                right: 24,
               ),
               child: FloatingActionButton.extended(
                 onPressed: _isAddingToOrder
@@ -1231,19 +1230,23 @@ class _MenuScreenState extends State<MenuScreen> {
             );
           }
 
-          // Admin: keep existing menu management
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: !kIsWeb ? 80 : 0, // Extra bottom padding on mobile to avoid overlap with bottom nav
-              right: !kIsWeb ? 8 : 0, // Slight right padding to avoid edge overlap
-            ),
-            child: FloatingActionButton.extended(
-              onPressed: () => _showAddProductDialog(),
-              backgroundColor: Theme.of(context).primaryColor,
-              icon: const Icon(Icons.add),
-              label: const Text('Add Item'),
-            ),
-          );
+          // Admin only: Add Item for menu management when cart is empty
+          if (auth.isAdmin) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: !kIsWeb ? 90 : 24,
+                right: 24,
+              ),
+              child: FloatingActionButton.extended(
+                onPressed: () => _showAddProductDialog(),
+                backgroundColor: Theme.of(context).primaryColor,
+                icon: const Icon(Icons.add),
+                label: const Text('Add Item'),
+              ),
+            );
+          }
+
+          return const SizedBox.shrink();
         },
       ),
     );
