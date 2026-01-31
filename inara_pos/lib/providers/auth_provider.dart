@@ -16,6 +16,13 @@ class InaraAuthProvider with ChangeNotifier {
   Timer? _inactivityTimer;
   BuildContext? _context;
   String _lockMode = 'timeout'; // NEW: 'always' | 'timeout'
+  /// App's single database instance (from main). Avoids using an uninitialized second instance.
+  final UnifiedDatabaseProvider? _databaseProvider;
+
+  /// Called when logout() runs so AuthWrapper can force rebuild (fixes web).
+  VoidCallback? onLogout;
+
+  InaraAuthProvider({UnifiedDatabaseProvider? databaseProvider}) : _databaseProvider = databaseProvider;
 
   bool get isAuthenticated => _isAuthenticated;
   String? get currentUserId => _currentUserId;
@@ -71,18 +78,18 @@ class InaraAuthProvider with ChangeNotifier {
   }
 
   dynamic _getDatabaseProvider() {
+    // Prefer the app's single database instance so we never use an uninitialized copy.
+    if (_databaseProvider != null) return _databaseProvider!;
     if (_context != null) {
       try {
-        // Use UnifiedDatabaseProvider which handles web/mobile automatically
         return Provider.of<UnifiedDatabaseProvider>(_context!, listen: false);
       } catch (e) {
-        // If the stored context is no longer valid (e.g. LoginScreen disposed),
-        // fall back to a fresh provider instance to avoid runtime crashes.
         debugPrint('AuthProvider: stored context no longer valid: $e');
       }
     }
-    // Fallback to creating new instance (shouldn't happen in normal flow)
-    return UnifiedDatabaseProvider();
+    throw StateError(
+      'Database not available. Ensure main.dart creates InaraAuthProvider with databaseProvider.'
+    );
   }
 
   Future<bool> checkPinExists() async {
@@ -774,9 +781,14 @@ class InaraAuthProvider with ChangeNotifier {
           }
           
           _isAuthenticated = true;
-          _currentUserId = user['id'].toString();
+          // Use documentId on web (Firestore), id on mobile (SQLite), else Firebase UID
+          final docId = user['documentId'];
+          final dbId = user['id'];
+          _currentUserId = ((docId is String) ? docId : (docId?.toString())) ??
+              (dbId != null ? dbId.toString() : null) ??
+              (firebaseUser.uid?.toString() ?? firebaseUser.uid.toString());
           _currentUserRole = user['role'] as String? ?? 'cashier';
-          _currentUsername = user['username'] as String? ?? email;
+          _currentUsername = user['username'] as String? ?? trimmedEmail.split('@').first;
           
           debugPrint('Login: Success! User authenticated - ID: $_currentUserId, Role: $_currentUserRole');
           // NEW: Clear old session info on successful login
@@ -918,30 +930,10 @@ class InaraAuthProvider with ChangeNotifier {
   }
 
   Future<void> logout() async {
-    // NEW: Store session info for 1-hour persistence
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final now = DateTime.now().millisecondsSinceEpoch;
-      
-      // Store user info and logout timestamp
-      await prefs.setString('last_logout_user_id', _currentUserId ?? '');
-      await prefs.setString('last_logout_user_role', _currentUserRole ?? '');
-      await prefs.setString('last_logout_username', _currentUsername ?? '');
-      await prefs.setInt('last_logout_timestamp', now);
-      
-      debugPrint('AuthProvider: Stored session info for 1-hour persistence');
-    } catch (e) {
-      debugPrint('AuthProvider: Error storing session info: $e');
-    }
-    
-    // Sign out from Firebase Auth
-    try {
-      await FirebaseAuth.instance.signOut();
-      debugPrint('AuthProvider: Signed out from Firebase Auth');
-    } catch (e) {
-      debugPrint('AuthProvider: Error signing out from Firebase Auth: $e');
-    }
-    
+    // Clear state immediately
+    final prevUserId = _currentUserId;
+    final prevRole = _currentUserRole;
+    final prevUsername = _currentUsername;
     _isAuthenticated = false;
     _currentUserId = null;
     _currentUserRole = null;
@@ -949,6 +941,27 @@ class InaraAuthProvider with ChangeNotifier {
     _inactivityTimer?.cancel();
     _inactivityTimer = null;
     notifyListeners();
+
+    // Force AuthWrapper to rebuild so it shows LoginScreen (no push needed;
+    // MaterialApp key change + Consumer rebuild handles navigation on web and mobile).
+    onLogout?.call();
+
+    // Persist and sign out from Firebase in background (non-blocking)
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final now = DateTime.now().millisecondsSinceEpoch;
+      await prefs.setString('last_logout_user_id', prevUserId ?? '');
+      await prefs.setString('last_logout_user_role', prevRole ?? '');
+      await prefs.setString('last_logout_username', prevUsername ?? '');
+      await prefs.setInt('last_logout_timestamp', now);
+    } catch (e) {
+      debugPrint('AuthProvider: Error storing session info: $e');
+    }
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (e) {
+      debugPrint('AuthProvider: Error signing out from Firebase Auth: $e');
+    }
   }
 
   void updateActivity() {
@@ -1073,21 +1086,15 @@ class InaraAuthProvider with ChangeNotifier {
 
       final pinHash = _hashPin(pin);
       final now = DateTime.now().millisecondsSinceEpoch;
-      
-      // Auto-generate temporary email for non-admin roles if not provided
-      String? normalizedEmail;
-      if (email != null && email.trim().isNotEmpty) {
-        normalizedEmail = email.trim().toLowerCase();
-      } else if (role != 'admin') {
-        // Generate temporary email for cashiers and custom roles
-        // Format: role_username@temp.chiyagadi.local
-        final sanitizedRole = role.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
-        final sanitizedUsername = username.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
-        normalizedEmail = '${sanitizedRole}_$sanitizedUsername@temp.chiyagadi.local';
-        debugPrint('createUser: Auto-generated temporary email for $role: $normalizedEmail');
-      }
 
-      // Create Firebase Auth user if on web (for email-based login)
+      // Use only the email the admin entered; store lowercase so login lookup works
+      final String? normalizedEmail = (email != null && email.trim().isNotEmpty)
+          ? email.trim().toLowerCase()
+          : null;
+
+      // On web with email: create Firebase Auth user so the user can log in with email/password.
+      // Without this, the user exists only in Firestore and cannot sign in.
+      bool firebaseAuthUserCreated = false;
       if (kIsWeb && normalizedEmail != null) {
         try {
           dynamic authInstance = FirebaseAuth.instance;
@@ -1095,27 +1102,28 @@ class InaraAuthProvider with ChangeNotifier {
             email: normalizedEmail,
             password: pin,
           );
-          debugPrint('createUser: Firebase Auth user created with email: $normalizedEmail');
+          firebaseAuthUserCreated = true;
+          debugPrint('createUser: Firebase Auth user created - user can log in with this email/password');
         } catch (authError) {
           final errorMsg = authError.toString();
           debugPrint('createUser: Firebase Auth user creation failed: $authError');
-          
-          // If email already exists in Firebase Auth, check if it's a critical error
           if (errorMsg.contains('email-already-in-use')) {
-            // Email exists in Firebase Auth - this might be okay if user exists in DB
-            // Continue with database insert - if username is different, it should work
-            debugPrint('createUser: Email already exists in Firebase Auth, continuing with database insert');
+            // User already exists in Firebase Auth - still add/update Firestore so role is linked
+            debugPrint('createUser: Email already in Firebase Auth, linking with Firestore');
           } else if (errorMsg.contains('weak-password') || errorMsg.contains('invalid-email')) {
-            // Critical Firebase Auth errors that should prevent user creation
             return 'Invalid email or password format. Please check your input.';
+          } else if (errorMsg.contains('requests-from-referer') || errorMsg.contains('are-blocked')) {
+            return 'This domain is not authorized. In Firebase Console go to Authentication → Settings → Authorized domains and add your domain (e.g. localhost).';
           } else {
-            // Other Firebase Auth errors - log but continue (non-critical for database insert)
-            debugPrint('createUser: Firebase Auth error (non-critical), continuing with database insert: $errorMsg');
+            // e.g. operation-not-allowed, network - show short hint; Email/Password may already be enabled
+            final hint = errorMsg.length > 80 ? '${errorMsg.substring(0, 77)}...' : errorMsg;
+            debugPrint('createUser: Auth error detail: $hint');
+            return 'Could not create login account. If Email/Password is enabled, check Authentication → Settings → Authorized domains, or try again.';
           }
         }
       }
 
-      // Store user in database
+      // Store user in Firestore with email (lowercase) and role so login can find them and set role
       await dbProvider.insert('users', {
         'username': username.trim(),
         'pin_hash': pinHash,
@@ -1126,7 +1134,18 @@ class InaraAuthProvider with ChangeNotifier {
         'updated_at': now,
       });
 
-      debugPrint('createUser: User created successfully - username: ${username.trim()}, email: $normalizedEmail, role: ${role.trim()}');
+      // After creating a new Firebase Auth user, sign out so the app doesn't stay as the new user.
+      // Admin will see login screen and can log back in; the new user can log in from any device.
+      if (kIsWeb && firebaseAuthUserCreated) {
+        try {
+          await FirebaseAuth.instance.signOut();
+          debugPrint('createUser: Signed out so new user can log in with their credentials');
+        } catch (e) {
+          debugPrint('createUser: signOut after create: $e');
+        }
+      }
+
+      debugPrint('createUser: User created - username: ${username.trim()}, email: $normalizedEmail, role: ${role.trim()}');
       return null; // Success
     } catch (e) {
       debugPrint('Error creating user: $e');
@@ -1191,17 +1210,39 @@ class InaraAuthProvider with ChangeNotifier {
 
       final pinHash = _hashPin(pin);
       final now = DateTime.now().millisecondsSinceEpoch;
-      
-      // Auto-generate temporary email for non-admin roles if not provided
-      String? normalizedEmail;
-      if (email != null && email.trim().isNotEmpty) {
-        normalizedEmail = email.trim().toLowerCase();
-      } else if (role != 'admin') {
-        // Generate temporary email for cashiers and custom roles
-        final sanitizedRole = role.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
-        final sanitizedUsername = username.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
-        normalizedEmail = '${sanitizedRole}_$sanitizedUsername@temp.chiyagadi.local';
-        debugPrint('createUserWithId: Auto-generated temporary email for $role: $normalizedEmail');
+
+      // Use only the email the admin entered; do not auto-generate
+      final String? normalizedEmail = (email != null && email.trim().isNotEmpty)
+          ? email.trim().toLowerCase()
+          : null;
+
+      // FIXED: On web with email, create Firebase Auth user so login works
+      // Without this, signInWithEmailAndPassword fails with "user-not-found"
+      if (kIsWeb && normalizedEmail != null) {
+        try {
+          dynamic authInstance = FirebaseAuth.instance;
+          await authInstance.createUserWithEmailAndPassword(
+            email: normalizedEmail,
+            password: pin,
+          );
+          debugPrint('createUserWithId: Firebase Auth user created for $normalizedEmail');
+          // Sign out so admin can log back in; new user can log in with their credentials
+          try {
+            await FirebaseAuth.instance.signOut();
+          } catch (e) {
+            debugPrint('createUserWithId: signOut after create: $e');
+          }
+        } catch (authError) {
+          final errorMsg = authError.toString();
+          debugPrint('createUserWithId: Firebase Auth creation failed: $authError');
+          if (errorMsg.contains('email-already-in-use')) {
+            debugPrint('createUserWithId: Email already in Firebase Auth - Firestore user will still be created');
+          } else if (errorMsg.contains('operation-not-allowed')) {
+            debugPrint('createUserWithId: Email/Password sign-in may not be enabled in Firebase Console');
+          } else {
+            rethrow;
+          }
+        }
       }
 
       await dbProvider.insert('users', {
@@ -1456,6 +1497,7 @@ class InaraAuthProvider with ChangeNotifier {
   }
 
   /// Update permissions for a role
+  /// On web, updates Firestore `roles` collection so Roles section and permissions stay in sync.
   Future<bool> updateRolePermissions(String role, Set<int> permissions) async {
     try {
       final dbProvider = _getDatabaseProvider();
@@ -1476,6 +1518,32 @@ class InaraAuthProvider with ChangeNotifier {
       final permissionsJson = jsonEncode(effectivePermissions.toList());
       final now = DateTime.now().millisecondsSinceEpoch;
 
+      // On web, update Firestore `roles` collection so Roles section and getRolePermissions use same data
+      if (kIsWeb) {
+        final roleDocs = await dbProvider.query(
+          'roles',
+          where: 'name = ?',
+          whereArgs: [role],
+        );
+        if (roleDocs.isNotEmpty) {
+          final docId = roleDocs.first['documentId'] ?? roleDocs.first['id'];
+          if (docId != null) {
+            await dbProvider.update(
+              'roles',
+              values: {
+                'permissions': permissionsJson,
+                'updated_at': now,
+              },
+              where: 'documentId = ?',
+              whereArgs: [docId.toString()],
+            );
+            notifyListeners();
+            return true;
+          }
+        }
+      }
+
+      // Fallback: settings table (mobile or when role doc not found on web)
       final existing = await dbProvider.query(
         'settings',
         where: 'key = ?',
