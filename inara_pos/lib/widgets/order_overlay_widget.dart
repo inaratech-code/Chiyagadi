@@ -12,16 +12,24 @@ import '../screens/orders/orders_screen.dart';
 class OrderOverlayWidget extends StatefulWidget {
   final dynamic orderId;
   final String orderNumber;
+  /// Pending items from menu cart - when provided, order is NOT in DB until Create Order
+  final List<Map<String, dynamic>>? pendingItems;
   final VoidCallback? onClose;
   final VoidCallback? onOrderUpdated;
-  final int refreshKey; // UPDATED: Force refresh when this changes
+  final VoidCallback? onOrderCreated; // Called when order created from pending items
+  /// Callback to sync pending items back when overlay closes without creating
+  final void Function(List<Map<String, dynamic>>)? onPendingItemsChanged;
+  final int refreshKey;
 
   const OrderOverlayWidget({
     super.key,
-    required this.orderId,
+    this.orderId,
     required this.orderNumber,
+    this.pendingItems,
     this.onClose,
     this.onOrderUpdated,
+    this.onOrderCreated,
+    this.onPendingItemsChanged,
     this.refreshKey = 0,
   });
 
@@ -46,11 +54,14 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
   @override
   void didUpdateWidget(OrderOverlayWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // UPDATED: Reload data when orderId or refreshKey changes
-    if (oldWidget.orderId != widget.orderId || oldWidget.refreshKey != widget.refreshKey) {
+    if (oldWidget.orderId != widget.orderId ||
+        oldWidget.refreshKey != widget.refreshKey ||
+        oldWidget.pendingItems != widget.pendingItems) {
       _loadData();
     }
   }
+
+  bool get _isPendingMode => widget.pendingItems != null && widget.orderId == null;
 
   @override
   void dispose() {
@@ -60,12 +71,13 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
 
   // Check if order should be deleted when cancelled (no items and pending status)
   Future<bool> _shouldDeleteOnCancel() async {
+    if (widget.orderId == null) return false;
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
       
-      final items = await _orderService.getOrderItems(dbProvider, widget.orderId);
+      final items = await _orderService.getOrderItems(dbProvider, widget.orderId!);
       final orders = await dbProvider.query(
         'orders',
         where: kIsWeb ? 'documentId = ?' : 'id = ?',
@@ -88,6 +100,24 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
 
   // Handle close with order deletion if needed
   Future<void> _handleClose() async {
+    if (_isPendingMode) {
+      final items = _orderItems.where((i) => ((i['quantity'] as num?)?.toInt() ?? 0) > 0).map((i) {
+        final product = i['product'] as Product?;
+        if (product != null) {
+          return {'product': product, 'quantity': (i['quantity'] as num?)?.toInt() ?? 1};
+        }
+        try {
+          final p = _products.firstWhere((p) =>
+              (kIsWeb ? p.documentId : p.id)?.toString() == i['product_id']?.toString());
+          return {'product': p, 'quantity': (i['quantity'] as num?)?.toInt() ?? 1};
+        } catch (_) {
+          return null;
+        }
+      }).whereType<Map<String, dynamic>>().toList();
+      widget.onPendingItemsChanged?.call(items);
+      widget.onClose?.call();
+      return;
+    }
     final shouldDelete = await _shouldDeleteOnCancel();
     
     if (shouldDelete) {
@@ -116,30 +146,41 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
-      debugPrint('OrderOverlay: Loading data for orderId: ${widget.orderId}');
-
-      // Load order
-      final orders = await dbProvider.query(
-        'orders',
-        where: kIsWeb ? 'documentId = ?' : 'id = ?',
-        whereArgs: [widget.orderId],
-      );
-      if (orders.isNotEmpty) {
-        _order = orders.first;
-        _discountController.text =
-            (_order!['discount_percent'] as num? ?? 0.0).toStringAsFixed(1);
-        debugPrint('OrderOverlay: Loaded order: ${_order!['order_number']}');
+      if (_isPendingMode && widget.pendingItems != null) {
+        // Pending mode: convert pending cart items to _orderItems format
+        _order = null;
+        _discountController.text = '0';
+        _orderItems = widget.pendingItems!.map((item) {
+          final product = item['product'] as Product;
+          final qty = (item['quantity'] as int) ?? 1;
+          final productId = kIsWeb ? product.documentId : product.id;
+          return {
+            'product_id': productId,
+            'product_name': product.name,
+            'unit_price': product.price,
+            'quantity': qty,
+            'total_price': product.price * qty,
+            'product': product,
+          };
+        }).toList();
+        debugPrint('OrderOverlay: Loaded ${_orderItems.length} pending items');
       } else {
-        debugPrint('OrderOverlay: Order not found for orderId: ${widget.orderId}');
-      }
+        // Order mode: load from DB
+        debugPrint('OrderOverlay: Loading data for orderId: ${widget.orderId}');
 
-      // Load order items
-      final items = await _orderService.getOrderItems(dbProvider, widget.orderId);
-      _orderItems = items;
-      debugPrint('OrderOverlay: Loaded ${items.length} order items');
-      for (var item in items) {
-        final qty = (item['quantity'] as num?)?.toInt() ?? 0;
-        debugPrint('OrderOverlay: Item ${item['product_name']} - quantity: $qty');
+        final orders = await dbProvider.query(
+          'orders',
+          where: kIsWeb ? 'documentId = ?' : 'id = ?',
+          whereArgs: [widget.orderId],
+        );
+        if (orders.isNotEmpty) {
+          _order = orders.first;
+          _discountController.text =
+              (_order!['discount_percent'] as num? ?? 0.0).toStringAsFixed(1);
+        }
+
+        final items = await _orderService.getOrderItems(dbProvider, widget.orderId!);
+        _orderItems = items;
       }
 
       // Load all sellable products
@@ -173,12 +214,40 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
 
   Future<void> _updateItemQuantity(Product product, int newQuantity) async {
     try {
+      final productId = kIsWeb ? product.documentId : product.id;
+
+      if (_isPendingMode) {
+        // Pending mode: update local _orderItems only
+        if (newQuantity <= 0) {
+          _orderItems.removeWhere(
+              (item) => item['product_id']?.toString() == productId?.toString());
+        } else {
+          final idx = _orderItems.indexWhere(
+              (item) => item['product_id']?.toString() == productId?.toString());
+          if (idx >= 0) {
+            _orderItems[idx]['quantity'] = newQuantity;
+            _orderItems[idx]['total_price'] = product.price * newQuantity;
+          } else {
+            _orderItems.add({
+              'product_id': productId,
+              'product_name': product.name,
+              'unit_price': product.price,
+              'quantity': newQuantity,
+              'total_price': product.price * newQuantity,
+              'product': product,
+            });
+          }
+        }
+        setState(() {});
+        widget.onOrderUpdated?.call();
+        return;
+      }
+
+      // Order mode: update in DB
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      final productId = kIsWeb ? product.documentId : product.id;
       
       if (newQuantity <= 0) {
-        // Remove item if quantity is 0
         final item = _orderItems.firstWhere(
           (item) => item['product_id']?.toString() == productId?.toString(),
           orElse: () => {},
@@ -197,19 +266,16 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
           );
         }
       } else {
-        // Add or update item
         final item = _orderItems.firstWhere(
           (item) => item['product_id']?.toString() == productId?.toString(),
           orElse: () => {},
         );
-        
         final auth = Provider.of<InaraAuthProvider>(context, listen: false);
         final createdBy = auth.currentUserId != null
             ? (kIsWeb ? auth.currentUserId! : int.tryParse(auth.currentUserId!))
             : null;
         
         if (item.isEmpty) {
-          // Add new item
           await _orderService.addItemToOrder(
             dbProvider: dbProvider,
             context: context,
@@ -219,7 +285,6 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
             createdBy: createdBy,
           );
         } else {
-          // Update existing item quantity
           final itemId = item['id'] ?? item['documentId'];
           await _orderService.updateItemQuantity(
             dbProvider: dbProvider,
@@ -282,6 +347,11 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
       return;
     }
 
+    if (_isPendingMode) {
+      setState(() {}); // Rebuild to show updated totals
+      return;
+    }
+
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
@@ -302,7 +372,7 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
     }
   }
 
-  // UPDATED: Create/finalize order and navigate to Orders page
+  // Create/finalize order - either from pending cart or update existing order
   Future<void> _createOrder() async {
     if (_orderItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -315,47 +385,96 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
     }
 
     try {
-      // Save order updates (VAT, discount, totals)
-      await _saveOrderUpdates();
-      
-      // Update order status to 'confirmed' (created but not yet paid)
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
-      
-      await dbProvider.update(
-        'orders',
-        values: {
-          'status': 'confirmed', // Order is created and confirmed
-          'updated_at': DateTime.now().millisecondsSinceEpoch,
-        },
-        where: kIsWeb ? 'documentId = ?' : 'id = ?',
-        whereArgs: [widget.orderId],
-      );
-      
-      debugPrint('OrderOverlay: Order ${widget.orderNumber} created successfully');
-      
-      if (mounted) {
-        // Close overlay
+      final auth = Provider.of<InaraAuthProvider>(context, listen: false);
+      final createdBy = auth.currentUserId != null
+          ? (kIsWeb ? auth.currentUserId! : int.tryParse(auth.currentUserId!))
+          : null;
+      final discountPercent = double.tryParse(_discountController.text) ?? 0.0;
+      final subtotal = _subtotal;
+      final discountAmount = subtotal * (discountPercent / 100);
+      final total = subtotal - discountAmount;
+
+      if (_isPendingMode) {
+        // Create order in DB for the first time (order does NOT exist yet)
+        final orderId = await _orderService.createOrder(
+          dbProvider: dbProvider,
+          orderType: 'dine_in',
+          createdBy: createdBy,
+        );
+
+        // Add all items to the new order (pending items have 'product' key)
+        for (final item in _orderItems) {
+          Product? product = item['product'] as Product?;
+          if (product == null && _products.isNotEmpty) {
+            try {
+              product = _products.firstWhere((p) =>
+                  (kIsWeb ? p.documentId : p.id)?.toString() ==
+                  item['product_id']?.toString());
+            } catch (_) {}
+          }
+          if (product != null) {
+            final qty = (item['quantity'] as num?)?.toInt() ?? 1;
+            await _orderService.addItemToOrder(
+              dbProvider: dbProvider,
+              context: context,
+              orderId: orderId,
+              product: product,
+              quantity: qty,
+              createdBy: createdBy,
+            );
+          }
+        }
+
+        // Update order totals and status
+        await dbProvider.update(
+          'orders',
+          values: {
+            'subtotal': subtotal,
+            'discount_percent': discountPercent,
+            'discount_amount': discountAmount,
+            'tax_percent': 0.0,
+            'tax_amount': 0.0,
+            'total_amount': total,
+            'status': 'confirmed',
+            'updated_at': DateTime.now().millisecondsSinceEpoch,
+          },
+          where: kIsWeb ? 'documentId = ?' : 'id = ?',
+          whereArgs: [orderId],
+        );
+
+        debugPrint('OrderOverlay: Created new order from pending cart');
+        widget.onOrderCreated?.call();
+      } else {
+        // Order mode: save updates and confirm
+        await _saveOrderUpdates();
+        await dbProvider.update(
+          'orders',
+          values: {
+            'status': 'confirmed',
+            'updated_at': DateTime.now().millisecondsSinceEpoch,
+          },
+          where: kIsWeb ? 'documentId = ?' : 'id = ?',
+          whereArgs: [widget.orderId],
+        );
         widget.onClose?.call();
-        
-        // Show success message
+      }
+
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Order ${widget.orderNumber} created successfully'),
+          const SnackBar(
+            content: Text('Order created successfully'),
             backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
+            duration: Duration(seconds: 2),
           ),
         );
-        
-        // Navigate to Orders page (push, not replace, so Back returns to Menu/Home)
-        if (mounted) {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const OrdersScreen(),
-            ),
-          );
-        }
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const OrdersScreen(),
+          ),
+        );
       }
     } catch (e) {
       debugPrint('OrderOverlay: Error creating order: $e');
@@ -573,20 +692,24 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
                       
                       return Column(
                         children: itemsWithQuantity.map((item) {
-                          final productId = item['product_id'];
-                          final product = _products.firstWhere(
-                            (p) {
-                              final pId = kIsWeb ? p.documentId : p.id;
-                              return pId?.toString() == productId?.toString();
-                            },
-                            orElse: () => Product(
-                              categoryId: 0,
-                              name: item['product_name'] as String? ?? 'Unknown Product',
-                              price: (item['unit_price'] as num?)?.toDouble() ?? 0,
-                              createdAt: 0,
-                              updatedAt: 0,
-                            ),
-                          );
+                          Product product;
+                          if (item['product'] != null) {
+                            product = item['product'] as Product;
+                          } else {
+                            try {
+                              product = _products.firstWhere((p) =>
+                                  (kIsWeb ? p.documentId : p.id)?.toString() ==
+                                  item['product_id']?.toString());
+                            } catch (_) {
+                              product = Product(
+                                categoryId: 0,
+                                name: item['product_name'] as String? ?? 'Unknown',
+                                price: (item['unit_price'] as num?)?.toDouble() ?? 0,
+                                createdAt: 0,
+                                updatedAt: 0,
+                              );
+                            }
+                          }
                           final quantity = (item['quantity'] as num?)?.toInt() ?? 0;
                           return _buildMenuItemRow(product, quantity);
                         }).toList(),

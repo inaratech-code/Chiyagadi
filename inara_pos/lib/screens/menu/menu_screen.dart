@@ -48,6 +48,9 @@ class _MenuScreenState extends State<MenuScreen> {
   int? _lastStartNewOrderKey; // Used when arriving from Orders "New Order"
   Timer? _loadDeferTimer;
 
+  // Pending cart: items held locally until "Create Order" is clicked (not in DB)
+  List<Map<String, dynamic>> _pendingCartItems = []; // [{product: Product, quantity: int}]
+
   // NEW: Delete menu item (soft delete)
   //
   // SECURITY/DATA INTEGRITY:
@@ -369,6 +372,7 @@ class _MenuScreenState extends State<MenuScreen> {
       _lastStartNewOrderKey = widget.startNewOrderKey;
       _activeOrderId = null;
       _activeOrderNumber = null;
+      _pendingCartItems = [];
       _showOrderOverlay = false;
       setState(() {});
     }
@@ -428,79 +432,32 @@ class _MenuScreenState extends State<MenuScreen> {
       debugPrint('Already adding item, skipping...');
       return;
     }
-    
-    debugPrint('Adding ${product.name} to order...');
+
+    debugPrint('Adding ${product.name} to cart...');
     setState(() => _isAddingToOrder = true);
 
     try {
-      final dbProvider =
-          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-      final auth = Provider.of<InaraAuthProvider>(context, listen: false);
-      await dbProvider.init();
-
-      // UPDATED: Try to load active order first, but if query fails, we'll create a new one
-      // The query might fail due to Firestore index issues, so we handle that gracefully
-      try {
-        await _loadActiveOrder();
-      } catch (e) {
-        debugPrint('MenuScreen: Error loading active order (will create new if needed): $e');
-        // Continue - we'll create a new order if _activeOrderId is still null
-      }
-
-      // Ensure an order exists - create new only if none found
-      if (_activeOrderId == null) {
-        debugPrint('MenuScreen: No active order found, creating new order...');
-        final createdBy = auth.currentUserId != null
-            ? (kIsWeb
-                ? auth.currentUserId!
-                : int.tryParse(auth.currentUserId!))
-            : null;
-
-        _activeOrderId = await _orderService.createOrder(
-          dbProvider: dbProvider,
-          orderType: 'dine_in',
-          createdBy: createdBy,
-        );
-
-        final order = await _orderService.getOrderById(dbProvider, _activeOrderId);
-        _activeOrderNumber = order?.orderNumber ?? 'Order';
-        debugPrint('MenuScreen: Created new order - ID: $_activeOrderId, Number: $_activeOrderNumber');
-        
-        // UPDATED: Store the order ID in state immediately so it persists
-        if (mounted) {
-          setState(() {
-            // State is already updated above, but ensure it's persisted
-          });
-        }
-      } else {
-        debugPrint('MenuScreen: Using existing order - ID: $_activeOrderId');
-      }
-
-      final createdBy = auth.currentUserId != null
-          ? (kIsWeb ? auth.currentUserId! : int.tryParse(auth.currentUserId!))
-          : null;
-
-      await _orderService.addItemToOrder(
-        dbProvider: dbProvider,
-        context: context,
-        orderId: _activeOrderId,
-        product: product,
-        quantity: 1, // Add with default quantity of 1
-        createdBy: createdBy,
-      );
+      // FIXED: Add to local pending cart only - NO order created in DB until
+      // user clicks "Create Order" in the overlay. Order will not appear in
+      // Orders section until then.
+      final productId = kIsWeb ? product.documentId : product.id;
+      final existingIndex = _pendingCartItems.indexWhere((item) {
+        final p = item['product'] as Product;
+        final pid = kIsWeb ? p.documentId : p.id;
+        return pid == productId || pid?.toString() == productId?.toString();
+      });
 
       if (mounted) {
-        // UPDATED: Don't reload active order - we already have the correct order ID
-        // The order ID is set when creating/loading the order above
-        //
-        // FIXED: Do NOT auto-show overlay when adding items. User must click
-        // "View Order" button to open the Create Order section.
         setState(() {
-          _overlayRefreshKey++; // Increment so overlay shows latest items when opened
+          if (existingIndex >= 0) {
+            final qty = (_pendingCartItems[existingIndex]['quantity'] as int) + 1;
+            _pendingCartItems[existingIndex]['quantity'] = qty;
+          } else {
+            _pendingCartItems.add({'product': product, 'quantity': 1});
+          }
+          _overlayRefreshKey++;
         });
-        
-        debugPrint('MenuScreen: After adding item - Order ID: $_activeOrderId');
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Added ${product.name}'),
@@ -510,7 +467,7 @@ class _MenuScreenState extends State<MenuScreen> {
         );
       }
     } catch (e) {
-      debugPrint('Error adding item to order: $e');
+      debugPrint('Error adding item to cart: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1131,7 +1088,7 @@ class _MenuScreenState extends State<MenuScreen> {
           ),
           // UPDATED: Semi-transparent backdrop on left side only (menu area) - allows menu clicks
           // Responsive: Full screen on mobile, side panel on larger screens
-          if (_showOrderOverlay && _activeOrderId != null)
+          if (_showOrderOverlay && _pendingCartItems.isNotEmpty)
             Builder(
               builder: (context) {
                 final screenWidth = MediaQuery.of(context).size.width;
@@ -1154,7 +1111,7 @@ class _MenuScreenState extends State<MenuScreen> {
               },
             ),
           // UPDATED: Order overlay as side panel (desktop) or bottom sheet (mobile) - allows menu interaction
-          if (_showOrderOverlay && _activeOrderId != null)
+          if (_showOrderOverlay && _pendingCartItems.isNotEmpty)
             Builder(
               builder: (context) {
                 final screenWidth = MediaQuery.of(context).size.width;
@@ -1176,34 +1133,29 @@ class _MenuScreenState extends State<MenuScreen> {
                       ),
                       color: Colors.white,
                       child: OrderOverlayWidget(
-                        key: ValueKey('${_activeOrderId}_$_overlayRefreshKey'),
-                        orderId: _activeOrderId,
-                        orderNumber: _activeOrderNumber ?? 'Order',
+                        key: ValueKey('pending_$_overlayRefreshKey'),
+                        orderId: null,
+                        orderNumber: 'Pending',
+                        pendingItems: _pendingCartItems,
                         refreshKey: _overlayRefreshKey,
-                        onClose: () async {
-                          // Check if order was deleted (no longer exists)
-                          final dbProvider =
-                              Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-                          await dbProvider.init();
-                          final orders = await dbProvider.query(
-                            'orders',
-                            where: kIsWeb ? 'documentId = ?' : 'id = ?',
-                            whereArgs: [_activeOrderId],
-                          );
-                          
-                          // If order was deleted, clear active order
-                          if (orders.isEmpty && _activeOrderId != null) {
-                            setState(() {
-                              _activeOrderId = null;
-                              _activeOrderNumber = null;
-                            });
-                          }
-                          
+                        onClose: () {
                           setState(() => _showOrderOverlay = false);
                         },
-                        onOrderUpdated: () async {
-                          await _loadActiveOrder();
+                        onOrderUpdated: () {
                           if (mounted) setState(() {});
+                        },
+                        onOrderCreated: () {
+                          if (mounted) {
+                            setState(() {
+                              _pendingCartItems = [];
+                              _showOrderOverlay = false;
+                            });
+                          }
+                        },
+                        onPendingItemsChanged: (items) {
+                          if (mounted) {
+                            setState(() => _pendingCartItems = items);
+                          }
                         },
                       ),
                     ),
@@ -1219,34 +1171,29 @@ class _MenuScreenState extends State<MenuScreen> {
                       elevation: 8,
                       color: Colors.white,
                       child: OrderOverlayWidget(
-                        key: ValueKey('${_activeOrderId}_$_overlayRefreshKey'),
-                        orderId: _activeOrderId,
-                        orderNumber: _activeOrderNumber ?? 'Order',
+                        key: ValueKey('pending_$_overlayRefreshKey'),
+                        orderId: null,
+                        orderNumber: 'Pending',
+                        pendingItems: _pendingCartItems,
                         refreshKey: _overlayRefreshKey,
-                        onClose: () async {
-                          // Check if order was deleted (no longer exists)
-                          final dbProvider =
-                              Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-                          await dbProvider.init();
-                          final orders = await dbProvider.query(
-                            'orders',
-                            where: kIsWeb ? 'documentId = ?' : 'id = ?',
-                            whereArgs: [_activeOrderId],
-                          );
-                          
-                          // If order was deleted, clear active order
-                          if (orders.isEmpty && _activeOrderId != null) {
-                            setState(() {
-                              _activeOrderId = null;
-                              _activeOrderNumber = null;
-                            });
-                          }
-                          
+                        onClose: () {
                           setState(() => _showOrderOverlay = false);
                         },
-                        onOrderUpdated: () async {
-                          await _loadActiveOrder();
+                        onOrderUpdated: () {
                           if (mounted) setState(() {});
+                        },
+                        onOrderCreated: () {
+                          if (mounted) {
+                            setState(() {
+                              _pendingCartItems = [];
+                              _showOrderOverlay = false;
+                            });
+                          }
+                        },
+                        onPendingItemsChanged: (items) {
+                          if (mounted) {
+                            setState(() => _pendingCartItems = items);
+                          }
                         },
                       ),
                     ),
@@ -1258,68 +1205,28 @@ class _MenuScreenState extends State<MenuScreen> {
       ),
       floatingActionButton: _showOrderOverlay ? null : Consumer<InaraAuthProvider>(
         builder: (context, auth, _) {
-          // UPDATED: Show "View Order" button when there's an active order (for all users)
-          // Cashiers can also create new orders, admins can view existing orders
-          if (_activeOrderId != null || _isOrderMode(auth)) {
+          // FIXED: Show "View Order" only when cart has items. Order is NOT created
+          // in DB until user clicks "Create Order" in the overlay.
+          if (_isOrderMode(auth) && _pendingCartItems.isNotEmpty) {
             return Padding(
               padding: EdgeInsets.only(
-                bottom: !kIsWeb ? 80 : 0, // Extra bottom padding on mobile to avoid overlap with bottom nav
-                right: !kIsWeb ? 8 : 0, // Slight right padding to avoid edge overlap
+                bottom: !kIsWeb ? 80 : 0,
+                right: !kIsWeb ? 8 : 0,
               ),
               child: FloatingActionButton.extended(
                 onPressed: _isAddingToOrder
                     ? null
-                    : () async {
-                        // If no active order and user is cashier, create one first
-                        if (_activeOrderId == null && _isOrderMode(auth)) {
-                          try {
-                            final dbProvider =
-                                Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-                            final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
-                            await dbProvider.init();
-
-                            final createdBy = authProvider.currentUserId != null
-                                ? (kIsWeb
-                                    ? authProvider.currentUserId!
-                                    : int.tryParse(authProvider.currentUserId!))
-                                : null;
-
-                            _activeOrderId = await _orderService.createOrder(
-                              dbProvider: dbProvider,
-                              orderType: 'dine_in',
-                              createdBy: createdBy,
-                            );
-
-                            final order = await _orderService.getOrderById(dbProvider, _activeOrderId);
-                            _activeOrderNumber = order?.orderNumber ?? 'Order';
-                          } catch (e) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error creating order: $e')),
-                              );
-                            }
-                            return;
-                          }
-                        }
-
-                        // UPDATED: Load active order before showing overlay to ensure correct order ID
-                        if (_activeOrderId == null) {
-                          await _loadActiveOrder();
-                        }
-                        
-                        // Show overlay if we have an active order
-                        if (mounted && _activeOrderId != null) {
+                    : () {
+                        if (mounted && _pendingCartItems.isNotEmpty) {
                           setState(() {
                             _showOrderOverlay = true;
-                            _overlayRefreshKey++; // Force overlay to reload with latest data
+                            _overlayRefreshKey++;
                           });
                         }
                       },
                 backgroundColor: AppTheme.logoPrimary,
                 icon: const Icon(Icons.receipt_long),
-                label: Text(_isAddingToOrder
-                    ? 'Please wait…'
-                    : (_activeOrderId == null ? 'New Order' : 'View Order')),
+                label: Text(_isAddingToOrder ? 'Please wait…' : 'View Order'),
               ),
             );
           }
