@@ -199,7 +199,7 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
         state == AppLifecycleState.paused) {
       final auth = context.read<InaraAuthProvider>();
       if (auth.lockMode == 'always') {
-        auth.logout();
+        auth.logout(storeForAutoLogin: true); // Allow quick re-login after background
       }
     }
   }

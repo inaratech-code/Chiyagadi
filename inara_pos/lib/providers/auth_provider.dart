@@ -929,7 +929,9 @@ class InaraAuthProvider with ChangeNotifier {
     }
   }
 
-  Future<void> logout() async {
+  /// [storeForAutoLogin] - when true, stores session for auto-login within 1 hour.
+  /// Pass false for explicit user logout so user stays logged out.
+  Future<void> logout({bool storeForAutoLogin = false}) async {
     // Clear state immediately
     final prevUserId = _currentUserId;
     final prevRole = _currentUserRole;
@@ -946,16 +948,30 @@ class InaraAuthProvider with ChangeNotifier {
     // MaterialApp key change + Consumer rebuild handles navigation on web and mobile).
     onLogout?.call();
 
-    // Persist and sign out from Firebase in background (non-blocking)
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final now = DateTime.now().millisecondsSinceEpoch;
-      await prefs.setString('last_logout_user_id', prevUserId ?? '');
-      await prefs.setString('last_logout_user_role', prevRole ?? '');
-      await prefs.setString('last_logout_username', prevUsername ?? '');
-      await prefs.setInt('last_logout_timestamp', now);
-    } catch (e) {
-      debugPrint('AuthProvider: Error storing session info: $e');
+    // Persist session for auto-login only when NOT explicit user logout (e.g. inactivity).
+    // FIXED: Explicit logout no longer stores session, so user stays logged out.
+    if (storeForAutoLogin) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final now = DateTime.now().millisecondsSinceEpoch;
+        await prefs.setString('last_logout_user_id', prevUserId ?? '');
+        await prefs.setString('last_logout_user_role', prevRole ?? '');
+        await prefs.setString('last_logout_username', prevUsername ?? '');
+        await prefs.setInt('last_logout_timestamp', now);
+      } catch (e) {
+        debugPrint('AuthProvider: Error storing session info: $e');
+      }
+    } else {
+      // Clear any previous auto-login data so user stays logged out
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('last_logout_user_id');
+        await prefs.remove('last_logout_user_role');
+        await prefs.remove('last_logout_username');
+        await prefs.remove('last_logout_timestamp');
+      } catch (e) {
+        debugPrint('AuthProvider: Error clearing session info: $e');
+      }
     }
     try {
       await FirebaseAuth.instance.signOut();
@@ -977,7 +993,7 @@ class InaraAuthProvider with ChangeNotifier {
       Duration(minutes: _inactivityTimeoutMinutes),
       () {
         if (_isAuthenticated) {
-          logout();
+          logout(storeForAutoLogin: true); // Allow quick re-login after timeout
         }
       },
     );
