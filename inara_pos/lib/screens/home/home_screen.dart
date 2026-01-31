@@ -486,6 +486,7 @@ class _HomeScreenState extends State<HomeScreen> {
       BuildContext context, InaraAuthProvider authProvider) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -495,42 +496,53 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context, snapshot) {
           final permissions = snapshot.data ?? <int>{};
 
-          return SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(top: 12, bottom: 8),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                if (permissions.contains(2))
-                  _buildMoreOptionTile(
-                      context, Icons.table_restaurant, 'Tables', 2),
-                if (permissions.contains(4))
-                  _buildMoreOptionTile(
-                      context, Icons.shopping_cart, 'Sales', 4),
-                if (permissions.contains(5))
-                  _buildMoreOptionTile(context, Icons.analytics, 'Reports', 5),
-                if (permissions.contains(6))
-                  _buildMoreOptionTile(
-                      context, Icons.inventory_2, 'Inventory', 6),
-                if (permissions.contains(7))
-                  _buildMoreOptionTile(context, Icons.people, 'Customers', 7),
-                if (permissions.contains(8))
-                  _buildMoreOptionTile(
-                      context, Icons.shopping_bag, 'Purchases', 8),
-                if (permissions.contains(9))
-                  _buildMoreOptionTile(context, Icons.payments, 'Expenses', 9),
-                _buildMoreOptionTile(context, Icons.settings, 'Settings', -1,
-                    isSettings: true),
-                const SizedBox(height: 8),
-              ],
+          return ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.65,
             ),
+            child: SafeArea(
+              child: SingleChildScrollView(
+                child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 12, bottom: 8),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  if (permissions.contains(2))
+                    _buildMoreOptionTile(
+                        context, Icons.table_restaurant, 'Tables', 2),
+                  if (permissions.contains(4))
+                    _buildMoreOptionTile(
+                        context, Icons.shopping_cart, 'Sales', 4),
+                  if (permissions.contains(5))
+                    _buildMoreOptionTile(
+                        context, Icons.analytics, 'Reports', 5),
+                  if (permissions.contains(6))
+                    _buildMoreOptionTile(
+                        context, Icons.inventory_2, 'Inventory', 6),
+                  if (permissions.contains(7))
+                    _buildMoreOptionTile(
+                        context, Icons.people, 'Customers', 7),
+                  if (permissions.contains(8))
+                    _buildMoreOptionTile(
+                        context, Icons.shopping_bag, 'Purchases', 8),
+                  if (permissions.contains(9))
+                    _buildMoreOptionTile(
+                        context, Icons.payments, 'Expenses', 9),
+                  _buildMoreOptionTile(
+                      context, Icons.settings, 'Settings', -1,
+                      isSettings: true),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ),
           );
         },
       ),
