@@ -46,7 +46,9 @@ class InaraPOSApp extends StatelessWidget {
         ChangeNotifierProvider.value(value: databaseProvider),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(
-          create: (_) => InaraAuthProvider(),
+          create: (context) => InaraAuthProvider(
+            databaseProvider: context.read<UnifiedDatabaseProvider>(),
+          ),
         ),
         ChangeNotifierProvider(
           create: (_) => SyncProvider(),
@@ -54,19 +56,20 @@ class InaraPOSApp extends StatelessWidget {
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
-          return MaterialApp(
-            title: 'चिया गढी',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: themeProvider.themeMode,
-            scaffoldMessengerKey: AppMessenger.messengerKey,
-            navigatorKey: AppMessenger.navigatorKey,
-            // IMPORTANT: Using routes instead of home to allow explicit root route
-            // so logout/login can reliably reset navigation back to AuthWrapper.
-            routes: {
-              '/': (context) => const _WarmStart(child: AuthWrapper()),
-              '/home': (context) => const HomeScreen(),
+          return Consumer<InaraAuthProvider>(
+            builder: (context, authProvider, _) {
+              // Key forces MaterialApp to rebuild when auth changes (fixes logout on web).
+              return MaterialApp(
+                key: ValueKey<bool>(authProvider.isAuthenticated),
+                title: 'चिया गढी',
+                debugShowCheckedModeBanner: false,
+                theme: AppTheme.lightTheme,
+                darkTheme: AppTheme.darkTheme,
+                themeMode: themeProvider.themeMode,
+                scaffoldMessengerKey: AppMessenger.messengerKey,
+                navigatorKey: AppMessenger.navigatorKey,
+                home: const _WarmStart(child: AuthWrapper()),
+              );
             },
           );
         },
@@ -154,6 +157,8 @@ class AuthWrapper extends StatefulWidget {
 }
 
 class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
+  InaraAuthProvider? _authProvider;
+
   @override
   void initState() {
     super.initState();
@@ -165,7 +170,23 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Register logout callback so AuthWrapper rebuilds when logout() is called (fixes web).
+    final authProvider = context.read<InaraAuthProvider>();
+    if (_authProvider != authProvider) {
+      _authProvider?.onLogout = null;
+      _authProvider = authProvider;
+      _authProvider!.onLogout = () {
+        if (mounted) setState(() {});
+      };
+    }
+  }
+
+  @override
   void dispose() {
+    _authProvider?.onLogout = null;
+    _authProvider = null;
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

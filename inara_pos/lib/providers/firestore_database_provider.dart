@@ -346,6 +346,9 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         debugPrint('FirestoreDatabase: Default settings created');
       }
 
+      // Seed default roles (admin, cashier) when roles collection is empty
+      await _ensureDefaultRoles();
+
       // Ensure menu seed exists (adds missing items without duplicating).
       await _ensureChiyagaadiMenuSeed();
     } catch (e) {
@@ -358,7 +361,44 @@ class FirestoreDatabaseProvider with ChangeNotifier {
   Future<void> seedMenuItems() async {
     await _ensureChiyagaadiMenuSeed();
   }
-  
+
+  /// Seed default roles (admin, cashier) when roles collection is empty.
+  Future<void> _ensureDefaultRoles() async {
+    try {
+      final rolesSnapshot = await firestore.collection('roles').limit(1).get();
+      if (rolesSnapshot.docs.isNotEmpty) return;
+
+      debugPrint('FirestoreDatabase: Seeding default roles (admin, cashier)...');
+      final now = DateTime.now().millisecondsSinceEpoch;
+
+      // Admin: all sections (0-9)
+      await firestore.collection('roles').add({
+        'name': 'admin',
+        'description': 'Full access to all sections',
+        'permissions': '[0,1,2,3,4,5,6,7,8,9]',
+        'is_system_role': 1,
+        'is_active': 1,
+        'created_at': now,
+        'updated_at': now,
+      });
+
+      // Cashier: dashboard, orders, tables, menu
+      await firestore.collection('roles').add({
+        'name': 'cashier',
+        'description': 'POS and orders access',
+        'permissions': '[0,1,2,3]',
+        'is_system_role': 1,
+        'is_active': 1,
+        'created_at': now,
+        'updated_at': now,
+      });
+
+      debugPrint('FirestoreDatabase: Default roles created');
+    } catch (e) {
+      debugPrint('FirestoreDatabase: Error seeding default roles: $e');
+    }
+  }
+
   Future<void> _ensureChiyagaadiMenuSeed() async {
     debugPrint('FirestoreDatabase: Ensuring Chiyagaadi menu seed...');
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -547,6 +587,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         if (!snap.exists) return [];
         final data = snap.data() ?? <String, dynamic>{};
         data['id'] = snap.id;
+        data['documentId'] = snap.id;
         return [data];
       }
 
@@ -637,8 +678,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
       return snapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
-        // Add document ID as 'id' field for compatibility
         data['id'] = doc.id;
+        data['documentId'] = doc.id; // So Role.fromMap has documentId on web
         return data;
       }).toList();
     } on FirebaseException catch (e) {
@@ -723,6 +764,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         final rows = snap.docs.map((doc) {
           final data = doc.data() as Map<String, dynamic>;
           data['id'] = doc.id;
+          data['documentId'] = doc.id;
           return data;
         }).toList();
 
@@ -871,6 +913,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       for (final doc in docs) {
         final data = (doc.data() as Map<String, dynamic>);
         data['id'] = doc.id;
+        data['documentId'] = doc.id;
         docsById[doc.id] = data;
       }
     }

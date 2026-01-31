@@ -385,7 +385,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Expanded(
+          Flexible(
             child: Row(
               children: [
                 // Logo
@@ -468,18 +468,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
           ),
-          // Settings button only (logout removed)
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              );
-            },
-            tooltip: 'Settings',
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
+          // Settings and Logout buttons - always visible, never clipped
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.settings),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                },
+                tooltip: 'Settings',
+                padding: const EdgeInsets.all(8),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                icon: const Icon(Icons.logout),
+                onPressed: () {
+                  Provider.of<InaraAuthProvider>(context, listen: false).logout();
+                },
+                tooltip: 'Logout',
+                padding: const EdgeInsets.all(8),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              ),
+            ],
           ),
         ],
       ),

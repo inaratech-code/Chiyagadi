@@ -77,11 +77,7 @@ class _LoginScreenState extends State<LoginScreen>
       if (canAuto) {
         final autoLoginSuccess = await authProvider.autoLogin();
         if (autoLoginSuccess && mounted) {
-          // Auto-login successful, navigate to home
-          Navigator.of(context).pushNamedAndRemoveUntil(
-            '/',
-            (route) => false,
-          );
+          // AuthWrapper (Consumer) will rebuild and show HomeScreen.
           return;
         }
       }
@@ -137,11 +133,7 @@ class _LoginScreenState extends State<LoginScreen>
       final success = await authProvider.login(email, password);
       
       if (success && mounted) {
-        // Go back to root so AuthWrapper can show HomeScreen.
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          '/',
-          (route) => false,
-        );
+        // AuthWrapper's Consumer will rebuild and show HomeScreen; no navigation needed.
       } else {
         setState(() {
           _errorMessage = 'Invalid email or password. Please try again.';
@@ -380,6 +372,7 @@ class _LoginScreenState extends State<LoginScreen>
                                         decoration: InputDecoration(
                                           labelText: 'Email',
                                           hintText: 'Enter your email',
+                                          helperText: 'Use the email set by your admin',
                                           prefixIcon: const Icon(
                                             Icons.email_outlined,
                                             color: Color(0xFFFFC107),
@@ -439,6 +432,7 @@ class _LoginScreenState extends State<LoginScreen>
                                         decoration: InputDecoration(
                                           labelText: 'Password',
                                           hintText: 'Enter your password',
+                                          helperText: 'Use the password set by your admin',
                                           prefixIcon: const Icon(
                                               Icons.lock_outline,
                                               color: Color(0xFFFFC107)),

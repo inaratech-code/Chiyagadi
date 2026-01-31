@@ -15,16 +15,16 @@ class UnifiedDatabaseProvider with ChangeNotifier {
   UnifiedDatabaseProvider() {
     if (kIsWeb) {
       _provider = FirestoreDatabaseProvider();
-      debugPrint('UnifiedDatabase: Using Firestore for web');
+      debugPrint('DB: Using Firestore for web');
     } else {
       _provider = DatabaseProvider();
-      debugPrint('UnifiedDatabase: Using SQLite for mobile');
+      debugPrint('DB: Using SQLite for mobile');
     }
   }
 
   /// Force re-initialization (resets failure flag)
   Future<void> forceInit() async {
-    debugPrint('UnifiedDatabase: Force re-initialization requested');
+    debugPrint('DB: Force re-initialization requested');
     _initFailed = false;
     _isInitialized = false;
     await init(forceRetry: true);
@@ -38,7 +38,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     // If init already failed, don't retry automatically (prevents infinite loops)
     // But allow retry if forceRetry is true
     if (_initFailed && !forceRetry) {
-      debugPrint('UnifiedDatabase: Init previously failed, skipping retry (use forceInit() to retry)');
+      debugPrint('DB: Init previously failed, skipping retry (use forceInit() to retry)');
       return;
     }
     
@@ -46,7 +46,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     if (forceRetry) {
       _initFailed = false;
       _isInitialized = false;
-      debugPrint('UnifiedDatabase: Retrying initialization...');
+      debugPrint('DB: Retrying initialization...');
     }
 
     try {
@@ -67,12 +67,12 @@ class UnifiedDatabaseProvider with ChangeNotifier {
             try {
               firebaseApps = Firebase.apps;
             } catch (e) {
-              debugPrint('UnifiedDatabase: Error accessing Firebase.apps: $e');
+              debugPrint('DB: Error accessing Firebase.apps: $e');
               // Retry immediately without delay for faster initialization
               try {
                 firebaseApps = Firebase.apps;
               } catch (e2) {
-                debugPrint('UnifiedDatabase: Error accessing Firebase.apps on retry: $e2');
+                debugPrint('DB: Error accessing Firebase.apps on retry: $e2');
                 firebaseInitialized = false;
               }
             }
@@ -81,18 +81,18 @@ class UnifiedDatabaseProvider with ChangeNotifier {
               try {
                 firebaseInitialized = (firebaseApps as dynamic).isNotEmpty;
               } catch (e) {
-                debugPrint('UnifiedDatabase: Error checking Firebase.apps.isNotEmpty: $e');
+                debugPrint('DB: Error checking Firebase.apps.isNotEmpty: $e');
                 firebaseInitialized = false;
               }
             }
           } catch (e) {
-            debugPrint('UnifiedDatabase: Error checking Firebase apps: $e');
+            debugPrint('DB: Error checking Firebase apps: $e');
             // If checking fails, assume not initialized and try to initialize
             firebaseInitialized = false;
           }
           
           if (!firebaseInitialized) {
-            debugPrint('UnifiedDatabase: Initializing Firebase App...');
+            debugPrint('DB: Initializing Firebase App...');
             
             // Get Firebase options with multiple fallbacks
             FirebaseOptions? options;
@@ -100,16 +100,16 @@ class UnifiedDatabaseProvider with ChangeNotifier {
             // Try currentPlatform first
             try {
               options = DefaultFirebaseOptions.currentPlatform;
-              debugPrint('UnifiedDatabase: Got Firebase options from currentPlatform');
+              debugPrint('DB: Got Firebase options from currentPlatform');
             } catch (e) {
-              debugPrint('UnifiedDatabase: Error getting currentPlatform options: $e');
+              debugPrint('DB: Error getting currentPlatform options: $e');
               
               // Fallback 1: Try web options directly
               try {
                 options = DefaultFirebaseOptions.web;
-                debugPrint('UnifiedDatabase: Using web Firebase options as fallback');
+                debugPrint('DB: Using web Firebase options as fallback');
               } catch (fallbackError) {
-                debugPrint('UnifiedDatabase: Web options fallback also failed: $fallbackError');
+                debugPrint('DB: Web options fallback also failed: $fallbackError');
                 
                 // Fallback 2: Try to construct options manually
                 try {
@@ -121,9 +121,9 @@ class UnifiedDatabaseProvider with ChangeNotifier {
                     authDomain: 'chiyagadi-cf302.firebaseapp.com',
                     storageBucket: 'chiyagadi-cf302.firebasestorage.app',
                   );
-                  debugPrint('UnifiedDatabase: Using manually constructed Firebase options');
+                  debugPrint('DB: Using manually constructed Firebase options');
                 } catch (manualError) {
-                  debugPrint('UnifiedDatabase: Manual options construction failed: $manualError');
+                  debugPrint('DB: Manual options construction failed: $manualError');
                   throw StateError('Failed to get Firebase options after all attempts: $e');
                 }
               }
@@ -141,13 +141,13 @@ class UnifiedDatabaseProvider with ChangeNotifier {
                   // FIXED: Reduced delays for faster retries
                   final delayMs = attempt == 1 ? 100 : (attempt == 2 ? 200 : 300);
                   await Future.delayed(Duration(milliseconds: delayMs));
-                  debugPrint('UnifiedDatabase: Retrying Firebase initialization (attempt ${attempt + 1}/5)...');
+                  debugPrint('DB: Retrying Firebase initialization (attempt ${attempt + 1}/5)...');
                 }
                 
                 // Wrap initializeApp in try-catch to catch null check errors
                 try {
                   await Firebase.initializeApp(options: options);
-                  debugPrint('UnifiedDatabase: Firebase App initialized successfully (web)');
+                  debugPrint('DB: Firebase App initialized successfully (web)');
                   initSuccess = true;
                   break;
                 } catch (initError) {
@@ -156,9 +156,9 @@ class UnifiedDatabaseProvider with ChangeNotifier {
                   // If it's a null check error, wait longer and retry
                   if (initErrorMsg.contains('Null check operator') || 
                       initErrorMsg.contains('null value')) {
-                    debugPrint('UnifiedDatabase: Null check error in Firebase.initializeApp: $initError');
+                    debugPrint('DB: Null check error in Firebase.initializeApp: $initError');
                     if (attempt < 4) {
-                      debugPrint('UnifiedDatabase: Waiting longer before retry...');
+                      debugPrint('DB: Waiting longer before retry...');
                       // FIXED: Reduced delay for faster retry
                       await Future.delayed(Duration(milliseconds: 50 * (attempt + 1)));
                       continue;
@@ -169,16 +169,16 @@ class UnifiedDatabaseProvider with ChangeNotifier {
                 }
               } catch (initError) {
                 final initErrorMsg = initError.toString();
-                debugPrint('UnifiedDatabase: Firebase init attempt ${attempt + 1} failed: $initError');
+                debugPrint('DB: Firebase init attempt ${attempt + 1} failed: $initError');
                 
                 // If this is the last attempt, handle gracefully
                 if (attempt == 4) {
                   // For null check errors on final attempt, mark as failed but don't throw
                   if (initErrorMsg.contains('Null check operator') || 
                       initErrorMsg.contains('null value')) {
-                    debugPrint('UnifiedDatabase: Null check error persists after all retries');
-                    debugPrint('UnifiedDatabase: This may be a browser compatibility issue');
-                    debugPrint('UnifiedDatabase: Try refreshing the page or using a different browser');
+                    debugPrint('DB: Null check error persists after all retries');
+                    debugPrint('DB: This may be a browser compatibility issue');
+                    debugPrint('DB: Try refreshing the page or using a different browser');
                     _initFailed = true;
                     _isInitialized = false;
                     return; // Exit gracefully
@@ -195,19 +195,19 @@ class UnifiedDatabaseProvider with ChangeNotifier {
             // iOS Safari: Minimal delay to ensure Firebase is fully ready
             if (defaultTargetPlatform == TargetPlatform.iOS) {
               await Future.delayed(const Duration(milliseconds: 50)); // FIXED: Reduced from 300ms to 50ms
-              debugPrint('UnifiedDatabase: iOS Safari delay applied');
+              debugPrint('DB: iOS Safari delay applied');
             }
           } else {
-            debugPrint('UnifiedDatabase: Firebase App already initialized');
+            debugPrint('DB: Firebase App already initialized');
           }
         } catch (e) {
           final errorMsg = e.toString();
-          debugPrint('UnifiedDatabase: Firebase App initialization error: $e');
+          debugPrint('DB: Firebase App initialization error: $e');
           
           // Don't throw if it's a null check error - might be transient
           if (errorMsg.contains('Null check operator') || 
               errorMsg.contains('null value')) {
-            debugPrint('UnifiedDatabase: Null check error in Firebase App init - marking as failed but allowing retry');
+            debugPrint('DB: Null check error in Firebase App init - marking as failed but allowing retry');
             _initFailed = true;
             _isInitialized = false;
             // Don't throw - allow retry via forceInit()
@@ -231,8 +231,8 @@ class UnifiedDatabaseProvider with ChangeNotifier {
           try {
             authInstance = FirebaseAuth.instance;
           } catch (e) {
-            debugPrint('UnifiedDatabase: Error getting FirebaseAuth.instance: $e');
-            debugPrint('UnifiedDatabase: Skipping Firebase Auth - Firestore will work without Auth');
+            debugPrint('DB: Error getting FirebaseAuth.instance: $e');
+            debugPrint('DB: Skipping Firebase Auth - Firestore will work without Auth');
             // Don't throw - continue to Firestore initialization
           }
           
@@ -242,7 +242,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
             try {
               currentUser = authInstance.currentUser;
             } catch (e) {
-              debugPrint('UnifiedDatabase: Error checking Firebase Auth: $e');
+              debugPrint('DB: Error checking Firebase Auth: $e');
               // If checking currentUser fails, skip auth but continue
               currentUser = null;
             }
@@ -254,49 +254,49 @@ class UnifiedDatabaseProvider with ChangeNotifier {
                   email: 'chiyagadi@gmail.com',
                   password: 'Chiyagadi15@',
                 );
-                debugPrint('UnifiedDatabase: Firebase Auth email/password sign-in ok');
+                debugPrint('DB: Firebase Auth email/password sign-in ok');
               } catch (signInError) {
-                debugPrint('UnifiedDatabase: Firebase Auth sign-in failed: $signInError');
+                debugPrint('DB: Firebase Auth sign-in failed: $signInError');
                 final errorMsg = signInError.toString();
                 
                 if (errorMsg.contains('user-not-found') || 
                     errorMsg.contains('wrong-password') ||
                     errorMsg.contains('invalid-email')) {
-                  debugPrint('UnifiedDatabase: Admin Firebase Auth user not found or invalid credentials');
-                  debugPrint('UnifiedDatabase: Firestore will work if rules allow public access');
+                  debugPrint('DB: Admin Firebase Auth user not found or invalid credentials');
+                  debugPrint('DB: Firestore will work if rules allow public access');
                 }
                 // Don't throw - continue to Firestore initialization
               }
             } else {
               try {
                 final email = currentUser.email;
-                debugPrint('UnifiedDatabase: Firebase Auth already signed in as $email');
+                debugPrint('DB: Firebase Auth already signed in as $email');
               } catch (e) {
-                debugPrint('UnifiedDatabase: Firebase Auth already signed in (could not get email)');
+                debugPrint('DB: Firebase Auth already signed in (could not get email)');
               }
             }
           }
         } catch (authError) {
           final authErrorMsg = authError.toString();
-          debugPrint('UnifiedDatabase: Firebase Auth error (non-critical): $authError');
-          debugPrint('UnifiedDatabase: Continuing without Firebase Auth - Firestore will initialize anyway');
+          debugPrint('DB: Firebase Auth error (non-critical): $authError');
+          debugPrint('DB: Continuing without Firebase Auth - Firestore will initialize anyway');
           // Don't throw - Auth is optional, Firestore can work without it
         }
         
-        debugPrint('UnifiedDatabase: Firebase App initialized, proceeding to Firestore initialization');
+        debugPrint('DB: Firebase App initialized, proceeding to Firestore initialization');
       }
 
       // Try to initialize the provider (Firestore or SQLite)
       // Wrap in try-catch to handle any errors gracefully
       try {
-        debugPrint('UnifiedDatabase: Initializing database provider...');
+        debugPrint('DB: Initializing database provider...');
         await _provider.init();
         _isInitialized = true;
         _initFailed = false; // Reset failure flag on success
-        debugPrint('UnifiedDatabase: Initialized successfully');
+        debugPrint('DB: Initialized successfully');
       } catch (providerError) {
         final providerErrorMsg = providerError.toString();
-        debugPrint('UnifiedDatabase: Provider init failed: $providerError');
+        debugPrint('DB: Provider init failed: $providerError');
         
         // If it's a null check error or minified JS error, it might be transient
         // Try one more time with a delay before giving up
@@ -304,24 +304,24 @@ class UnifiedDatabaseProvider with ChangeNotifier {
             providerErrorMsg.contains('null value') ||
             providerErrorMsg.contains('minified') ||
             providerErrorMsg.contains('TypeError')) {
-          debugPrint('UnifiedDatabase: Transient error detected, retrying after delay...');
+          debugPrint('DB: Transient error detected, retrying after delay...');
           // Reduced delay for faster retry (was 1000ms, now 100ms)
           await Future.delayed(const Duration(milliseconds: 100));
           
           try {
-            debugPrint('UnifiedDatabase: Retrying provider initialization...');
+            debugPrint('DB: Retrying provider initialization...');
             await _provider.init();
             _isInitialized = true;
             _initFailed = false;
-            debugPrint('UnifiedDatabase: Initialized successfully on retry');
+            debugPrint('DB: Initialized successfully on retry');
           } catch (retryError) {
-            debugPrint('UnifiedDatabase: Retry also failed: $retryError');
-            debugPrint('UnifiedDatabase: This is often caused by:');
-            debugPrint('UnifiedDatabase: 1. Firebase not fully initialized on iOS Safari');
-            debugPrint('UnifiedDatabase: 2. Firestore instance not available');
-            debugPrint('UnifiedDatabase: 3. Browser compatibility issue');
-            debugPrint('UnifiedDatabase: 4. Firestore security rules require authentication');
-            debugPrint('UnifiedDatabase: Will allow retries via forceInit()');
+            debugPrint('DB: Retry also failed: $retryError');
+            debugPrint('DB: This is often caused by:');
+            debugPrint('DB: 1. Firebase not fully initialized on iOS Safari');
+            debugPrint('DB: 2. Firestore instance not available');
+            debugPrint('DB: 3. Browser compatibility issue');
+            debugPrint('DB: 4. Firestore security rules require authentication');
+            debugPrint('DB: Will allow retries via forceInit()');
             
             // For transient errors, mark as failed but allow retries via forceInit()
             _initFailed = true;
@@ -332,12 +332,12 @@ class UnifiedDatabaseProvider with ChangeNotifier {
           // For other errors, mark as failed
           _initFailed = true;
           _isInitialized = false;
-          debugPrint('UnifiedDatabase: Provider initialization failed: $providerError');
+          debugPrint('DB: Provider initialization failed: $providerError');
           // Don't rethrow - allow app to continue
         }
       }
     } catch (e) {
-      debugPrint('UnifiedDatabase: Initialization failed: $e');
+      debugPrint('DB: Initialization failed: $e');
       final errorMsg = e.toString();
       
       // Mark as failed but don't throw - allow app to continue
@@ -346,13 +346,13 @@ class UnifiedDatabaseProvider with ChangeNotifier {
       
       // Log helpful information
       if (errorMsg.contains('Null check operator') || errorMsg.contains('null value')) {
-        debugPrint('UnifiedDatabase: Null check error detected.');
-        debugPrint('UnifiedDatabase: This is often caused by:');
-        debugPrint('UnifiedDatabase: 1. Firebase not fully initialized on iOS Safari');
-        debugPrint('UnifiedDatabase: 2. Firestore instance not available');
-        debugPrint('UnifiedDatabase: 3. Browser compatibility issue');
-        debugPrint('UnifiedDatabase: App will continue but database operations may fail.');
-        debugPrint('UnifiedDatabase: Use forceInit() to retry initialization.');
+        debugPrint('DB: Null check error detected.');
+        debugPrint('DB: This is often caused by:');
+        debugPrint('DB: 1. Firebase not fully initialized on iOS Safari');
+        debugPrint('DB: 2. Firestore instance not available');
+        debugPrint('DB: 3. Browser compatibility issue');
+        debugPrint('DB: App will continue but database operations may fail.');
+        debugPrint('DB: Use forceInit() to retry initialization.');
       }
       
       // Don't rethrow - allow app to continue even if database init fails
@@ -376,7 +376,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
           return firestoreProvider.isInitialized;
         }
       } catch (e) {
-        debugPrint('UnifiedDatabase: Error checking Firestore availability: $e');
+        debugPrint('DB: Error checking Firestore availability: $e');
         return false;
       }
     }
@@ -398,18 +398,18 @@ class UnifiedDatabaseProvider with ChangeNotifier {
       // Try a simple query to test connectivity
       try {
         await _provider.query('categories', limit: 1);
-        debugPrint('UnifiedDatabase: Connection test successful');
+        debugPrint('DB: Connection test successful');
         return true;
       } catch (queryError) {
         final errorMsg = queryError.toString();
-        debugPrint('UnifiedDatabase: Connection test failed: $queryError');
+        debugPrint('DB: Connection test failed: $queryError');
         
         // If it's a permission error, the connection works but rules block access
         if (errorMsg.contains('permission') || 
             errorMsg.contains('PERMISSION_DENIED') ||
             errorMsg.contains('Missing or insufficient permissions')) {
-          debugPrint('UnifiedDatabase: Connection works but Firestore rules block access');
-          debugPrint('UnifiedDatabase: Please update Firestore rules to allow public access');
+          debugPrint('DB: Connection works but Firestore rules block access');
+          debugPrint('DB: Please update Firestore rules to allow public access');
           // Still return true - connection works, just rules need updating
           return true;
         }
@@ -417,7 +417,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
         return false;
       }
     } catch (e) {
-      debugPrint('UnifiedDatabase: Connection test error: $e');
+      debugPrint('DB: Connection test error: $e');
       return false;
     }
   }
@@ -440,16 +440,16 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     
     // If init failed, try to reinitialize once
     if (!isAvailable) {
-      debugPrint('UnifiedDatabase: Query skipped - database not available, attempting reinit...');
+      debugPrint('DB: Query skipped - database not available, attempting reinit...');
       try {
         await forceInit();
         await Future.delayed(const Duration(milliseconds: 300));
       } catch (e) {
-        debugPrint('UnifiedDatabase: Reinit failed: $e');
+        debugPrint('DB: Reinit failed: $e');
       }
       
       if (!isAvailable) {
-        debugPrint('UnifiedDatabase: Query skipped - database still not available after reinit');
+        debugPrint('DB: Query skipped - database still not available after reinit');
         return [];
       }
     }
@@ -467,18 +467,18 @@ class UnifiedDatabaseProvider with ChangeNotifier {
         limit: limit,
         offset: offset,
       );
-      debugPrint('UnifiedDatabase: Query successful - returned ${result.length} rows from $table');
+      debugPrint('Database: Query successful - returned ${result.length} rows from $table');
       return result;
     } catch (e) {
       final errorMsg = e.toString();
-      debugPrint('UnifiedDatabase: Query error: $e');
+      debugPrint('DB: Query error: $e');
       
       // If it's a permission error, log helpful message
       if (errorMsg.contains('permission') || 
           errorMsg.contains('PERMISSION_DENIED') ||
           errorMsg.contains('Missing or insufficient permissions')) {
-        debugPrint('UnifiedDatabase: Permission denied - Firestore rules may require authentication');
-        debugPrint('UnifiedDatabase: Please update Firestore rules to allow public access');
+        debugPrint('DB: Permission denied - Firestore rules may require authentication');
+        debugPrint('DB: Please update Firestore rules to allow public access');
       }
       
       return []; // Return empty list on error
@@ -492,7 +492,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     
     // If init failed, return null instead of throwing
     if (!isAvailable) {
-      debugPrint('UnifiedDatabase: Insert skipped - database not available');
+      debugPrint('DB: Insert skipped - database not available');
       return null;
     }
 
@@ -505,7 +505,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
         return await _provider.insert(table, values);
       }
     } catch (e) {
-      debugPrint('UnifiedDatabase: Insert error: $e');
+      debugPrint('DB: Insert error: $e');
       return null; // Return null on error
     }
   }
@@ -522,7 +522,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     
     // If init failed, return 0 instead of throwing
     if (!isAvailable) {
-      debugPrint('UnifiedDatabase: Update skipped - database not available');
+      debugPrint('DB: Update skipped - database not available');
       return 0;
     }
     
@@ -545,7 +545,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
         whereArgs: whereArgs,
       );
     } catch (e) {
-      debugPrint('UnifiedDatabase: Update error: $e');
+      debugPrint('DB: Update error: $e');
       return 0; // Return 0 on error (no rows updated)
     }
   }
@@ -561,7 +561,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     
     // If init failed, return 0 instead of throwing
     if (!isAvailable) {
-      debugPrint('UnifiedDatabase: Delete skipped - database not available');
+      debugPrint('DB: Delete skipped - database not available');
       return 0;
     }
     
@@ -572,7 +572,7 @@ class UnifiedDatabaseProvider with ChangeNotifier {
         whereArgs: whereArgs,
       );
     } catch (e) {
-      debugPrint('UnifiedDatabase: Delete error: $e');
+      debugPrint('DB: Delete error: $e');
       return 0; // Return 0 on error (no rows deleted)
     }
   }
@@ -584,14 +584,14 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     
     // If init failed, return null instead of throwing
     if (!isAvailable) {
-      debugPrint('UnifiedDatabase: Transaction skipped - database not available');
+      debugPrint('DB: Transaction skipped - database not available');
       return null;
     }
     
     try {
       return await _provider.transaction(action);
     } catch (e) {
-      debugPrint('UnifiedDatabase: Transaction error: $e');
+      debugPrint('DB: Transaction error: $e');
       return null; // Return null on error
     }
   }
@@ -603,14 +603,14 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     
     // If init failed, just return (nothing to reset)
     if (!isAvailable) {
-      debugPrint('UnifiedDatabase: Reset skipped - database not available');
+      debugPrint('DB: Reset skipped - database not available');
       return;
     }
     
     try {
       return await _provider.resetDatabase();
     } catch (e) {
-      debugPrint('UnifiedDatabase: Reset error: $e');
+      debugPrint('DB: Reset error: $e');
       // Don't throw - just log the error
     }
   }
@@ -622,13 +622,13 @@ class UnifiedDatabaseProvider with ChangeNotifier {
       await init();
     }
     if (!isAvailable) {
-      debugPrint('UnifiedDatabase: Clear orders data skipped - database not available');
+      debugPrint('DB: Clear orders data skipped - database not available');
       return;
     }
     try {
       await _provider.clearOrdersData();
     } catch (e) {
-      debugPrint('UnifiedDatabase: Clear orders data error: $e');
+      debugPrint('DB: Clear orders data error: $e');
       rethrow;
     }
   }
@@ -645,14 +645,14 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     
     // If init failed, just return (nothing to clear)
     if (!isAvailable) {
-      debugPrint('UnifiedDatabase: Clear business data skipped - database not available');
+      debugPrint('DB: Clear business data skipped - database not available');
       return;
     }
     
     try {
       return await _provider.clearBusinessData(seedDefaults: seedDefaults);
     } catch (e) {
-      debugPrint('UnifiedDatabase: Clear business data error: $e');
+      debugPrint('DB: Clear business data error: $e');
       // Don't throw - just log the error
     }
   }
@@ -674,11 +674,11 @@ class UnifiedDatabaseProvider with ChangeNotifier {
       
       // If database is not available, try to force reinitialize
       if (!isAvailable) {
-        debugPrint('UnifiedDatabase: Database not available, attempting to force reinitialize...');
+        debugPrint('DB: Database not available, attempting to force reinitialize...');
         await forceInit();
         
         if (!isAvailable) {
-          debugPrint('UnifiedDatabase: Cannot seed menu - database still not available after retry');
+          debugPrint('DB: Cannot seed menu - database still not available after retry');
           return false;
         }
       }
@@ -689,21 +689,21 @@ class UnifiedDatabaseProvider with ChangeNotifier {
         if (_provider is FirestoreDatabaseProvider) {
           final firestoreProvider = _provider as FirestoreDatabaseProvider;
           await firestoreProvider.seedMenuItems();
-          debugPrint('UnifiedDatabase: Menu items seeded successfully to Firestore');
+          debugPrint('DB: Menu items seeded successfully to Firestore');
           return true;
         } else {
-          debugPrint('UnifiedDatabase: Provider is not FirestoreDatabaseProvider on web');
+          debugPrint('DB: Provider is not FirestoreDatabaseProvider on web');
           return false;
         }
       } else {
         // For SQLite, the seed happens during init
         // But we can trigger it manually by calling clearBusinessData with seedDefaults=true
         await clearBusinessData(seedDefaults: true);
-        debugPrint('UnifiedDatabase: Menu items seeded successfully (SQLite)');
+        debugPrint('DB: Menu items seeded successfully (SQLite)');
         return true;
       }
     } catch (e) {
-      debugPrint('UnifiedDatabase: Error seeding menu items: $e');
+      debugPrint('DB: Error seeding menu items: $e');
       return false;
     }
   }

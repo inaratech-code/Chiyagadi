@@ -16,6 +16,23 @@ After saving, try creating the user again in the app.
 
 ---
 
+## Fix "This domain is not authorized"
+
+If the app shows: *"This domain is not authorized. In Firebase Console go to Authentication → Settings → Authorized domains and add your domain (e.g. localhost)."*:
+
+1. Open **[Firebase Console](https://console.firebase.google.com)** and select your project.
+2. In the left sidebar, click **Authentication** (or **Build** → **Authentication**).
+3. Open the **Settings** tab (gear icon or "Settings" in the top menu).
+4. Under **Authorized domains**, click **Add domain**.
+5. Add your domain:
+   - For local development: add `localhost`
+   - For deployed app: add your domain (e.g. `your-app.web.app`, `your-domain.com`)
+6. Click **Add** and save.
+
+After adding the domain, try again in the app.
+
+---
+
 ## Users and roles (login flow)
 
 For **admin-set email/password** login to work:

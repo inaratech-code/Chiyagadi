@@ -40,35 +40,70 @@ class Role {
     };
   }
 
-  /// Create Role from database map
+  /// Create Role from database map (SQLite or Firestore).
+  /// Accepts permissions as JSON string or List (Firestore may return either).
   factory Role.fromMap(Map<String, dynamic> map) {
-    final permissionsJson = map['permissions'] as String? ?? '[]';
-    final List<dynamic> permissionsList = jsonDecode(permissionsJson);
-    final permissions = permissionsList.map((e) => (e as num).toInt()).toSet();
+    final rawPermissions = map['permissions'];
+    Set<int> permissions;
+    if (rawPermissions == null) {
+      permissions = {};
+    } else if (rawPermissions is String) {
+      try {
+        final list = jsonDecode(rawPermissions);
+        if (list is List) {
+          permissions = list
+              .map((e) => (e is num ? e : int.tryParse(e.toString()) ?? 0).toInt())
+              .toSet();
+        } else {
+          permissions = {};
+        }
+      } catch (_) {
+        permissions = {};
+      }
+    } else if (rawPermissions is List) {
+      permissions = rawPermissions
+          .map((e) => (e is num ? e : int.tryParse(e.toString()) ?? 0).toInt())
+          .toSet();
+    } else {
+      permissions = {};
+    }
 
-    // UPDATED: Better handling of ID from both SQLite and Firestore
-    // SQLite uses 'id' as integer, Firestore uses 'documentId' as string
+    // SQLite uses 'id' as integer, Firestore uses documentId (or 'id' set to doc.id)
     dynamic id = map['id'];
     String? documentId = map['documentId'] as String?;
-    
-    // If documentId is not set but we have an id, try to use it as documentId for Firestore
-    // For SQLite, id should be an integer
     if (documentId == null && id != null && id is String) {
       documentId = id as String;
-      id = null; // Clear id if it's actually a documentId
+      id = null;
+    }
+
+    final name = map['name'];
+    if (name == null || name is! String) {
+      throw ArgumentError('Role map must have a non-null String "name"');
     }
 
     return Role(
       id: id,
       documentId: documentId,
-      name: map['name'] as String,
+      name: name,
       description: map['description'] as String?,
       permissions: permissions,
-      isSystemRole: (map['is_system_role'] as int?) == 1,
-      isActive: (map['is_active'] as int?) == 1,
-      createdAt: (map['created_at'] as num?)?.toInt() ?? 0,
-      updatedAt: (map['updated_at'] as num?)?.toInt() ?? 0,
+      isSystemRole: (map['is_system_role'] as num?)?.toInt() == 1,
+      isActive: (map['is_active'] as num?)?.toInt() == 1,
+      createdAt: _parseTimestamp(map['created_at']),
+      updatedAt: _parseTimestamp(map['updated_at']),
     );
+  }
+
+  /// Parse timestamp from num, Firestore Timestamp, or null.
+  static int _parseTimestamp(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v.toInt();
+    try {
+      final ms = (v as dynamic).millisecondsSinceEpoch;
+      return ms is num ? ms.toInt() : 0;
+    } catch (_) {
+      return 0;
+    }
   }
 
   /// Create a copy of Role with updated fields

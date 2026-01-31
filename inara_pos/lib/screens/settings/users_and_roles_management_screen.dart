@@ -150,16 +150,20 @@ class _UsersAndRolesManagementScreenState
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Create User'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: usernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Username',
-                    border: OutlineInputBorder(),
-                  ),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.6,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: usernameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Username',
+                      border: OutlineInputBorder(),
+                    ),
                   autofocus: true,
                 ),
                 const SizedBox(height: 12),
@@ -197,43 +201,18 @@ class _UsersAndRolesManagementScreenState
                     }
                   },
                 ),
-                if (selectedRole == 'admin') ...[
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Email *',
-                      border: OutlineInputBorder(),
-                      helperText: 'Required for admin users',
-                    ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    labelText: selectedRole == 'admin' ? 'Email *' : 'Email',
+                    border: const OutlineInputBorder(),
+                    helperText: selectedRole == 'admin'
+                        ? 'Required for admin users'
+                        : 'Optional – add if user will log in with email (e.g. on web)',
                   ),
-                ] else if (selectedRole == 'cashier') ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue[200]!),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Email will be auto-generated for cashier login',
-                            style: TextStyle(
-                              color: Colors.blue[900],
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: pinController,
@@ -272,6 +251,7 @@ class _UsersAndRolesManagementScreenState
                 ),
               ],
             ),
+          ),
           ),
           actions: [
             TextButton(
@@ -323,12 +303,12 @@ class _UsersAndRolesManagementScreenState
       return;
     }
 
-    // UPDATED: Use createUserWithError for better error messages
+    // Pass email only if admin entered one (no auto-generation)
     final error = await auth.createUserWithError(
       username,
       pin,
       selectedRole,
-      email: selectedRole == 'admin' ? email : null,
+      email: email.isEmpty ? null : email,
     );
     if (!mounted) return;
     
@@ -660,18 +640,34 @@ class _UsersAndRolesManagementScreenState
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
-      final roleMaps = await dbProvider.query(
-        'roles',
-        orderBy: 'is_system_role DESC, name ASC',
-      );
+      List<dynamic> roleMaps;
+      try {
+        roleMaps = await dbProvider.query(
+          'roles',
+          orderBy: 'is_system_role DESC, name ASC',
+        );
+      } catch (queryError) {
+        // Firestore may require an index; retry without orderBy and sort in memory
+        debugPrint('Roles query with orderBy failed: $queryError');
+        roleMaps = await dbProvider.query('roles');
+      }
 
-      // UPDATED: Ensure ID is properly set for both SQLite and Firestore
-      _rolesList = roleMaps.map((map) {
-        final role = Role.fromMap(map);
-        // Debug: Log role data to help diagnose ID issues
-        debugPrint('Loaded role: ${role.name}, id: ${role.id}, documentId: ${role.documentId}');
-        return role;
-      }).toList();
+      final List<Role> loaded = [];
+      for (final item in roleMaps) {
+        if (item is! Map) continue;
+        try {
+          final map = Map<String, dynamic>.from(item as Map);
+          loaded.add(Role.fromMap(map));
+        } catch (e) {
+          debugPrint('Error parsing role (skipping): $e — map: $item');
+        }
+      }
+      // Sort: system roles first, then by name
+      loaded.sort((a, b) {
+        if (a.isSystemRole != b.isSystemRole) return a.isSystemRole ? -1 : 1;
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      });
+      _rolesList = loaded;
     } catch (e) {
       debugPrint('Error loading roles: $e');
       if (mounted) {
@@ -681,6 +677,7 @@ class _UsersAndRolesManagementScreenState
             backgroundColor: Colors.red,
           ),
         );
+        _rolesList = [];
       }
     } finally {
       if (mounted) {
@@ -711,81 +708,85 @@ class _UsersAndRolesManagementScreenState
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: Text(existingRole == null ? 'Create Role' : 'Edit Role'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Role Name *',
-                    hintText: 'e.g., Manager, Staff, etc.',
-                    border: OutlineInputBorder(),
+          content: SizedBox(
+            width: 400,
+            height: (MediaQuery.of(context).size.height * 0.6).clamp(300.0, 560.0),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Role Name *',
+                      hintText: 'e.g., Manager, Staff, etc.',
+                      border: OutlineInputBorder(),
+                    ),
+                    enabled: existingRole == null || !existingRole.isSystemRole,
                   ),
-                  enabled: existingRole == null || !existingRole.isSystemRole,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: descController,
-                  decoration: const InputDecoration(
-                    labelText: 'Description',
-                    hintText: 'Brief description of this role',
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: descController,
+                    decoration: const InputDecoration(
+                      labelText: 'Description',
+                      hintText: 'Brief description of this role',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 2,
                   ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Permissions *',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Permissions *',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  constraints: const BoxConstraints(maxHeight: 300),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: _sectionNames.length,
-                    itemBuilder: (context, index) {
-                      final sectionIndex = _sectionNames.keys.elementAt(index);
-                      final sectionName = _sectionNames[sectionIndex]!;
-                      final isSelected = selectedPermissions.contains(sectionIndex);
-                      final isDashboard = sectionIndex == 0;
+                  const SizedBox(height: 8),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _sectionNames.length,
+                      itemBuilder: (context, index) {
+                        final sectionIndex = _sectionNames.keys.elementAt(index);
+                        final sectionName = _sectionNames[sectionIndex]!;
+                        final isSelected = selectedPermissions.contains(sectionIndex);
+                        final isDashboard = sectionIndex == 0;
 
-                      return CheckboxListTile(
-                        title: Text(sectionName),
-                        value: isSelected,
-                        enabled: !isDashboard,
-                        onChanged: isDashboard
-                            ? null
-                            : (value) {
-                                setDialogState(() {
-                                  if (value == true) {
-                                    selectedPermissions.add(sectionIndex);
-                                  } else {
-                                    selectedPermissions.remove(sectionIndex);
-                                    if (selectedPermissions.isEmpty) {
-                                      selectedPermissions.add(0);
+                        return CheckboxListTile(
+                          title: Text(sectionName),
+                          value: isSelected,
+                          enabled: !isDashboard,
+                          onChanged: isDashboard
+                              ? null
+                              : (value) {
+                                  setDialogState(() {
+                                    if (value == true) {
+                                      selectedPermissions.add(sectionIndex);
+                                    } else {
+                                      selectedPermissions.remove(sectionIndex);
+                                      if (selectedPermissions.isEmpty) {
+                                        selectedPermissions.add(0);
+                                      }
                                     }
-                                  }
-                                });
-                              },
-                      );
+                                  });
+                                },
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  CheckboxListTile(
+                    title: const Text('Active'),
+                    value: isActive,
+                    onChanged: (value) {
+                      setDialogState(() => isActive = value ?? true);
                     },
                   ),
-                ),
-                const SizedBox(height: 16),
-                CheckboxListTile(
-                  title: const Text('Active'),
-                  value: isActive,
-                  onChanged: (value) {
-                    setDialogState(() => isActive = value ?? true);
-                  },
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           actions: [
@@ -861,6 +862,15 @@ class _UsersAndRolesManagementScreenState
             }
             await _loadRoles();
             await _loadUsers(); // Refresh users to get updated roles
+          } else {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Failed to create role. Please try again.'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
           }
         } else {
           // UPDATED: Better handling of role ID for both SQLite and Firestore
@@ -1123,13 +1133,33 @@ class _UsersAndRolesManagementScreenState
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: TextField(
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              labelText: 'Search users',
-              border: OutlineInputBorder(),
-            ),
-            onChanged: (v) => setState(() => _userSearch = v),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (kIsWeb)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.cloud_done, size: 18, color: Colors.green[700]),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Users are stored in Firebase and sync across devices.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+              TextField(
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search),
+                  labelText: 'Search users',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (v) => setState(() => _userSearch = v),
+              ),
+            ],
           ),
         ),
         Expanded(
@@ -1309,25 +1339,78 @@ class _UsersAndRolesManagementScreenState
       children: [
         Padding(
           padding: const EdgeInsets.all(16),
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: 'Search roles...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _roleSearch.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        setState(() => _roleSearch = '');
-                      },
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (kIsWeb)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.cloud_done, size: 18, color: Colors.green[700]),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Roles are stored in Firebase and sync across devices.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+              Row(
+                children: [
+              Expanded(
+                child: TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Search roles...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _roleSearch.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              setState(() => _roleSearch = '');
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onChanged: (value) {
+                    setState(() => _roleSearch = value);
+                  },
+                ),
               ),
-            ),
-            onChanged: (value) {
-              setState(() => _roleSearch = value);
-            },
+              const SizedBox(width: 12),
+              Material(
+                color: AppTheme.logoSecondary,
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  onTap: () => _showAddRoleDialog(),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 16),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.add, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text(
+                          'Create Role',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+                ],
+              ),
+            ],
           ),
         ),
         Expanded(

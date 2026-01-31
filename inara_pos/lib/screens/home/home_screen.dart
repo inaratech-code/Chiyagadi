@@ -337,6 +337,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
+              if (_selectedIndex == 0)
+                ListTile(
+                  leading: const Icon(Icons.logout, color: Colors.red),
+                  title: const Text(
+                    'Logout',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    authProvider.logout();
+                  },
+                ),
             ],
           );
         },
