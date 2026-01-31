@@ -202,15 +202,33 @@ class _UsersAndRolesManagementScreenState
                   },
                 ),
                 const SizedBox(height: 12),
+                if (selectedRole == 'cashier')
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 18, color: Colors.blue[700]),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Set email for web login',
+                            style: TextStyle(fontSize: 12, color: Colors.blue[800]),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 TextField(
                   controller: emailController,
                   keyboardType: TextInputType.emailAddress,
+                  autofillHints: const [AutofillHints.email],
                   decoration: InputDecoration(
                     labelText: selectedRole == 'admin' ? 'Email *' : 'Email',
+                    hintText: 'user@example.com',
                     border: const OutlineInputBorder(),
                     helperText: selectedRole == 'admin'
                         ? 'Required for admin users'
-                        : 'Optional – add if user will log in with email (e.g. on web)',
+                        : 'Optional – set for web login',
                   ),
                 ),
                 const SizedBox(height: 12),
