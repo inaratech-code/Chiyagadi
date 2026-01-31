@@ -376,8 +376,6 @@ class _LoginScreenState extends State<LoginScreen>
                                         decoration: InputDecoration(
                                           labelText: 'Email',
                                           hintText: 'Enter your email',
-                                          helperText:
-                                              'Use the email set by your admin',
                                           prefixIcon: const Icon(
                                             Icons.email_outlined,
                                             color: Color(0xFFFFC107),
@@ -438,8 +436,6 @@ class _LoginScreenState extends State<LoginScreen>
                                         decoration: InputDecoration(
                                           labelText: 'Password',
                                           hintText: 'Enter your password',
-                                          helperText:
-                                              'Use the password set by your admin',
                                           prefixIcon: const Icon(
                                               Icons.lock_outline,
                                               color: Color(0xFFFFC107)),
