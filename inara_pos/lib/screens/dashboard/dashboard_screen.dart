@@ -381,95 +381,96 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return [
       // Welcome Section with Logo and Settings Button
       const SizedBox(height: 8),
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Logo
-              Container(
-                width: kIsWeb ? 80 : 60,
-                height: kIsWeb ? 80 : 60,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      const Color(0xFFFFEB3B),
-                      const Color(0xFFFFC107),
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFFFC107).withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: ClipOval(
-                  child: Image.asset(
-                    'assets/images/logo.jpeg',
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Icon(
-                        Icons.local_cafe,
-                        color: Color(0xFF8B4513),
-                        size: 36,
-                      );
-                    },
-                  ),
-                ),
-              ),
-              SizedBox(width: kIsWeb ? 16 : 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Welcome,\nChiyagadi',
-                      style: TextStyle(
-                        fontSize: kIsWeb ? 26 : 18,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF1A1A1A),
-                        letterSpacing: -0.2,
-                        height: 1.2,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.visible,
-                      softWrap: true,
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Text(
-                          'Powered by ',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey[500],
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        Text(
-                          'Inara Tech',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF8B4513),
-                            letterSpacing: 0.5,
-                          ),
-                        ),
+          Flexible(
+            child: Row(
+              children: [
+                // Logo
+                Container(
+                  width: kIsWeb ? 80 : 70,
+                  height: kIsWeb ? 80 : 70,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        const Color(0xFFFFEB3B), // Light yellow center
+                        const Color(0xFFFFC107), // Golden yellow edges
                       ],
                     ),
-                  ],
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFFC107).withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/images/logo.jpeg',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(
+                          Icons.local_cafe,
+                          color: Color(0xFF8B4513), // Brown
+                          size: 40,
+                        );
+                      },
+                    ),
+                  ),
                 ),
-              ),
-            ],
+                SizedBox(width: kIsWeb ? 16 : 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Welcome,\nChiyagadi',
+                        style: TextStyle(
+                          fontSize: kIsWeb ? 26 : 14,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF1A1A1A),
+                          letterSpacing: -0.2,
+                          height: 1.2,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.visible,
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Text(
+                            'Powered by ',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[500],
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          Text(
+                            'Inara Tech',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF8B4513),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
+          // Settings and Logout buttons - always visible, never clipped
           Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
                 icon: const Icon(Icons.settings),
@@ -483,6 +484,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 padding: const EdgeInsets.all(8),
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
               ),
+              const SizedBox(width: 4),
               IconButton(
                 icon: const Icon(Icons.logout),
                 onPressed: () {
@@ -820,13 +822,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Text(
                   title,
                   style: TextStyle(
-                    fontSize: kIsWeb ? 14 : 12,
+                    fontSize: kIsWeb ? 14 : 13,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    color: Colors.black87, // Dark/black text
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.visible,
-                  softWrap: true,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 8),
@@ -1161,14 +1162,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Text(
                 label,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontSize: isCompact ? 10 : 12,
+                      fontSize: isCompact ? 11 : 12,
                       fontWeight: FontWeight.w600,
                       color: Colors.grey[800],
                     ),
                 textAlign: TextAlign.center,
                 maxLines: 2,
-                overflow: TextOverflow.visible,
-                softWrap: true,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
