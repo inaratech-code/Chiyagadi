@@ -23,10 +23,15 @@ class MenuScreen extends StatefulWidget {
   /// the screen clears any active order so the next add creates a new order.
   final int? startNewOrderKey;
 
+  /// When provided, listen for changes instead of relying on widget rebuild.
+  /// Enables instant tab switch without cache clear.
+  final ValueNotifier<int>? startNewOrderListenable;
+
   const MenuScreen({
     super.key,
     this.hideAppBar = false,
     this.startNewOrderKey,
+    this.startNewOrderListenable,
   });
 
   @override
@@ -47,6 +52,7 @@ class _MenuScreenState extends State<MenuScreen> {
   int _overlayRefreshKey = 0; // UPDATED: Force overlay refresh
   int? _lastStartNewOrderKey; // Used when arriving from Orders "New Order"
   Timer? _loadDeferTimer;
+  VoidCallback? _newOrderListener;
 
   // Pending cart: items held locally until "Create Order" is clicked (not in DB)
   List<Map<String, dynamic>> _pendingCartItems =
@@ -371,15 +377,39 @@ class _MenuScreenState extends State<MenuScreen> {
     );
   }
 
+  void _clearActiveOrderForNewOrder() {
+    if (!mounted) return;
+    setState(() {
+      _activeOrderId = null;
+      _activeOrderNumber = null;
+      _pendingCartItems = [];
+      _showOrderOverlay = false;
+      _lastStartNewOrderKey =
+          widget.startNewOrderListenable?.value ?? widget.startNewOrderKey;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
-    _lastStartNewOrderKey = widget.startNewOrderKey;
+    _lastStartNewOrderKey =
+        widget.startNewOrderListenable?.value ?? widget.startNewOrderKey;
+    _newOrderListener = () {
+      final newKey = widget.startNewOrderListenable?.value;
+      if (newKey != null && newKey != _lastStartNewOrderKey) {
+        _clearActiveOrderForNewOrder();
+      }
+    };
+    widget.startNewOrderListenable?.addListener(_newOrderListener!);
     // PERF: Let the screen render first.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
       // When opened from Orders "New Order", start with no active order.
-      if (widget.startNewOrderKey == null) {
+      // With listenable: load only when value is 0 (opened from nav, not New Order).
+      final fromNewOrder = widget.startNewOrderKey != null ||
+          (widget.startNewOrderListenable != null &&
+              widget.startNewOrderListenable!.value > 0);
+      if (!fromNewOrder) {
         _loadActiveOrder(); // Load active order for cashiers
       }
     });
@@ -402,6 +432,9 @@ class _MenuScreenState extends State<MenuScreen> {
   @override
   void dispose() {
     _loadDeferTimer?.cancel();
+    if (_newOrderListener != null) {
+      widget.startNewOrderListenable?.removeListener(_newOrderListener!);
+    }
     super.dispose();
   }
 
