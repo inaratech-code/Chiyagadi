@@ -1,0 +1,34 @@
+# CodeRabbit configuration for Flutter POS app
+# https://docs.coderabbit.ai/configure-coderabbit
+
+language: "en-US"
+early_access: false
+
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: true
+  review_status: true
+  review_details: false
+
+  path_filters:
+    - "lib/**"
+    - "!**/*.g.dart"
+    - "!**/*.freezed.dart"
+    - "!.dart_tool/**"
+    - "!build/**"
+
+  path_instructions:
+    - path: "lib/**/*.dart"
+      instructions: |
+        This is a Flutter/Dart POS app for cafés. Use Provider for state.
+        Follow Flutter best practices: const widgets, ListView.builder for lists.
+        Firestore on web, SQLite on mobile. Keep offline-first in mind.
+
+  auto_review:
+    enabled: true
+    drafts: false
+
+chat:
+  auto_reply: true
