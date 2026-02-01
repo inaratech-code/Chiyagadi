@@ -1,0 +1,2 @@
+# Preserve LF line endings for config files
+.coderabbit.yaml text eol=lf

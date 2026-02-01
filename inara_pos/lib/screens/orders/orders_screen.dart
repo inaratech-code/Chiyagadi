@@ -197,22 +197,45 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
       List<Map<String, dynamic>> orders;
       if (_filterStatus == 'all') {
-        // Pending orders at top, then confirmed, completed, cancelled; within same status: newest first
+        // Unpaid/partial first, then paid; within same payment status: newest first
         orders = List<Map<String, dynamic>>.from(allOrders);
         orders.sort((a, b) {
-          final statusA = (a['status'] as String?)?.toLowerCase() ?? 'pending';
-          final statusB = (b['status'] as String?)?.toLowerCase() ?? 'pending';
-          const pendingFirst = {'pending': 0, 'confirmed': 1, 'completed': 2, 'cancelled': 3};
-          final orderA = pendingFirst[statusA] ?? 4;
-          final orderB = pendingFirst[statusB] ?? 4;
+          final payA = (a['payment_status'] as String?) ?? 'unpaid';
+          final payB = (b['payment_status'] as String?) ?? 'unpaid';
+          final unpaidFirst = {'unpaid': 0, 'partial': 1, 'paid': 2};
+          final orderA = unpaidFirst[payA] ?? 3;
+          final orderB = unpaidFirst[payB] ?? 3;
           if (orderA != orderB) return orderA.compareTo(orderB);
           final timeA = (a['created_at'] as num?)?.toInt() ?? 0;
           final timeB = (b['created_at'] as num?)?.toInt() ?? 0;
           return timeB.compareTo(timeA);
         });
+      } else if (_filterStatus == 'pending') {
+        // Pending = orders where payment has not been completed (unpaid or partial)
+        orders = allOrders
+            .where((o) {
+              final ps = o['payment_status'] as String? ?? 'unpaid';
+              return ps != 'paid';
+            })
+            .toList();
+        orders.sort((a, b) {
+          final timeA = (a['created_at'] as num?)?.toInt() ?? 0;
+          final timeB = (b['created_at'] as num?)?.toInt() ?? 0;
+          return timeB.compareTo(timeA);
+        });
+      } else if (_filterStatus == 'completed') {
+        // Completed = orders where payment has been completed
+        orders = allOrders
+            .where((o) => (o['payment_status'] as String? ?? 'unpaid') == 'paid')
+            .toList();
+        orders.sort((a, b) {
+          final timeA = (a['created_at'] as num?)?.toInt() ?? 0;
+          final timeB = (b['created_at'] as num?)?.toInt() ?? 0;
+          return timeB.compareTo(timeA);
+        });
       } else {
+        // Cancelled: filter by order status
         orders = allOrders.where((o) => o['status'] == _filterStatus).toList();
-        // Within filtered status: newest first
         orders.sort((a, b) {
           final timeA = (a['created_at'] as num?)?.toInt() ?? 0;
           final timeB = (b['created_at'] as num?)?.toInt() ?? 0;
@@ -863,11 +886,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
       double sum = 0.0;
       for (final entry in qty.entries) {
         if (entry.value <= 0) continue;
-        final product = products.firstWhere((p) {
+        final matches = products.where((p) {
           final pid = kIsWeb ? p.documentId : p.id;
           return pid == entry.key;
         });
-        sum += product.price * entry.value;
+        final product = matches.isEmpty ? null : matches.first;
+        if (product != null) {
+          sum += product.price * entry.value;
+        }
       }
       return sum;
     }

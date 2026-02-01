@@ -1,0 +1,5 @@
+# EditorConfig: https://editorconfig.org
+
+# Preserve LF for config files
+[.coderabbit.yaml]
+end_of_line = lf
