@@ -724,7 +724,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
             children: [
               TextField(
                 controller: nameController,
-                decoration: const InputDecoration(labelText: 'Customer Name *'),
+                decoration: const InputDecoration(
+                  labelText: 'Customer Name',
+                  hintText: 'Enter customer name',
+                ),
                 autofocus: true,
               ),
               TextField(
@@ -834,7 +837,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
             children: [
               TextField(
                 controller: nameController,
-                decoration: const InputDecoration(labelText: 'Customer Name *'),
+                decoration: const InputDecoration(
+                  labelText: 'Customer Name',
+                  hintText: 'Enter customer name',
+                ),
               ),
               TextField(
                 controller: phoneController,
@@ -878,7 +884,18 @@ class _CustomersScreenState extends State<CustomersScreen> {
       ),
     );
 
-    if (result == true && nameController.text.isNotEmpty) {
+    if (result == true) {
+      if (nameController.text.trim().isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please enter customer name'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
       try {
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);

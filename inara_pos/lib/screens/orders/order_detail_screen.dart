@@ -5,7 +5,6 @@ import '../../providers/unified_database_provider.dart';
 import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../models/product.dart';
 import '../../services/order_service.dart';
-import '../../services/inventory_ledger_service.dart';
 import '../../utils/theme.dart';
 import 'package:intl/intl.dart';
 import '../dashboard/dashboard_screen.dart';
@@ -693,9 +692,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     List<Product> filteredProducts = _products;
     Product? selectedProduct;
     int quantity = 1;
-    double? availableStock; // Track available stock for selected product
-    final InventoryLedgerService ledgerService =
-        InventoryLedgerService(); // For stock checking
 
     final result = await showDialog<bool>(
       context: context,
@@ -818,7 +814,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 '${product.name} - ${NumberFormat.currency(symbol: 'NPR ').format(product.price)}'),
                           );
                         }).toList(),
-                        onChanged: (Object? value) async {
+                        onChanged: (Object? value) {
                           if (value != null) {
                             try {
                               final product = filteredProducts.firstWhere((p) {
@@ -827,70 +823,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               });
                               setDialogState(() {
                                 selectedProduct = product;
+                                quantity = 1;
                               });
-
-                              // Load stock availability for selected product
-                              final productId =
-                                  kIsWeb ? product.documentId : product.id;
-                              if (productId != null) {
-                                try {
-                                  final stock =
-                                      await ledgerService.getCurrentStock(
-                                    context: context,
-                                    productId: productId,
-                                  );
-                                  // Get current quantity already in this order
-                                  final dbProvider =
-                                      Provider.of<UnifiedDatabaseProvider>(
-                                          context,
-                                          listen: false);
-                                  await dbProvider.init();
-                                  final existingItems = await dbProvider.query(
-                                    'order_items',
-                                    where: 'order_id = ? AND product_id = ?',
-                                    whereArgs: [widget.orderId, productId],
-                                  );
-                                  double currentOrderQty = 0.0;
-                                  if (existingItems.isNotEmpty) {
-                                    currentOrderQty = (existingItems
-                                                .first['quantity'] as num?)
-                                            ?.toDouble() ??
-                                        0.0;
-                                  }
-                                  final maxAvailable =
-                                      (stock - currentOrderQty).toInt();
-
-                                  setDialogState(() {
-                                    availableStock = stock;
-                                    // Limit quantity to available stock
-                                    if (quantity > maxAvailable &&
-                                        maxAvailable > 0) {
-                                      quantity = maxAvailable;
-                                    } else if (maxAvailable <= 0) {
-                                      quantity = 0;
-                                    } else if (quantity == 0 &&
-                                        maxAvailable > 0) {
-                                      quantity = 1; // Set to 1 if was 0
-                                    }
-                                  });
-                                } catch (e) {
-                                  debugPrint('Error loading stock: $e');
-                                  setDialogState(() {
-                                    availableStock = null;
-                                  });
-                                }
-                              }
                             } catch (e) {
                               debugPrint('Error finding product: $e');
                               setDialogState(() {
                                 selectedProduct = null;
-                                availableStock = null;
                               });
                             }
                           } else {
                             setDialogState(() {
                               selectedProduct = null;
-                              availableStock = null;
                             });
                           }
                         },
@@ -898,37 +841,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
                 const SizedBox(height: 16),
 
-                // Stock availability info
-                if (selectedProduct != null && availableStock != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: Row(
-                      children: [
-                        Icon(
-                          availableStock! > 0
-                              ? Icons.check_circle
-                              : Icons.warning,
-                          color: availableStock! > 0
-                              ? Colors.green
-                              : Colors.orange,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Available Stock: ${availableStock!.toStringAsFixed(1)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: availableStock! > 0
-                                ? Colors.green
-                                : Colors.orange,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                // Quantity
+                // Quantity (stock not checked on edit order page)
                 Row(
                   children: [
                     const Text('Quantity: '),
@@ -944,55 +857,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
                         '$quantity',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: (availableStock != null &&
-                                  quantity > availableStock!)
-                              ? Colors.red
-                              : null,
                         ),
                       ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.add),
-                      onPressed: () async {
-                        if (selectedProduct != null) {
-                          final productId = kIsWeb
-                              ? selectedProduct!.documentId
-                              : selectedProduct!.id;
-                          if (productId != null && availableStock != null) {
-                            // Get current quantity in order
-                            final dbProvider =
-                                Provider.of<UnifiedDatabaseProvider>(context,
-                                    listen: false);
-                            await dbProvider.init();
-                            final existingItems = await dbProvider.query(
-                              'order_items',
-                              where: 'order_id = ? AND product_id = ?',
-                              whereArgs: [widget.orderId, productId],
-                            );
-                            double currentOrderQty = 0.0;
-                            if (existingItems.isNotEmpty) {
-                              currentOrderQty =
-                                  (existingItems.first['quantity'] as num?)
-                                          ?.toDouble() ??
-                                      0.0;
-                            }
-                            final maxQty =
-                                (availableStock! - currentOrderQty).toInt();
-
-                            setDialogState(() {
-                              if (quantity < maxQty) {
-                                quantity++;
-                              }
-                            });
-                          } else {
-                            setDialogState(() => quantity++);
-                          }
-                        } else {
-                          setDialogState(() => quantity++);
-                        }
+                      onPressed: () {
+                        setDialogState(() => quantity++);
                       },
                     ),
                   ],
@@ -1069,19 +943,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
-      // Batch-load stock for all sellable products to keep UI fast
-      final productIds = _products
-          .map((p) => kIsWeb ? p.documentId : p.id)
-          .where((id) => id != null)
-          .toList()
-          .cast<dynamic>();
-
-      final ledgerService = InventoryLedgerService();
-      final stockMap = await ledgerService.getCurrentStockBatch(
-        context: context,
-        productIds: productIds,
-      );
-
+      // Stock not checked on edit order page
       final searchController = TextEditingController();
       final Map<dynamic, int> qty = {};
 
@@ -1122,17 +984,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           final pid = kIsWeb ? p.documentId : p.id;
                           if (pid == null) return const SizedBox.shrink();
 
-                          final available = stockMap[pid] ?? 0.0;
                           final current = qty[pid] ?? 0;
-                          final maxQty = available.floor();
-                          final canAddMore = current < maxQty;
 
                           return ListTile(
                             dense: true,
                             title: Text(p.name,
                                 maxLines: 1, overflow: TextOverflow.ellipsis),
                             subtitle: Text(
-                              'Stock: ${available.toStringAsFixed(1)} • Price: ${NumberFormat.currency(symbol: 'NPR ').format(p.price)}',
+                              'Price: ${NumberFormat.currency(symbol: 'NPR ').format(p.price)}',
                               style: TextStyle(
                                   fontSize: 12, color: Colors.grey[700]),
                             ),
@@ -1157,10 +1016,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.add),
-                                  onPressed: canAddMore
-                                      ? () => setDialogState(
-                                          () => qty[pid] = current + 1)
-                                      : null,
+                                  onPressed: () => setDialogState(
+                                      () => qty[pid] = current + 1),
                                 ),
                               ],
                             ),

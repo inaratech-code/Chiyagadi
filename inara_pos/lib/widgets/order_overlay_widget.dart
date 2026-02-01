@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/performance.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:provider/provider.dart';
 import '../providers/unified_database_provider.dart';
@@ -45,7 +46,10 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
   Map<String, dynamic>? _order;
   List<Product> _products = [];
   bool _isLoading = false;
+  bool _isCreating = false; // Prevent double-tap creating multiple orders
   final TextEditingController _discountController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  String? _paymentMethod; // null = no payment, 'cash'|'card'|'digital' = optional payment
 
   @override
   void initState() {
@@ -69,6 +73,7 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
   @override
   void dispose() {
     _discountController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
@@ -165,6 +170,8 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
         // Pending mode: convert pending cart items to _orderItems format
         _order = null;
         _discountController.text = '0';
+        _nameController.clear();
+        _paymentMethod = null;
         _orderItems = widget.pendingItems!.map((item) {
           final product = item['product'] as Product;
           final qty = (item['quantity'] as num?)?.toInt() ?? 1;
@@ -192,6 +199,8 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
           _order = orders.first;
           _discountController.text =
               (_order!['discount_percent'] as num? ?? 0.0).toStringAsFixed(1);
+          _nameController.text =
+              (_order!['customer_name'] as String?)?.trim() ?? '';
         }
 
         final items =
@@ -403,6 +412,9 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
       );
       return;
     }
+    if (_isCreating) return; // Prevent double-tap
+    _isCreating = true;
+    if (mounted) setState(() {});
 
     try {
       final dbProvider =
@@ -423,9 +435,13 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
           dbProvider: dbProvider,
           orderType: 'dine_in',
           createdBy: createdBy,
+          customerName: _nameController.text.trim().isEmpty
+              ? null
+              : _nameController.text.trim(),
         );
 
         // Add all items to the new order (pending items have 'product' key)
+        int itemsAdded = 0;
         for (final item in _orderItems) {
           Product? product = item['product'] as Product?;
           if (product == null && _products.isNotEmpty) {
@@ -445,25 +461,63 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
               quantity: qty,
               createdBy: createdBy,
             );
+            itemsAdded++;
           }
         }
 
-        // Update order totals and status
+        // Safety: if no items were added (e.g. product lookup failed), delete empty order
+        if (itemsAdded == 0) {
+          await dbProvider.delete(
+            'orders',
+            where: kIsWeb ? 'documentId = ?' : 'id = ?',
+            whereArgs: [orderId],
+          );
+          if (mounted) {
+            setState(() => _isCreating = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Error: Could not add items to order. Please try again.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+
+        final updateValues = <String, dynamic>{
+          'subtotal': subtotal,
+          'discount_percent': discountPercent,
+          'discount_amount': discountAmount,
+          'tax_percent': 0.0,
+          'tax_amount': 0.0,
+          'total_amount': total,
+          'status': 'confirmed',
+          'updated_at': DateTime.now().millisecondsSinceEpoch,
+        };
+        final name = _nameController.text.trim();
+        if (name.isNotEmpty) {
+          updateValues['customer_name'] = name;
+        }
         await dbProvider.update(
           'orders',
-          values: {
-            'subtotal': subtotal,
-            'discount_percent': discountPercent,
-            'discount_amount': discountAmount,
-            'tax_percent': 0.0,
-            'tax_amount': 0.0,
-            'total_amount': total,
-            'status': 'confirmed',
-            'updated_at': DateTime.now().millisecondsSinceEpoch,
-          },
+          values: updateValues,
           where: kIsWeb ? 'documentId = ?' : 'id = ?',
           whereArgs: [orderId],
         );
+
+        // Optional: add payment if user selected one
+        if (_paymentMethod != null &&
+            _paymentMethod!.isNotEmpty &&
+            _paymentMethod != 'none') {
+          await _orderService.completePayment(
+            dbProvider: dbProvider,
+            context: context,
+            orderId: orderId,
+            paymentMethod: _paymentMethod!,
+            amount: total,
+            createdBy: createdBy,
+          );
+        }
 
         debugPrint('OrderOverlay: Created new order from pending cart');
         widget.onOrderCreated?.call();
@@ -479,6 +533,21 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
           where: kIsWeb ? 'documentId = ?' : 'id = ?',
           whereArgs: [widget.orderId],
         );
+
+        // Optional: add payment if user selected one
+        if (_paymentMethod != null &&
+            _paymentMethod!.isNotEmpty &&
+            _paymentMethod != 'none') {
+          await _orderService.completePayment(
+            dbProvider: dbProvider,
+            context: context,
+            orderId: widget.orderId!,
+            paymentMethod: _paymentMethod!,
+            amount: total,
+            createdBy: createdBy,
+          );
+        }
+
         widget.onClose?.call();
       }
 
@@ -491,14 +560,18 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
           ),
         );
         Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => const OrdersScreen(),
+          smoothPageRoute(
+            builder: OrdersScreen(
+              hideAppBar: true,
+              onNewOrder: (ctx) => Navigator.of(ctx).pop(),
+            ),
           ),
         );
       }
     } catch (e) {
       debugPrint('OrderOverlay: Error creating order: $e');
       if (mounted) {
+        setState(() => _isCreating = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error creating order: $e'),
@@ -506,6 +579,10 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
             duration: const Duration(seconds: 3),
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isCreating = false);
       }
     }
   }
@@ -524,18 +601,23 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
       final discountAmount = (subtotal * discountPercent / 100);
       final total = subtotal - discountAmount;
 
-      // Update order with current totals
+      // Update order with current totals and optional name
+      final updateValues = <String, dynamic>{
+        'subtotal': subtotal,
+        'discount_percent': discountPercent,
+        'discount_amount': discountAmount,
+        'tax_percent': 0.0,
+        'tax_amount': 0.0,
+        'total_amount': total,
+        'updated_at': DateTime.now().millisecondsSinceEpoch,
+      };
+      final name = _nameController.text.trim();
+      if (name.isNotEmpty) {
+        updateValues['customer_name'] = name;
+      }
       await dbProvider.update(
         'orders',
-        values: {
-          'subtotal': subtotal,
-          'discount_percent': discountPercent,
-          'discount_amount': discountAmount,
-          'tax_percent': 0.0,
-          'tax_amount': 0.0,
-          'total_amount': total,
-          'updated_at': DateTime.now().millisecondsSinceEpoch,
-        },
+        values: updateValues,
         where: kIsWeb ? 'documentId = ?' : 'id = ?',
         whereArgs: [widget.orderId],
       );
@@ -595,6 +677,18 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Optional name bar (not compulsory)
+                    TextField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Name',
+                        hintText: 'Customer or guest name (optional)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
                     // UPDATED: Order Type and Table dropdowns matching 2nd image
                     Row(
                       children: [
@@ -768,6 +862,33 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
 
                     const SizedBox(height: 16),
 
+                    // Optional payment (not compulsory)
+                    DropdownButtonFormField<String>(
+                      value: _paymentMethod ?? 'none',
+                      decoration: const InputDecoration(
+                        labelText: 'Add payment (optional)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.payment),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'none', child: Text('No payment')),
+                        DropdownMenuItem(
+                            value: 'cash', child: Text('Cash')),
+                        DropdownMenuItem(
+                            value: 'card', child: Text('Card')),
+                        DropdownMenuItem(
+                            value: 'digital', child: Text('Digital')),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _paymentMethod =
+                              value == 'none' ? null : value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
                     // UPDATED: Cancel and Create Order buttons matching 2nd image
                     // Added bottom padding to prevent overlap with bottom navigation
                     Padding(
@@ -794,8 +915,9 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: ElevatedButton(
-                              onPressed:
-                                  _orderItems.isEmpty ? null : _createOrder,
+                              onPressed: (_orderItems.isEmpty || _isCreating)
+                                  ? null
+                                  : _createOrder,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor:
                                     const Color(0xFFFFC107), // Yellow/orange
@@ -803,13 +925,22 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 16),
                               ),
-                              child: const Text(
-                                'Create Order',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                              child: _isCreating
+                                  ? SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Create Order',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                             ),
                           ),
                         ],

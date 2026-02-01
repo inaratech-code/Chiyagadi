@@ -14,13 +14,15 @@ import 'order_detail_screen.dart';
 import 'order_payment_dialog.dart';
 import 'package:intl/intl.dart';
 import '../../utils/loading_constants.dart';
+import '../../utils/performance.dart';
 
 class OrdersScreen extends StatefulWidget {
   final bool hideAppBar;
 
   /// When set, the "New Order" FAB navigates to the Menu section to create
   /// the order there (Menu is connected to inventory; avoids inventory errors).
-  final VoidCallback? onNewOrder;
+  /// Callback receives context so it can pop when OrdersScreen was pushed.
+  final void Function(BuildContext)? onNewOrder;
 
   const OrdersScreen({
     super.key,
@@ -193,9 +195,30 @@ class _OrdersScreenState extends State<OrdersScreen> {
         limit: _ordersLimit * 2,
       );
 
-      final orders = _filterStatus == 'all'
-          ? allOrders
-          : allOrders.where((o) => o['status'] == _filterStatus).toList();
+      List<Map<String, dynamic>> orders;
+      if (_filterStatus == 'all') {
+        // Pending orders at top, then confirmed, completed, cancelled; within same status: newest first
+        orders = List<Map<String, dynamic>>.from(allOrders);
+        orders.sort((a, b) {
+          final statusA = (a['status'] as String?)?.toLowerCase() ?? 'pending';
+          final statusB = (b['status'] as String?)?.toLowerCase() ?? 'pending';
+          const pendingFirst = {'pending': 0, 'confirmed': 1, 'completed': 2, 'cancelled': 3};
+          final orderA = pendingFirst[statusA] ?? 4;
+          final orderB = pendingFirst[statusB] ?? 4;
+          if (orderA != orderB) return orderA.compareTo(orderB);
+          final timeA = (a['created_at'] as num?)?.toInt() ?? 0;
+          final timeB = (b['created_at'] as num?)?.toInt() ?? 0;
+          return timeB.compareTo(timeA);
+        });
+      } else {
+        orders = allOrders.where((o) => o['status'] == _filterStatus).toList();
+        // Within filtered status: newest first
+        orders.sort((a, b) {
+          final timeA = (a['created_at'] as num?)?.toInt() ?? 0;
+          final timeB = (b['created_at'] as num?)?.toInt() ?? 0;
+          return timeB.compareTo(timeA);
+        });
+      }
       final limitedOrders = orders.take(_ordersLimit).toList();
 
       if (!mounted) return;
@@ -320,7 +343,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           if (widget.onNewOrder != null) {
-            widget.onNewOrder!();
+            widget.onNewOrder!(context);
           } else {
             _showCreateOrderDialog();
           }
@@ -390,6 +413,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             : RefreshIndicator(
                                 onRefresh: _loadOrders,
                                 child: ListView.builder(
+                                  physics: platformScrollPhysics,
                                   padding: const EdgeInsets.only(
                                     left: 16,
                                     right: 16,
@@ -448,6 +472,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         : RefreshIndicator(
                             onRefresh: _loadOrders,
                             child: ListView.builder(
+                              physics: platformScrollPhysics,
                               padding: const EdgeInsets.only(
                                 left: 16,
                                 right: 16,
@@ -519,13 +544,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
     final creditAmount = (order['credit_amount'] as num? ?? 0).toDouble();
     final paymentMethod = order['payment_method'] as String?;
 
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: InkWell(
+    return RepaintBoundary(
+      child: Card(
+        elevation: 2,
+        margin: const EdgeInsets.only(bottom: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: InkWell(
         // UX change: Tap = Payment dialog. Long-press = Details screen.
         onTap: () async {
           if (paymentStatus == 'paid') {
@@ -550,9 +576,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
         onLongPress: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => OrderDetailScreen(
-                orderId: orderId, // FIXED: Use dynamic orderId
+            smoothPageRoute(
+              builder: OrderDetailScreen(
+                orderId: orderId,
                 orderNumber: order['order_number'] as String,
               ),
             ),
@@ -596,9 +622,33 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 color: Colors.grey[600],
                               ),
                             ),
-                            // REMOVED: Date display as requested
                           ],
                         ),
+                        if ((order['customer_name'] as String?)?.trim().isNotEmpty == true) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.person_outline,
+                                size: 18,
+                                color: Colors.grey[700],
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  order['customer_name'] as String,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey[800],
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -627,8 +677,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (context) => OrderDetailScreen(
+                        smoothPageRoute(
+                          builder: OrderDetailScreen(
                             orderId: orderId,
                             orderNumber:
                                 order['order_number'] as String? ?? 'Order',
@@ -760,6 +810,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -774,6 +825,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     dynamic selectedTableId;
     double discountPercent = 0.0;
     final searchController = TextEditingController();
+    final nameController = TextEditingController();
     final Map<dynamic, int> qty = {};
 
     // Load tables
@@ -862,6 +914,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           icon: const Icon(Icons.close),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Optional name bar (not compulsory)
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Name',
+                        hintText: 'Customer or guest name (optional)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
                     ),
                     const SizedBox(height: 12),
 
@@ -1078,8 +1142,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
       ),
     );
 
-    if (result == true) {
-      try {
+    try {
+      if (result == true) {
         // Validate stock for selected items only (fast).
         final selectedEntries = qty.entries.where((e) => e.value > 0).toList();
         final selectedIds = selectedEntries.map((e) => e.key).toList();
@@ -1097,6 +1161,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
           dbProvider: dbProvider,
           orderType: orderType,
           tableId: selectedTableId,
+          customerName: nameController.text.trim().isEmpty
+              ? null
+              : nameController.text.trim(),
           // FIXED: Handle both int (SQLite) and String (Firestore) user IDs
           createdBy: authProvider.currentUserId != null
               ? (kIsWeb
@@ -1105,25 +1172,44 @@ class _OrdersScreenState extends State<OrdersScreen> {
               : null,
         );
 
-        // Add selected items
-        for (final entry in qty.entries) {
-          if (entry.value <= 0) continue;
-          final product = products.firstWhere((p) {
-            final pid = kIsWeb ? p.documentId : p.id;
-            return pid == entry.key;
-          });
-          await _orderService.addItemToOrder(
-            dbProvider: dbProvider,
-            context: context,
-            orderId: orderId,
-            product: product,
-            quantity: entry.value,
-            createdBy: authProvider.currentUserId != null
-                ? (kIsWeb
-                    ? authProvider.currentUserId!
-                    : int.tryParse(authProvider.currentUserId!))
-                : null,
+        // Add selected items - if none added, delete empty order
+        int itemsAdded = 0;
+        try {
+          for (final entry in qty.entries) {
+            if (entry.value <= 0) continue;
+            final product = products.firstWhere((p) {
+              final pid = kIsWeb ? p.documentId : p.id;
+              return pid == entry.key;
+            });
+            await _orderService.addItemToOrder(
+              dbProvider: dbProvider,
+              context: context,
+              orderId: orderId,
+              product: product,
+              quantity: entry.value,
+              createdBy: authProvider.currentUserId != null
+                  ? (kIsWeb
+                      ? authProvider.currentUserId!
+                      : int.tryParse(authProvider.currentUserId!))
+                  : null,
+            );
+            itemsAdded++;
+          }
+        } catch (e) {
+          await dbProvider.delete(
+            'orders',
+            where: kIsWeb ? 'documentId = ?' : 'id = ?',
+            whereArgs: [orderId],
           );
+          rethrow;
+        }
+        if (itemsAdded == 0) {
+          await dbProvider.delete(
+            'orders',
+            where: kIsWeb ? 'documentId = ?' : 'id = ?',
+            whereArgs: [orderId],
+          );
+          throw Exception('Could not add items to order. Please try again.');
         }
 
         // Apply Discount and force totals update
@@ -1144,10 +1230,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
           leadingAssetPath: 'assets/images/order_done.jpg',
           leadingIcon: Icons.receipt_long,
         );
-      } catch (e) {
-        AppMessenger.showSnackBar('Error creating order: $e',
-            backgroundColor: Colors.red);
       }
+    } catch (e) {
+      AppMessenger.showSnackBar('Error creating order: $e',
+          backgroundColor: Colors.red);
+    } finally {
+      nameController.dispose();
     }
   }
 

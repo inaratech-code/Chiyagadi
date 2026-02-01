@@ -401,6 +401,11 @@ class DatabaseProvider with ChangeNotifier {
               'ALTER TABLE orders ADD COLUMN paid_amount REAL NOT NULL DEFAULT 0');
           debugPrint('Database: Added paid_amount column to orders');
         }
+        if (!ordersColumnNames.contains('customer_name')) {
+          await db.execute(
+              'ALTER TABLE orders ADD COLUMN customer_name TEXT');
+          debugPrint('Database: Added customer_name column to orders');
+        }
       }
 
       // FIXED: Users should support soft-disable (is_active) for multi-user management

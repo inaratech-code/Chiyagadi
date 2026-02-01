@@ -4,6 +4,7 @@ import '../../models/product.dart';
 import '../../models/category.dart';
 import '../../providers/unified_database_provider.dart';
 import '../../utils/number_formatter.dart';
+import '../../utils/performance.dart';
 
 class POSProductGrid extends StatefulWidget {
   final Function(Product) onProductSelected;
@@ -99,6 +100,7 @@ class _POSProductGridState extends State<POSProductGrid> {
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              physics: platformScrollPhysics,
               itemCount: _categories.length,
               itemBuilder: (context, index) {
                 final category = _categories[index];
@@ -181,6 +183,7 @@ class _POSProductGridState extends State<POSProductGrid> {
                     )
                   : GridView.builder(
                       padding: const EdgeInsets.all(12),
+                      physics: platformScrollPhysics,
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 4,
@@ -191,7 +194,9 @@ class _POSProductGridState extends State<POSProductGrid> {
                       itemCount: _products.length,
                       itemBuilder: (context, index) {
                         final product = _products[index];
-                        return _buildProductCard(product);
+                        return RepaintBoundary(
+                          child: _buildProductCard(product),
+                        );
                       },
                     ),
         ),

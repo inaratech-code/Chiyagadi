@@ -30,6 +30,9 @@ class _HomeScreenState extends State<HomeScreen> {
   /// When Orders "New Order" is used, we bump this and switch to Menu so the
   /// new order is created from the Menu section (inventory is handled there).
   int _newOrderRequestKey = 0;
+
+  /// Cached permissions for instant tab switch (no await on every tap).
+  Set<int>? _cachedPermissions;
   final Map<int, GlobalKey> _screenKeys = {
     0: GlobalKey(),
     1: GlobalKey(),
@@ -62,14 +65,24 @@ class _HomeScreenState extends State<HomeScreen> {
     'Expenses',
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    // PERF: Warm permission cache for instant tab switch
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = context.read<InaraAuthProvider>();
+      auth.getRolePermissions(auth.currentUserRole ?? 'cashier').then((p) {
+        if (mounted) setState(() => _cachedPermissions = p);
+      });
+    });
+  }
+
   void _navigateToScreen(int index) => _selectIndex(index);
 
-  void _selectIndex(int index) async {
-    // Role-based access control using permissions
-    final auth = context.read<InaraAuthProvider>();
-    final hasAccess = await auth.hasAccessToSection(index);
-
-    if (!hasAccess) {
+  void _selectIndex(int index) {
+    // PERF: Check cached permissions for instant tab switch.
+    // Cache is warmed when drawer loads; admin always has access.
+    if (_cachedPermissions != null && !_cachedPermissions!.contains(index)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -79,8 +92,32 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       return;
     }
-
+    if (_cachedPermissions == null) {
+      // First load: check async, then switch
+      _checkAndSelectIndex(index);
+      return;
+    }
     if (index == _selectedIndex && _alive.contains(index)) return;
+    setState(() {
+      _selectedIndex = index;
+      _ensureAlive(index);
+    });
+  }
+
+  Future<void> _checkAndSelectIndex(int index) async {
+    final auth = context.read<InaraAuthProvider>();
+    _cachedPermissions ??= await auth.getRolePermissions(auth.currentUserRole ?? 'cashier');
+    if (!mounted) return;
+    if (!_cachedPermissions!.contains(index) && !auth.isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Access denied: You do not have permission to access this section'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
     setState(() {
       _selectedIndex = index;
       _ensureAlive(index);
@@ -98,7 +135,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return OrdersScreen(
           key: _screenKeys[1],
           hideAppBar: true,
-          onNewOrder: () {
+          onNewOrder: (_) {
             setState(() {
               _newOrderRequestKey++;
               _screenCache.remove(3);
@@ -260,7 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildDrawer(BuildContext context, InaraAuthProvider authProvider) {
     return Drawer(
-      child: FutureBuilder<Set<int>>(
+        child: FutureBuilder<Set<int>>(
         future: authProvider
             .getRolePermissions(authProvider.currentUserRole ?? 'cashier'),
         builder: (context, snapshot) {

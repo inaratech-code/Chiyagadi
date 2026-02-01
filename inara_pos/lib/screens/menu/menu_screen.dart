@@ -11,6 +11,7 @@ import '../../widgets/order_overlay_widget.dart';
 import '../../utils/theme.dart';
 import '../../utils/inventory_category_helper.dart';
 import '../../utils/loading_constants.dart';
+import '../../utils/performance.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io' as io;
 import 'dart:convert';
@@ -445,60 +446,38 @@ class _MenuScreenState extends State<MenuScreen> {
     }
   }
 
-  Future<void> _addToOrder(Product product) async {
-    if (_isAddingToOrder) {
-      debugPrint('Already adding item, skipping...');
-      return;
-    }
+  /// PERF: Instant cart update - single setState, no await. Optimistic UI.
+  void _addToOrder(Product product) {
+    if (_isAddingToOrder) return;
+    _isAddingToOrder = true;
 
-    debugPrint('Adding ${product.name} to cart...');
-    setState(() => _isAddingToOrder = true);
+    final productId = kIsWeb ? product.documentId : product.id;
+    final existingIndex = _pendingCartItems.indexWhere((item) {
+      final p = item['product'] as Product;
+      final pid = kIsWeb ? p.documentId : p.id;
+      return pid == productId || pid?.toString() == productId?.toString();
+    });
 
-    try {
-      // FIXED: Add to local pending cart only - NO order created in DB until
-      // user clicks "Create Order" in the overlay. Order will not appear in
-      // Orders section until then.
-      final productId = kIsWeb ? product.documentId : product.id;
-      final existingIndex = _pendingCartItems.indexWhere((item) {
-        final p = item['product'] as Product;
-        final pid = kIsWeb ? p.documentId : p.id;
-        return pid == productId || pid?.toString() == productId?.toString();
-      });
-
-      if (mounted) {
-        setState(() {
-          if (existingIndex >= 0) {
-            final qty =
-                (_pendingCartItems[existingIndex]['quantity'] as int) + 1;
-            _pendingCartItems[existingIndex]['quantity'] = qty;
-          } else {
-            _pendingCartItems.add({'product': product, 'quantity': 1});
-          }
-          _overlayRefreshKey++;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Added ${product.name}'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 1),
-          ),
-        );
+    setState(() {
+      if (existingIndex >= 0) {
+        final qty = (_pendingCartItems[existingIndex]['quantity'] as int) + 1;
+        _pendingCartItems[existingIndex]['quantity'] = qty;
+      } else {
+        _pendingCartItems.add({'product': product, 'quantity': 1});
       }
-    } catch (e) {
-      debugPrint('Error adding item to cart: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Unable to add item: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isAddingToOrder = false);
-    }
+      _overlayRefreshKey++;
+    });
+
+    Future.microtask(() {
+      if (mounted) _isAddingToOrder = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Added ${product.name}'),
+        backgroundColor: Colors.green,
+        duration: const Duration(milliseconds: 800),
+      ),
+    );
   }
 
   Future<void> _loadData() async {
@@ -857,6 +836,7 @@ class _MenuScreenState extends State<MenuScreen> {
           RefreshIndicator(
             onRefresh: _loadData,
             child: CustomScrollView(
+              physics: platformScrollPhysics,
               slivers: [
                 // Search Bar with Add Category button
                 SliverToBoxAdapter(
@@ -1133,7 +1113,9 @@ class _MenuScreenState extends State<MenuScreen> {
                                 itemBuilder: (context, productIndex) {
                                   final product =
                                       categoryProducts[productIndex];
-                                  return _buildProductCard(product);
+                                  return RepaintBoundary(
+                                    child: _buildProductCard(product),
+                                  );
                                 },
                               ),
                               // FIXED: Increased spacing between categories to prevent overlap

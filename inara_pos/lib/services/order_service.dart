@@ -64,12 +64,13 @@ class OrderService {
     required String orderType,
     dynamic tableId, // Can be int (SQLite) or String (Firestore)
     dynamic createdBy, // FIXED: Can be int (SQLite) or String (Firestore)
+    String? customerName, // Optional name for the order (guest/customer name)
   }) async {
     await dbProvider.init();
     final now = DateTime.now().millisecondsSinceEpoch;
     final orderNumber = await generateOrderNumber(dbProvider);
 
-    final orderId = await dbProvider.insert('orders', {
+    final values = <String, dynamic>{
       'order_number': orderNumber,
       'table_id': tableId,
       'order_type': orderType,
@@ -85,7 +86,12 @@ class OrderService {
       'created_at': now,
       'updated_at': now,
       'synced': 0,
-    });
+    };
+    if (customerName != null && customerName.trim().isNotEmpty) {
+      values['customer_name'] = customerName.trim();
+    }
+
+    final orderId = await dbProvider.insert('orders', values);
 
     return orderId;
   }
