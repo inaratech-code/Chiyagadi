@@ -29,7 +29,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// When Orders "New Order" is used, we bump this and switch to Menu so the
   /// new order is created from the Menu section (inventory is handled there).
-  int _newOrderRequestKey = 0;
+  /// ValueNotifier enables instant tab switch without recreating MenuScreen.
+  final ValueNotifier<int> _newOrderRequestNotifier = ValueNotifier(0);
 
   /// Cached permissions for instant tab switch (no await on every tap).
   Set<int>? _cachedPermissions;
@@ -75,6 +76,12 @@ class _HomeScreenState extends State<HomeScreen> {
         if (mounted) setState(() => _cachedPermissions = p);
       });
     });
+  }
+
+  @override
+  void dispose() {
+    _newOrderRequestNotifier.dispose();
+    super.dispose();
   }
 
   void _navigateToScreen(int index) => _selectIndex(index);
@@ -136,11 +143,8 @@ class _HomeScreenState extends State<HomeScreen> {
           key: _screenKeys[1],
           hideAppBar: true,
           onNewOrder: (_) {
-            setState(() {
-              _newOrderRequestKey++;
-              _screenCache.remove(3);
-              _screenKeys[3] = GlobalKey();
-            });
+            _newOrderRequestNotifier.value++;
+            _ensureAlive(3); // Pre-warm Menu so it opens instantly
             _selectIndex(3);
           },
         );
@@ -150,7 +154,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return MenuScreen(
           key: _screenKeys[3],
           hideAppBar: true,
-          startNewOrderKey: _newOrderRequestKey,
+          startNewOrderListenable: _newOrderRequestNotifier,
         );
       case 4:
         return SalesScreen(key: _screenKeys[4], hideAppBar: true);
@@ -183,6 +187,14 @@ class _HomeScreenState extends State<HomeScreen> {
     // Update LRU list
     _alive.remove(index);
     _alive.add(index);
+
+    // PERF: Pre-warm Menu when on Orders so "New Order" opens instantly
+    if (index == 1) {
+      _getScreen(3);
+      if (!_alive.contains(3)) {
+        _alive.add(3);
+      }
+    }
 
     // Evict oldest screens (but never evict the currently selected one)
     while (_alive.length > _maxAliveScreens) {
