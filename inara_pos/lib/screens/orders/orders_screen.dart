@@ -43,6 +43,53 @@ class _OrdersScreenState extends State<OrdersScreen> {
   bool _canLoadMore = false;
   Timer? _loadDeferTimer;
 
+  // Expandable ordered items on card (any role with Orders permission)
+  static const int _ordersSectionIndex = 1; // Orders in role permissions
+  bool? _hasOrdersPermission;
+  dynamic _expandedOrderId;
+  List<Map<String, dynamic>>? _expandedOrderItems;
+  bool _loadingExpandedItems = false;
+
+  Future<void> _loadOrderItemsForCard(dynamic orderId) async {
+    if (_expandedOrderId != orderId) return;
+    setState(() => _loadingExpandedItems = true);
+    try {
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      await dbProvider.init();
+      final items = await dbProvider.query(
+        'order_items',
+        where: 'order_id = ?',
+        whereArgs: [orderId],
+      );
+      if (mounted && _expandedOrderId == orderId) {
+        setState(() {
+          _expandedOrderItems = items;
+          _loadingExpandedItems = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading order items: $e');
+      if (mounted) {
+        setState(() => _loadingExpandedItems = false);
+      }
+    }
+  }
+
+  void _toggleOrderItemsExpanded(Map<String, dynamic> order) {
+    final orderId = kIsWeb ? (order['documentId'] ?? order['id']) : order['id'];
+    setState(() {
+      if (_expandedOrderId == orderId) {
+        _expandedOrderId = null;
+        _expandedOrderItems = null;
+      } else {
+        _expandedOrderId = orderId;
+        _expandedOrderItems = null;
+      }
+    });
+    if (_expandedOrderId == orderId) _loadOrderItemsForCard(orderId);
+  }
+
   // NEW: Sensitive action confirmation (password)
   Future<bool> _confirmAdminPin() async {
     final auth = Provider.of<InaraAuthProvider>(context, listen: false);
@@ -166,7 +213,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadOrders());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loadOrders();
+      if (!mounted) return;
+      final auth = Provider.of<InaraAuthProvider>(context, listen: false);
+      final has = await auth.hasAccessToSection(_ordersSectionIndex);
+      if (mounted) setState(() => _hasOrdersPermission = has);
+    });
   }
 
   @override
@@ -211,11 +264,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
           return timeB.compareTo(timeA);
         });
       } else if (_filterStatus == 'pending') {
-        // Pending = orders where payment has not been completed (unpaid or partial)
+        // Pending = orders where payment has not been completed (unpaid or partial),
+        // OR order status is confirmed (include confirmed orders regardless of payment)
         orders = allOrders
             .where((o) {
               final ps = o['payment_status'] as String? ?? 'unpaid';
-              return ps != 'paid';
+              final st = o['status'] as String? ?? 'pending';
+              return ps != 'paid' || st == 'confirmed';
             })
             .toList();
         orders.sort((a, b) {
@@ -263,6 +318,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
     switch (status) {
       case 'pending':
         return Colors.orange;
+      case 'confirmed':
+        return Colors.blue;
       case 'completed':
         return Colors.green;
       case 'cancelled':
@@ -276,6 +333,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
     switch (status) {
       case 'pending':
         return 'Pending';
+      case 'confirmed':
+        return 'Confirmed';
       case 'completed':
         return 'Completed';
       case 'cancelled':
@@ -827,8 +886,93 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ),
                 ),
 
-              // PERF: Don't show item preview here (it forces N+1 queries on web).
-              // Item details are shown in Order Detail screen.
+              // Expandable ordered items for roles with Orders permission
+              if (_hasOrdersPermission == true) ...[
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () => _toggleOrderItemsExpanded(order),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _expandedOrderId == orderId
+                              ? Icons.keyboard_arrow_up
+                              : Icons.keyboard_arrow_down,
+                          size: 20,
+                          color: Colors.grey[700],
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _expandedOrderId == orderId
+                              ? 'Hide items'
+                              : 'View ordered items',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_expandedOrderId == orderId) ...[
+                  const SizedBox(height: 8),
+                  _loadingExpandedItems
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: Center(child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )),
+                        )
+                      : (_expandedOrderItems == null || _expandedOrderItems!.isEmpty)
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                'No items in this order',
+                                style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                              ),
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: _expandedOrderItems!.map<Widget>((item) {
+                                final name = item['product_name'] as String? ?? 'Item';
+                                final qty = (item['quantity'] as num?)?.toInt() ?? 0;
+                                final total = (item['total_price'] as num?)?.toDouble() ?? 0.0;
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          '$name × $qty',
+                                          style: const TextStyle(fontSize: 13),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      Text(
+                                        NumberFormat.currency(symbol: 'NPR ').format(total),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          color: Colors.grey[800],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                ],
+              ],
             ],
           ),
         ),

@@ -35,6 +35,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   bool _isLoading = false;
   final TextEditingController _discountController = TextEditingController();
   bool _didAutoOpenAddItems = false;
+  static const int _ordersSectionIndex = 1; // Orders in role permissions
+  bool? _hasOrdersPermission;
 
   @override
   void initState() {
@@ -122,6 +124,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       _categories =
           await dbProvider.query('categories', orderBy: 'display_order ASC');
       debugPrint('Loaded ${_categories.length} categories');
+
+      // Permission: can view/edit order items (Orders section)
+      final auth = Provider.of<InaraAuthProvider>(context, listen: false);
+      final has = await auth.hasAccessToSection(_ordersSectionIndex);
+      if (mounted) setState(() => _hasOrdersPermission = has);
     } catch (e) {
       debugPrint('Error loading order data: $e');
     } finally {
@@ -174,6 +181,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           child: Text('Order ${widget.orderNumber}'),
         ),
         actions: [
+          // Save / Push changes for roles with Orders permission
+          if (_hasOrdersPermission == true)
+            IconButton(
+              icon: const Icon(Icons.save_alt),
+              onPressed: _orderItems.isEmpty ? null : _pushChanges,
+              tooltip: 'Save / Push changes',
+            ),
           // Only show delete/cancel if order is not paid
           if (_order?['payment_status'] != 'paid') ...[
             IconButton(
@@ -564,12 +578,72 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 4),
-            Text(
-              '${NumberFormat.currency(symbol: 'NPR ').format(item['unit_price'])} × ${item['quantity']}',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[700],
-              ),
+            Row(
+              children: [
+                Text(
+                  '${NumberFormat.currency(symbol: 'NPR ').format(item['unit_price'])} × ',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                // Quantity edit (+/-) when order is not paid
+                if (_order?['payment_status'] != 'paid')
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 28,
+                          minHeight: 28,
+                        ),
+                        icon: const Icon(Icons.remove_circle_outline, size: 20),
+                        onPressed: () {
+                          final qty = (item['quantity'] as num?)?.toInt() ?? 1;
+                          if (qty <= 1) {
+                            _removeItem(item['id']);
+                          } else {
+                            _updateItemQuantity(item['id'], qty - 1);
+                          }
+                        },
+                        tooltip: 'Decrease quantity',
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          '${item['quantity']}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 28,
+                          minHeight: 28,
+                        ),
+                        icon: const Icon(Icons.add_circle_outline, size: 20),
+                        onPressed: () {
+                          final qty = (item['quantity'] as num?)?.toInt() ?? 0;
+                          _updateItemQuantity(item['id'], qty + 1);
+                        },
+                        tooltip: 'Increase quantity',
+                      ),
+                    ],
+                  )
+                else
+                  Text(
+                    '${item['quantity']}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[700],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+              ],
             ),
             if (product.description != null &&
                 product.description!.isNotEmpty) ...[
@@ -1123,6 +1197,56 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             SnackBar(content: Text('Error: $e')),
           );
         }
+      }
+    }
+  }
+
+  /// Save / Push changes: refresh order and items, then show confirmation.
+  Future<void> _pushChanges() async {
+    try {
+      await _loadData();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Changes saved'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  /// Update order item quantity and persist; then refresh.
+  Future<void> _updateItemQuantity(dynamic orderItemId, int quantity) async {
+    if (quantity <= 0) {
+      _removeItem(orderItemId);
+      return;
+    }
+    try {
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final auth = Provider.of<InaraAuthProvider>(context, listen: false);
+      final createdBy = auth.currentUserId != null
+          ? (kIsWeb ? auth.currentUserId! : int.tryParse(auth.currentUserId!))
+          : null;
+      await _orderService.updateItemQuantity(
+        dbProvider: dbProvider,
+        context: context,
+        orderItemId: orderItemId,
+        quantity: quantity,
+        createdBy: createdBy,
+      );
+      await _loadData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
       }
     }
   }
