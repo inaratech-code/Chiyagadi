@@ -258,6 +258,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               'Type: ${_order?['order_type'] == 'dine_in' ? 'Dine-In' : 'Takeaway'}'),
                           Text(
                               'Payment: ${_order?['payment_status'] == 'paid' ? 'Paid' : 'Unpaid'}'),
+                          if ((_order?['customer_name'] as String?)?.trim().isNotEmpty == true) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(Icons.person_outline, size: 18),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Customer: ${_order!['customer_name']}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -311,6 +328,34 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             return _buildOrderItemCard(item, product);
                           },
                         ),
+
+                  // Add item from same page (when order is not paid)
+                  if (_order?['payment_status'] != 'paid') ...[
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _showAddItemDialog(),
+                              icon: const Icon(Icons.add, size: 20),
+                              label: const Text('Add Item'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _showAddMultipleItemsDialog(),
+                              icon: const Icon(Icons.playlist_add, size: 20),
+                              label: const Text('Add Multiple'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
 
                   // Totals and Payment
                   Container(
@@ -563,109 +608,122 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildOrderItemCard(Map<String, dynamic> item, Product product) {
+    final bool canEdit = _order?['payment_status'] != 'paid';
+    final int qty = (item['quantity'] as num?)?.toInt() ?? 0;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: _buildVegNonVegIcon(product),
-        title: Text(
-          product.name,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
-        ),
-        subtitle: Column(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Text(
-                  '${NumberFormat.currency(symbol: 'NPR ').format(item['unit_price'])} × ',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[700],
-                  ),
-                ),
-                // Quantity edit (+/-) when order is not paid
-                if (_order?['payment_status'] != 'paid')
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 28,
-                          minHeight: 28,
-                        ),
-                        icon: const Icon(Icons.remove_circle_outline, size: 20),
-                        onPressed: () {
-                          final qty = (item['quantity'] as num?)?.toInt() ?? 1;
-                          if (qty <= 1) {
-                            _removeItem(item['id']);
-                          } else {
-                            _updateItemQuantity(item['id'], qty - 1);
-                          }
-                        },
-                        tooltip: 'Decrease quantity',
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          '${item['quantity']}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 28,
-                          minHeight: 28,
-                        ),
-                        icon: const Icon(Icons.add_circle_outline, size: 20),
-                        onPressed: () {
-                          final qty = (item['quantity'] as num?)?.toInt() ?? 0;
-                          _updateItemQuantity(item['id'], qty + 1);
-                        },
-                        tooltip: 'Increase quantity',
-                      ),
-                    ],
-                  )
-                else
+            _buildVegNonVegIcon(product),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    '${item['quantity']}',
+                    product.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${NumberFormat.currency(symbol: 'NPR ').format(item['unit_price'])} × $qty',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey[700],
-                      fontWeight: FontWeight.w500,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-              ],
-            ),
-            if (product.description != null &&
-                product.description!.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(
-                product.description!,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                  fontStyle: FontStyle.italic,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                  if (product.description != null &&
+                      product.description!.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      product.description!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontStyle: FontStyle.italic,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  if (canEdit) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: () {
+                              if (qty <= 1) {
+                                _removeItem(item['id']);
+                              } else {
+                                _updateItemQuantity(item['id'], qty - 1);
+                              }
+                            },
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(
+                                Icons.remove_circle_outline,
+                                size: 24,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: SizedBox(
+                            width: 28,
+                            child: Text(
+                              '$qty',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: () =>
+                                _updateItemQuantity(item['id'], qty + 1),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(
+                                Icons.add_circle_outline,
+                                size: 24,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
               ),
-            ],
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+            ),
+            const SizedBox(width: 6),
             Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
@@ -673,12 +731,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       .format(item['total_price']),
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                    fontSize: 14,
                     color: Color(0xFFFFC107),
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
+                const SizedBox(height: 4),
                 Container(
-                  margin: const EdgeInsets.only(top: 4),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
@@ -694,14 +754,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ),
                   ),
                 ),
+                if (canEdit) ...[
+                  const SizedBox(height: 4),
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                    iconSize: 22,
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    onPressed: () => _removeItem(item['id']),
+                    tooltip: 'Remove item',
+                  ),
+                ],
               ],
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              // FIXED: Handle both int (SQLite) and String (Firestore) order item IDs
-              onPressed: () => _removeItem(item['id']),
-              tooltip: 'Remove item',
             ),
           ],
         ),

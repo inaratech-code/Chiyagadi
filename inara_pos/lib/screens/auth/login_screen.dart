@@ -14,6 +14,8 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
+  static const _defaultEmail = 'chiyagadi@gmail.com';
+
   final TextEditingController _pinController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   bool _isLoading = false;
@@ -89,8 +91,8 @@ class _LoginScreenState extends State<LoginScreen>
       if (mounted) {
         setState(() {
           _isFirstTime = !hasPin;
-          if (_isFirstTime) {
-            _emailController.text = 'chiyagadi@gmail.com';
+            if (_isFirstTime) {
+            _emailController.text = _defaultEmail;
           }
         });
       }
@@ -367,6 +369,7 @@ class _LoginScreenState extends State<LoginScreen>
                                       offset: Offset(0, 20 * (1 - value)),
                                       child: TextField(
                                         controller: _emailController,
+                                        obscureText: false,
                                         keyboardType:
                                             TextInputType.emailAddress,
                                         autofillHints: const [
@@ -553,7 +556,7 @@ class _LoginScreenState extends State<LoginScreen>
                                                                   .clear();
                                                               _emailController
                                                                       .text =
-                                                                  'chiyagadi@gmail.com';
+                                                                  _defaultEmail;
                                                             });
                                                           },
                                                     child: const Text(
@@ -637,7 +640,7 @@ class _LoginScreenState extends State<LoginScreen>
                                                                         .clear();
                                                                     _emailController
                                                                             .text =
-                                                                        'chiyagadi@gmail.com';
+                                                                        _defaultEmail;
                                                                     _isLoading =
                                                                         false;
                                                                   });

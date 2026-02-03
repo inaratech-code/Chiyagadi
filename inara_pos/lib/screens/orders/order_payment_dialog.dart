@@ -33,10 +33,45 @@ class _OrderPaymentDialogState extends State<OrderPaymentDialog> {
   bool _isProcessing = false;
   Customer? _selectedCustomer;
 
+  Map<String, dynamic>? _order;
+  List<Map<String, dynamic>> _orderItems = [];
+  bool _loadingOrder = true;
+
+  double get _subtotal => _orderItems.fold(
+      0.0, (sum, item) => sum + ((item['total_price'] as num?)?.toDouble() ?? 0.0));
+  double get _discountAmount =>
+      (_order?['discount_amount'] as num?)?.toDouble() ?? 0.0;
+  double get _displayTotal =>
+      (_order?['total_amount'] as num?)?.toDouble() ?? widget.totalAmount;
+
   @override
   void initState() {
     super.initState();
     _amountController.text = widget.totalAmount.toStringAsFixed(2);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadOrderDetails());
+  }
+
+  Future<void> _loadOrderDetails() async {
+    try {
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      await dbProvider.init();
+      final orders = await dbProvider.query(
+        'orders',
+        where: kIsWeb ? 'documentId = ?' : 'id = ?',
+        whereArgs: [widget.orderId],
+      );
+      if (orders.isNotEmpty) _order = orders.first;
+      _orderItems = await dbProvider.query(
+        'order_items',
+        where: 'order_id = ?',
+        whereArgs: [widget.orderId],
+      );
+    } catch (e) {
+      debugPrint('OrderPaymentDialog load order: $e');
+    } finally {
+      if (mounted) setState(() => _loadingOrder = false);
+    }
   }
 
   @override
@@ -49,175 +84,320 @@ class _OrderPaymentDialogState extends State<OrderPaymentDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       child: Container(
-        width: 420,
-        padding: const EdgeInsets.all(24),
+        width: 440,
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'Payment',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              widget.orderNumber,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(color: Colors.grey[700]),
-            ),
-            const SizedBox(height: 18),
-
-            // Total amount
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Total Amount'),
-                  const SizedBox(height: 8),
                   Text(
-                    NumberFormatter.formatCurrency(widget.totalAmount),
-                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                    'Payment',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: Theme.of(context).primaryColor,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.orderNumber,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Colors.grey[700],
                         ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
 
-            Text(
-              'Payment Method',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'cash', label: Text('Cash')),
-                ButtonSegment(value: 'card', label: Text('Card')),
-                ButtonSegment(value: 'digital', label: Text('QR Payment')),
-                ButtonSegment(value: 'credit', label: Text('Credit')),
-              ],
-              selected: {_selectedPaymentMethod},
-              onSelectionChanged: (Set<String> newSelection) async {
-                final next = newSelection.first;
-                if (next == 'credit') {
-                  // Pick customer when choosing credit
-                  final picked = await _pickCustomer();
-                  if (picked == null) {
-                    // User cancelled picking a customer; keep previous method.
-                    return;
-                  }
-                  setState(() {
-                    _selectedPaymentMethod = 'credit';
-                    _selectedCustomer = picked;
-                    // Default paid-now amount to 0; user can enter partial.
-                    _amountController.text = '0';
-                  });
-                } else {
-                  setState(() {
-                    _selectedPaymentMethod = next;
-                    if (_selectedPaymentMethod != 'credit') {
-                      _selectedCustomer = null;
-                      // Restore default amount to full total for normal payments.
-                      _amountController.text =
-                          widget.totalAmount.toStringAsFixed(2);
-                    }
-                  });
-                }
-              },
-            ),
-            const SizedBox(height: 18),
-
-            if (_selectedPaymentMethod == 'credit') ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.orange.withOpacity(0.35)),
-                ),
-                child: Row(
+            // Scrollable: order details + payment
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Icon(Icons.person, color: Colors.orange),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _selectedCustomer == null
-                            ? 'Select customer for credit'
-                            : 'Credit customer: ${_selectedCustomer!.name}',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                    // Order summary (items, customer, totals)
+                    _buildOrderSummary(),
+                    const SizedBox(height: 20),
+                    const Divider(height: 1),
+                    const SizedBox(height: 20),
+
+                    // Payment method
+                    Text(
+                      'Payment Method',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(value: 'cash', label: Text('Cash')),
+                        ButtonSegment(value: 'card', label: Text('Card')),
+                        ButtonSegment(value: 'digital', label: Text('QR Payment')),
+                        ButtonSegment(value: 'credit', label: Text('Credit')),
+                      ],
+                      selected: {_selectedPaymentMethod},
+                      onSelectionChanged: (Set<String> newSelection) async {
+                        final next = newSelection.first;
+                        if (next == 'credit') {
+                          final picked = await _pickCustomer();
+                          if (picked == null) return;
+                          setState(() {
+                            _selectedPaymentMethod = 'credit';
+                            _selectedCustomer = picked;
+                            _amountController.text = '0';
+                          });
+                        } else {
+                          setState(() {
+                            _selectedPaymentMethod = next;
+                            if (_selectedPaymentMethod != 'credit') {
+                              _selectedCustomer = null;
+                              _amountController.text =
+                                  widget.totalAmount.toStringAsFixed(2);
+                            }
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 18),
+
+                    if (_selectedPaymentMethod == 'credit') ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.orange.withOpacity(0.35)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.person, color: Colors.orange),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _selectedCustomer == null
+                                    ? 'Select customer for credit'
+                                    : 'Credit customer: ${_selectedCustomer!.name}',
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: _isProcessing
+                                  ? null
+                                  : () async {
+                                      final picked = await _pickCustomer();
+                                      if (picked != null) {
+                                        setState(() => _selectedCustomer = picked);
+                                      }
+                                    },
+                              child: Text(
+                                  _selectedCustomer == null ? 'Select' : 'Change'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                    ],
+
+                    TextField(
+                      controller: _amountController,
+                      enabled: !_isProcessing,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(
+                        labelText: 'Amount',
+                        prefixText: 'Rs. ',
+                        helperText: _selectedPaymentMethod == 'credit'
+                            ? 'Enter amount received now (remaining will be credit)'
+                            : 'Enter amount to pay (partial allowed)',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
-                    TextButton(
-                      onPressed: _isProcessing
-                          ? null
-                          : () async {
-                              final picked = await _pickCustomer();
-                              if (picked != null) {
-                                setState(() => _selectedCustomer = picked);
-                              }
-                            },
-                      child:
-                          Text(_selectedCustomer == null ? 'Select' : 'Change'),
+                    const SizedBox(height: 22),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _isProcessing
+                                ? null
+                                : () => Navigator.of(context).pop(null),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _isProcessing ? null : _processPayment,
+                            child: _isProcessing
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : const Text('Confirm'),
+                          ),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),
-              const SizedBox(height: 18),
-            ],
-
-            TextField(
-              controller: _amountController,
-              enabled: !_isProcessing,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                labelText: 'Amount',
-                prefixText: 'Rs. ',
-                helperText: _selectedPaymentMethod == 'credit'
-                    ? 'Enter amount received now (remaining will be credit)'
-                    : 'Enter amount to pay (partial allowed)',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
             ),
-            const SizedBox(height: 22),
+          ],
+        ),
+      ),
+    );
+  }
 
+  Widget _buildOrderSummary() {
+    if (_loadingOrder) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    final customerName =
+        (_order?['customer_name'] as String?)?.trim();
+    final hasCustomer =
+        customerName != null && customerName.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (hasCustomer) ...[
             Row(
               children: [
+                const Icon(Icons.person_outline, size: 18),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isProcessing
-                        ? null
-                        : () => Navigator.of(context).pop(null),
-                    child: const Text('Cancel'),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _isProcessing ? null : _processPayment,
-                    child: _isProcessing
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Confirm'),
+                  child: Text(
+                    customerName!,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 12),
           ],
-        ),
+          Text(
+            'Items',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[700],
+                ),
+          ),
+          const SizedBox(height: 8),
+          _orderItems.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'No items',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                )
+              : ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _orderItems.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 6),
+                  itemBuilder: (context, index) {
+                    final item = _orderItems[index];
+                    final name =
+                        item['product_name'] as String? ?? 'Item';
+                    final qty =
+                        (item['quantity'] as num?)?.toInt() ?? 0;
+                    final total = (item['total_price'] as num?)
+                            ?.toDouble() ??
+                        0.0;
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '$name × $qty',
+                            style: const TextStyle(fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          NumberFormatter.formatCurrency(total),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 8),
+          _buildSummaryRow('Subtotal', _subtotal),
+          if (_discountAmount > 0)
+            _buildSummaryRow('Discount', -_discountAmount),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Total',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              Text(
+                NumberFormatter.formatCurrency(_displayTotal),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).primaryColor,
+                    ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryRow(String label, double amount) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 13)),
+          Text(
+            NumberFormatter.formatCurrency(amount),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }
