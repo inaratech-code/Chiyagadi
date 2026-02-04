@@ -1060,18 +1060,55 @@ class InaraAuthProvider with ChangeNotifier {
 
       final oldPinHash = _hashPin(oldPin);
 
-      // Verify old password
+      // Verify old password - handle both SQLite (id) and Firestore (documentId)
       final users = await dbProvider.query(
         'users',
-        where: 'id = ? AND pin_hash = ?',
-        whereArgs: [_currentUserId, oldPinHash],
+        where: kIsWeb ? 'documentId = ?' : 'id = ?',
+        whereArgs: [_currentUserId],
+        limit: 1,
       );
 
       if (users.isEmpty) {
-        return false; // Old password incorrect
+        debugPrint('changePassword: User not found');
+        return false;
       }
 
-      // Update password
+      final user = users.first;
+      final storedPinHash = user['pin_hash'] as String?;
+      
+      // Verify old password - check database hash first
+      bool oldPasswordValid = false;
+      
+      if (storedPinHash != null && storedPinHash == oldPinHash) {
+        oldPasswordValid = true;
+      } else if (kIsWeb) {
+        // For web, also try Firebase Auth verification if database hash doesn't match
+        // This handles cases where password was changed in Firebase Auth but not synced to database
+        try {
+          dynamic authInstance = FirebaseAuth.instance;
+          final currentUser = authInstance.currentUser;
+          if (currentUser != null && currentUser.email != null) {
+            // Try to verify by attempting to re-authenticate
+            // Note: We can't directly verify without re-authenticating, so we'll try updatePassword
+            // which will fail if old password is wrong
+            try {
+              // For verification, we'll use verifyAdminPin which handles Firebase Auth
+              oldPasswordValid = await verifyAdminPin(oldPin);
+            } catch (e) {
+              debugPrint('changePassword: Firebase Auth verification failed: $e');
+            }
+          }
+        } catch (e) {
+          debugPrint('changePassword: Firebase Auth check error: $e');
+        }
+      }
+
+      if (!oldPasswordValid) {
+        debugPrint('changePassword: Old password incorrect');
+        return false;
+      }
+
+      // Update password in database
       final newPinHash = _hashPin(newPin);
       final now = DateTime.now().millisecondsSinceEpoch;
 
@@ -1081,9 +1118,37 @@ class InaraAuthProvider with ChangeNotifier {
           'pin_hash': newPinHash,
           'updated_at': now,
         },
-        where: 'id = ?',
+        where: kIsWeb ? 'documentId = ?' : 'id = ?',
         whereArgs: [_currentUserId],
       );
+
+      // Update Firebase Auth password (for web)
+      // Note: updatePassword requires recent authentication. If it fails, user may need to re-login.
+      if (kIsWeb) {
+        try {
+          dynamic authInstance = FirebaseAuth.instance;
+          final currentUser = authInstance.currentUser;
+          if (currentUser != null && currentUser.email != null) {
+            try {
+              await currentUser.updatePassword(newPin);
+              debugPrint('changePassword: Firebase Auth password updated successfully');
+            } catch (e) {
+              final errorStr = e.toString();
+              if (errorStr.contains('requires-recent-login') || 
+                  errorStr.contains('auth/requires-recent-login')) {
+                debugPrint('changePassword: Firebase Auth requires recent login. Password updated in database only.');
+                debugPrint('changePassword: User may need to re-login to update Firebase Auth password.');
+              } else {
+                debugPrint('changePassword: Firebase Auth update error: $e');
+              }
+              // Continue - database password is updated
+            }
+          }
+        } catch (e) {
+          debugPrint('changePassword: Firebase Auth check error (continuing): $e');
+          // Continue even if Firebase Auth update fails
+        }
+      }
 
       // Also update SharedPreferences if admin
       if (_currentUserRole == 'admin') {
@@ -1094,6 +1159,40 @@ class InaraAuthProvider with ChangeNotifier {
       return true;
     } catch (e) {
       debugPrint('Error changing password: $e');
+      return false;
+    }
+  }
+
+  /// Change admin password specifically (updates SharedPreferences, database, and Firebase Auth)
+  /// This is a convenience method for admin password changes
+  Future<bool> changeAdminPassword(String oldPin, String newPin) async {
+    if (!_isValidPassword(oldPin) || !_isValidPassword(newPin)) {
+      return false;
+    }
+
+    if (!_isAuthenticated || _currentUserRole != 'admin') {
+      debugPrint('changeAdminPassword: Only admin can change admin password');
+      return false;
+    }
+
+    try {
+      // First verify old password
+      final isValid = await verifyAdminPin(oldPin);
+      if (!isValid) {
+        debugPrint('changeAdminPassword: Old password incorrect');
+        return false;
+      }
+
+      // Update password using the standard changePassword method
+      final success = await changePassword(oldPin, newPin);
+      
+      if (success) {
+        debugPrint('changeAdminPassword: Admin password changed successfully');
+      }
+      
+      return success;
+    } catch (e) {
+      debugPrint('Error changing admin password: $e');
       return false;
     }
   }
@@ -1431,12 +1530,67 @@ class InaraAuthProvider with ChangeNotifier {
     try {
       final dbProvider = _getDatabaseProvider();
       await dbProvider.init();
+      
+      // Get user info to update Firebase Auth if needed
+      final users = await dbProvider.query(
+        'users',
+        where: kIsWeb ? 'documentId = ?' : 'id = ?',
+        whereArgs: [userId],
+        limit: 1,
+      );
+      
+      if (users.isEmpty) {
+        debugPrint('resetUserPin: User not found');
+        return false;
+      }
+      
+      final user = users.first;
+      final userEmail = user['email'] as String?;
+      final isAdmin = (user['role'] as String?) == 'admin';
+      
+      // Update password in database
+      final newPinHash = _hashPin(newPin);
+      final now = DateTime.now().millisecondsSinceEpoch;
+      
       await dbProvider.update(
         'users',
-        values: {'pin_hash': _hashPin(newPin)},
+        values: {
+          'pin_hash': newPinHash,
+          'updated_at': now,
+        },
         where: kIsWeb ? 'documentId = ?' : 'id = ?',
         whereArgs: [userId],
       );
+      
+      // Update Firebase Auth password (for web users with email)
+      if (kIsWeb && userEmail != null && userEmail.isNotEmpty) {
+        try {
+          dynamic authInstance = FirebaseAuth.instance;
+          // Get the user by email
+          try {
+            // Note: We can't directly update another user's password from client-side
+            // This would require admin SDK or Cloud Functions
+            // For now, we'll update the database and log a message
+            debugPrint('resetUserPin: Database password updated. Firebase Auth password should be updated via Firebase Console or Cloud Functions for user: $userEmail');
+          } catch (e) {
+            debugPrint('resetUserPin: Firebase Auth update note: $e');
+          }
+        } catch (e) {
+          debugPrint('resetUserPin: Firebase Auth check error (continuing): $e');
+        }
+      }
+      
+      // Also update SharedPreferences if this is the admin user
+      if (isAdmin) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('admin_pin', newPinHash);
+          debugPrint('resetUserPin: Admin PIN updated in SharedPreferences');
+        } catch (e) {
+          debugPrint('resetUserPin: SharedPreferences update error: $e');
+        }
+      }
+      
       return true;
     } catch (e) {
       debugPrint('Error resetting user PIN: $e');

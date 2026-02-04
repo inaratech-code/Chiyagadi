@@ -371,7 +371,8 @@ class _UsersAndRolesManagementScreenState
 
   Future<void> _showResetPinDialog(Map<String, dynamic> user) async {
     final auth = Provider.of<InaraAuthProvider>(context, listen: false);
-    final userId = user['id'];
+    // Handle both SQLite (id) and Firestore (documentId)
+    final userId = kIsWeb ? (user['documentId'] ?? user['id']) : user['id'];
     final username = user['username'] as String? ?? '';
     final pinController = TextEditingController();
     final confirmController = TextEditingController();

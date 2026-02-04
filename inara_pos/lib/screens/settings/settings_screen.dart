@@ -420,6 +420,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   const Icon(Icons.arrow_forward_ios, size: 16),
                               onTap: () => _showChangePasswordDialog(),
                             ),
+                            if (authProvider.currentUserRole == 'admin') ...[
+                              const SizedBox(height: 8),
+                              const Divider(),
+                              const SizedBox(height: 8),
+                              ListTile(
+                                leading: const Icon(Icons.admin_panel_settings,
+                                    color: Color(0xFFFFC107)),
+                                title: const Text('Change Admin Password'),
+                                subtitle: const Text(
+                                    'Change the admin password for the app'),
+                                trailing:
+                                    const Icon(Icons.arrow_forward_ios, size: 16),
+                                onTap: () => _showChangeAdminPasswordDialog(),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -772,6 +787,169 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SnackBar(
                 content: Text(
                     'Failed to change password. Please check your current PIN.'),
+                backgroundColor: AppTheme.errorColor,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _showChangeAdminPasswordDialog() async {
+    final oldPinController = TextEditingController();
+    final newPinController = TextEditingController();
+    final confirmPinController = TextEditingController();
+    bool obscureOldPin = true;
+    bool obscureNewPin = true;
+    bool obscureConfirmPin = true;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Change Admin Password'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Change the admin password for the app. This will update the password in the database, SharedPreferences, and Firebase Auth (if on web).',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: oldPinController,
+                  decoration: InputDecoration(
+                    labelText: 'Current Admin Password',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureOldPin
+                          ? Icons.visibility
+                          : Icons.visibility_off),
+                      onPressed: () {
+                        setDialogState(() => obscureOldPin = !obscureOldPin);
+                      },
+                    ),
+                  ),
+                  obscureText: obscureOldPin,
+                  keyboardType: TextInputType.text,
+                  maxLength: 20,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: newPinController,
+                  decoration: InputDecoration(
+                    labelText: 'New Admin Password',
+                    border: const OutlineInputBorder(),
+                    helperText: '4-20 characters',
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureNewPin
+                          ? Icons.visibility
+                          : Icons.visibility_off),
+                      onPressed: () {
+                        setDialogState(() => obscureNewPin = !obscureNewPin);
+                      },
+                    ),
+                  ),
+                  obscureText: obscureNewPin,
+                  keyboardType: TextInputType.text,
+                  maxLength: 20,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: confirmPinController,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm New Admin Password',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureConfirmPin
+                          ? Icons.visibility
+                          : Icons.visibility_off),
+                      onPressed: () {
+                        setDialogState(
+                            () => obscureConfirmPin = !obscureConfirmPin);
+                      },
+                    ),
+                  ),
+                  obscureText: obscureConfirmPin,
+                  keyboardType: TextInputType.text,
+                  maxLength: 20,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Change Admin Password'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result == true) {
+      final oldPin = oldPinController.text.trim();
+      final newPin = newPinController.text.trim();
+      final confirmPin = confirmPinController.text.trim();
+
+      if (oldPin.isEmpty || newPin.isEmpty || confirmPin.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('All fields are required')),
+          );
+        }
+        return;
+      }
+
+      // Validate password: 4-20 characters (allows special characters)
+      if (newPin.length < 4 || newPin.length > 20) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Password must be 4-20 characters')),
+          );
+        }
+        return;
+      }
+
+      if (newPin != confirmPin) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('New passwords do not match')),
+          );
+        }
+        return;
+      }
+
+      try {
+        final authProvider =
+            Provider.of<InaraAuthProvider>(context, listen: false);
+        final success = await authProvider.changeAdminPassword(oldPin, newPin);
+
+        if (mounted) {
+          if (success) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Admin password changed successfully'),
+                backgroundColor: AppTheme.successColor,
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                    'Failed to change admin password. Please check your current password.'),
                 backgroundColor: AppTheme.errorColor,
               ),
             );
