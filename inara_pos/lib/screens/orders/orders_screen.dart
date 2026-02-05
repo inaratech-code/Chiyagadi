@@ -11,6 +11,7 @@ import '../../widgets/responsive_wrapper.dart';
 import '../../utils/theme.dart';
 import '../../utils/app_messenger.dart';
 import 'order_detail_screen.dart';
+import 'order_details_dialog.dart';
 import 'order_payment_dialog.dart';
 import 'package:intl/intl.dart';
 import '../../utils/loading_constants.dart';
@@ -634,14 +635,35 @@ class _OrdersScreenState extends State<OrdersScreen> {
           borderRadius: BorderRadius.circular(12),
         ),
         child: InkWell(
-        // UX change: Tap = Payment dialog. Long-press = Details screen.
-        onTap: () async {
+        // Tap = order details dialog (items, total, discount, customer). Pay or Edit order from there.
+        onTap: () {
+          showDialog<void>(
+            context: context,
+            builder: (_) => OrderDetailsDialog(
+              orderId: orderId,
+              orderNumber: order['order_number'] as String? ?? 'Order',
+              orderService: _orderService,
+              onEditOrder: () {
+                Navigator.push(
+                  context,
+                  smoothPageRoute(
+                    builder: OrderDetailScreen(
+                      orderId: orderId,
+                      orderNumber: order['order_number'] as String? ?? 'Order',
+                    ),
+                  ),
+                ).then((_) => _loadOrders());
+              },
+            ),
+          ).then((_) => _loadOrders());
+        },
+        onLongPress: () {
+          // Quick payment for unpaid orders without opening full detail
           if (paymentStatus == 'paid') {
             AppMessenger.showSnackBar('Order already paid');
             return;
           }
-
-          final result = await showDialog<Map<String, dynamic>>(
+          showDialog<Map<String, dynamic>>(
             context: context,
             builder: (_) => OrderPaymentDialog(
               orderId: orderId,
@@ -649,22 +671,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
               totalAmount: totalAmount,
               orderService: _orderService,
             ),
-          );
-
-          if (result != null && result['success'] == true) {
-            await _loadOrders();
-          }
-        },
-        onLongPress: () {
-          Navigator.push(
-            context,
-            smoothPageRoute(
-              builder: OrderDetailScreen(
-                orderId: orderId,
-                orderNumber: order['order_number'] as String,
-              ),
-            ),
-          ).then((_) => _loadOrders());
+          ).then((result) async {
+            if (result != null && result['success'] == true) await _loadOrders();
+          });
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
@@ -1406,6 +1415,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           backgroundColor: Colors.red);
     } finally {
       nameController.dispose();
+      searchController.dispose();
     }
   }
 

@@ -536,8 +536,8 @@ class _LoginScreenState extends State<LoginScreen>
                                                 ],
                                               ),
                                               // Add "Create Admin" button if login fails and no admin exists
-                                              if (_errorMessage!.contains(
-                                                      'Invalid username/email or password') &&
+                                              if (_errorMessage != null &&
+                                                  _errorMessage!.contains('Invalid') &&
                                                   !_isFirstTime)
                                                 Padding(
                                                   padding:
@@ -573,8 +573,8 @@ class _LoginScreenState extends State<LoginScreen>
                                                       'no such table') ||
                                                   _errorMessage!.contains(
                                                       'Reset failed') ||
-                                                  (_errorMessage!.contains(
-                                                          'Invalid username/email or password') &&
+                                                  (                                                  _errorMessage != null &&
+                                                      _errorMessage!.contains('Invalid') &&
                                                       !_isFirstTime))
                                                 Padding(
                                                   padding:
