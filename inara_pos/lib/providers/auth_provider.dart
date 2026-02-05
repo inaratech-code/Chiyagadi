@@ -1016,22 +1016,15 @@ class InaraAuthProvider with ChangeNotifier {
   }
 
   void updateActivity() {
-    // UPDATED: Only apply inactivity timer in timeout mode.
-    if (_lockMode == 'timeout') {
-      _resetInactivityTimer();
-    }
+    // DISABLED: Automatic logout is disabled - no inactivity timer
+    // Timer functionality removed to prevent automatic logout
   }
 
   void _resetInactivityTimer() {
+    // DISABLED: Automatic logout is disabled - timer is not started
+    // Cancel any existing timer but don't start a new one
     _inactivityTimer?.cancel();
-    _inactivityTimer = Timer(
-      Duration(minutes: _inactivityTimeoutMinutes),
-      () {
-        if (_isAuthenticated) {
-          logout(storeForAutoLogin: true); // Allow quick re-login after timeout
-        }
-      },
-    );
+    _inactivityTimer = null;
   }
 
   String _hashPin(String pin) {
