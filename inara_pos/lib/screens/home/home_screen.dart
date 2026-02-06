@@ -308,92 +308,105 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildDrawer(BuildContext context, InaraAuthProvider authProvider) {
+    final permissions = _cachedPermissions ?? <int>{0, 1, 2, 3, 4, 5, 7, 9};
     return Drawer(
-        child: FutureBuilder<Set<int>>(
-        future: authProvider
-            .getRolePermissions(authProvider.currentUserRole ?? 'cashier'),
-        builder: (context, snapshot) {
-          final permissions = snapshot.data ?? <int>{0, 1, 2, 3, 4, 5, 7, 9};
+      child: _cachedPermissions != null
+          ? ListView(
+              padding: EdgeInsets.zero,
+              children: _drawerChildren(context, authProvider, permissions),
+            )
+          : FutureBuilder<Set<int>>(
+              future: authProvider.getRolePermissions(
+                  authProvider.currentUserRole ?? 'cashier'),
+              builder: (context, snapshot) {
+                final perms = snapshot.data ?? permissions;
+                return ListView(
+                  padding: EdgeInsets.zero,
+                  children: _drawerChildren(context, authProvider, perms),
+                );
+              },
+            ),
+    );
+  }
 
-          return ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              DrawerHeader(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppTheme.logoPrimary,
-                      AppTheme.logoSecondary,
-                    ],
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'चिया गढी',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      authProvider.currentUsername ?? 'User',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      authProvider.isAdmin ? 'Admin' : 'Cashier',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (permissions.contains(0))
-                _buildDrawerTile(Icons.dashboard, 'Dashboard', 0),
-              if (permissions.contains(1))
-                _buildDrawerTile(Icons.receipt_long, 'Orders', 1),
-              if (permissions.contains(2))
-                _buildDrawerTile(Icons.table_restaurant, 'Tables', 2),
-              if (permissions.contains(3))
-                _buildDrawerTile(Icons.restaurant_menu, 'Menu', 3),
-              if (permissions.contains(4))
-                _buildDrawerTile(Icons.shopping_cart, 'Sales', 4),
-              if (permissions.contains(5))
-                _buildDrawerTile(Icons.analytics, 'Reports', 5),
-              if (permissions.contains(6))
-                _buildDrawerTile(Icons.inventory_2, 'Inventory', 6),
-              if (permissions.contains(7))
-                _buildDrawerTile(Icons.people, 'Customers', 7),
-              if (permissions.contains(8))
-                _buildDrawerTile(Icons.shopping_bag, 'Purchases', 8),
-              if (permissions.contains(9))
-                _buildDrawerTile(Icons.payments, 'Expenses', 9),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.settings),
-                title: const Text('Settings'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                  );
-                },
-              ),
+  List<Widget> _drawerChildren(
+    BuildContext context,
+    InaraAuthProvider authProvider,
+    Set<int> permissions,
+  ) {
+    return [
+      DrawerHeader(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppTheme.logoPrimary,
+              AppTheme.logoSecondary,
             ],
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'चिया गढी',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              authProvider.currentUsername ?? 'User',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              authProvider.isAdmin ? 'Admin' : 'Cashier',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+      if (permissions.contains(0))
+        _buildDrawerTile(Icons.dashboard, 'Dashboard', 0),
+      if (permissions.contains(1))
+        _buildDrawerTile(Icons.receipt_long, 'Orders', 1),
+      if (permissions.contains(2))
+        _buildDrawerTile(Icons.table_restaurant, 'Tables', 2),
+      if (permissions.contains(3))
+        _buildDrawerTile(Icons.restaurant_menu, 'Menu', 3),
+      if (permissions.contains(4))
+        _buildDrawerTile(Icons.shopping_cart, 'Sales', 4),
+      if (permissions.contains(5))
+        _buildDrawerTile(Icons.analytics, 'Reports', 5),
+      if (permissions.contains(6))
+        _buildDrawerTile(Icons.inventory_2, 'Inventory', 6),
+      if (permissions.contains(7))
+        _buildDrawerTile(Icons.people, 'Customers', 7),
+      if (permissions.contains(8))
+        _buildDrawerTile(Icons.shopping_bag, 'Purchases', 8),
+      if (permissions.contains(9))
+        _buildDrawerTile(Icons.payments, 'Expenses', 9),
+      const Divider(),
+      ListTile(
+        leading: const Icon(Icons.settings),
+        title: const Text('Settings'),
+        onTap: () {
+          Navigator.pop(context);
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SettingsScreen()),
           );
         },
       ),
-    );
+    ];
   }
 
   Widget _buildDrawerTile(IconData icon, String title, int index) {

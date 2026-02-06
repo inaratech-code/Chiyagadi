@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -15,6 +16,15 @@ import 'utils/add_admin_user.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Lock orientation to portrait mode (disable auto-rotation)
+  // Only apply on mobile platforms (not web)
+  if (!kIsWeb) {
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  }
 
   // Global error handler to catch all unhandled errors
   FlutterError.onError = (FlutterErrorDetails details) {
@@ -190,16 +200,8 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // NEW: "Ask password every time" option.
-    // If lockMode == 'always', we lock the app when it goes to background.
-    if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused) {
-      final auth = context.read<InaraAuthProvider>();
-      if (auth.lockMode == 'always') {
-        auth.logout(
-            storeForAutoLogin: true); // Allow quick re-login after background
-      }
-    }
+    // Auto-logout disabled for all roles: users stay logged in until they tap Logout.
+    // No logout on app background (inactive/paused) for any login ID or role.
   }
 
   Future<void> _checkAuth() async {

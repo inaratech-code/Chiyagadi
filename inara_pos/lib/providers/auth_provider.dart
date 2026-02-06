@@ -31,8 +31,8 @@ class InaraAuthProvider with ChangeNotifier {
   String? get currentUsername => _currentUsername;
   String get lockMode => _lockMode; // NEW
 
-  // Auto-lock after 5 minutes of inactivity
-  static const int _inactivityTimeoutMinutes = 5;
+  // Auto-logout disabled for all roles: users only logout manually (no inactivity timer, no app-background logout).
+  static const int _inactivityTimeoutMinutes = 5; // Unused; kept for reference.
 
   /// Validate password: letters, numbers, and special characters, 4-20 characters
   static bool _isValidPassword(String password) {

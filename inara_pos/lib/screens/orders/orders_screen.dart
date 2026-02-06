@@ -497,6 +497,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 onRefresh: _loadOrders,
                                 child: ListView.builder(
                                   physics: platformScrollPhysics,
+                                  cacheExtent: 400,
                                   padding: const EdgeInsets.only(
                                     left: 16,
                                     right: 16,
@@ -556,6 +557,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             onRefresh: _loadOrders,
                             child: ListView.builder(
                               physics: platformScrollPhysics,
+                              cacheExtent: 400,
                               padding: const EdgeInsets.only(
                                 left: 16,
                                 right: 16,
@@ -1054,6 +1056,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     double calcDiscountAmount(double subtotal) =>
         subtotal * (discountPercent / 100.0);
 
+    Timer? searchDebounce;
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -1195,7 +1198,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         labelText: 'Search items',
                         border: OutlineInputBorder(),
                       ),
-                      onChanged: (_) => setDialogState(() {}),
+                      onChanged: (_) {
+                        searchDebounce?.cancel();
+                        searchDebounce = Timer(
+                          const Duration(milliseconds: 120),
+                          () => setDialogState(() {}),
+                        );
+                      },
                     ),
                     const SizedBox(height: 12),
 
@@ -1209,6 +1218,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         ),
                         child: ListView.separated(
                           shrinkWrap: true,
+                          cacheExtent: 200,
                           itemCount: filtered.length,
                           separatorBuilder: (_, __) => const Divider(height: 1),
                           itemBuilder: (context, index) {
@@ -1414,6 +1424,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       AppMessenger.showSnackBar('Error creating order: $e',
           backgroundColor: Colors.red);
     } finally {
+      searchDebounce?.cancel();
       nameController.dispose();
       searchController.dispose();
     }

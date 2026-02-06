@@ -406,6 +406,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       : _viewMode == 'movement'
                           ? _buildStockMovementView()
                           : ListView.builder(
+                              cacheExtent: 400,
                               padding: const EdgeInsets.all(16),
                               itemCount: _inventory.length,
                               itemBuilder: (context, index) {
@@ -763,6 +764,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         }
 
         return ListView.builder(
+          cacheExtent: 400,
           padding: const EdgeInsets.all(16),
           itemCount: movements.length,
           itemBuilder: (context, index) {
