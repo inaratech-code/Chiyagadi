@@ -7,6 +7,7 @@ import '../../services/supplier_service.dart';
 import '../../models/product.dart';
 import '../../models/purchase_item_model.dart';
 import '../../utils/theme.dart';
+import '../../utils/performance.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'suppliers_screen.dart';
@@ -139,6 +140,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                     // Purchases List
                     Expanded(
                       child: ListView.builder(
+                        physics: platformScrollPhysics,
+                        cacheExtent: 400,
                         padding: const EdgeInsets.all(16),
                         itemCount: _purchases.length + (_canLoadMore ? 1 : 0),
                         itemBuilder: (context, index) {
@@ -172,10 +175,11 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                                   (totalAmount - paidAmount);
                           final hasOutstanding = outstandingAmount > 0;
 
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            // Softer, logo-matching palette
-                            color: hasOutstanding
+                          return RepaintBoundary(
+                            child: Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              // Softer, logo-matching palette
+                              color: hasOutstanding
                                 ? AppTheme.warningColor.withOpacity(0.12)
                                 : AppTheme.successColor.withOpacity(0.12),
                             child: InkWell(
@@ -356,7 +360,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                                 ),
                               ),
                             ),
-                          );
+                          ),
+                            );
                         },
                       ),
                     ),

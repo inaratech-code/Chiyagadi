@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/unified_database_provider.dart';
 import '../../widgets/responsive_wrapper.dart';
+import '../../utils/performance.dart';
 import '../orders/orders_screen.dart';
 
 class RecentActivityScreen extends StatefulWidget {
@@ -178,18 +179,26 @@ class _RecentActivityScreenState extends State<RecentActivityScreen> {
                   child: kIsWeb
                       ? ResponsiveWrapper(
                           child: ListView.builder(
+                            physics: platformScrollPhysics,
+                            cacheExtent: 400,
                             padding: const EdgeInsets.all(16),
                             itemCount: _allActivity.length,
                             itemBuilder: (context, index) {
-                              return _buildActivityItem(_allActivity[index]);
+                              return RepaintBoundary(
+                                child: _buildActivityItem(_allActivity[index]),
+                              );
                             },
                           ),
                         )
                       : ListView.builder(
+                          physics: platformScrollPhysics,
+                          cacheExtent: 400,
                           padding: const EdgeInsets.all(16),
                           itemCount: _allActivity.length,
                           itemBuilder: (context, index) {
-                            return _buildActivityItem(_allActivity[index]);
+                            return RepaintBoundary(
+                              child: _buildActivityItem(_allActivity[index]),
+                            );
                           },
                         ),
                 ),

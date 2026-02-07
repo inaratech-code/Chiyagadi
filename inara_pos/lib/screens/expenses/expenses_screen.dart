@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../services/expense_service.dart';
 import '../../models/expense_model.dart';
 import '../../utils/theme.dart';
+import '../../utils/performance.dart';
 
 class ExpensesScreen extends StatefulWidget {
   final bool hideAppBar;
@@ -251,6 +252,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                           ),
                         )
                       : ListView.builder(
+                          physics: platformScrollPhysics,
+                          cacheExtent: 400,
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 8),
                           itemCount: _expenses.length + (_canLoadMore ? 1 : 0),
@@ -273,7 +276,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                             final e = _expenses[index];
                             final date = DateTime.fromMillisecondsSinceEpoch(
                                 e.createdAt);
-                            return Card(
+                            return RepaintBoundary(
+                              child: Card(
                               margin: const EdgeInsets.only(bottom: 10),
                               child: ListTile(
                                 leading: CircleAvatar(
@@ -301,6 +305,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                       color: Colors.black87),
                                 ),
                               ),
+                            ),
                             );
                           },
                         ),

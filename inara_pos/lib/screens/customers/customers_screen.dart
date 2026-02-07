@@ -6,6 +6,7 @@ import '../../providers/unified_database_provider.dart';
 import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../models/customer.dart';
 import '../../utils/theme.dart';
+import '../../utils/performance.dart';
 import '../orders/order_detail_screen.dart';
 
 class CustomersScreen extends StatefulWidget {
@@ -207,6 +208,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       ),
                     )
                   : ListView.builder(
+                      physics: platformScrollPhysics,
+                      cacheExtent: 400,
                       padding: const EdgeInsets.all(16),
                       itemCount: _filteredCustomers.length +
                           (_canLoadMoreCustomers && _customerSearch.isEmpty
@@ -233,28 +236,63 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         final hasCredit = customer.creditBalance > 0;
                         final brand = AppTheme.logoPrimary;
 
-                        return Card(
+                        return RepaintBoundary(
+                          child: Card(
                           margin: const EdgeInsets.only(bottom: 8),
-                          color: hasCredit ? brand.withOpacity(0.04) : null,
+                          color: Colors.white,
+                          elevation: 1,
                           child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
                             leading: CircleAvatar(
                               backgroundColor: brand,
                               child: Text(
                                 customer.name.substring(0, 1).toUpperCase(),
-                                style: const TextStyle(color: Colors.white),
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600),
                               ),
                             ),
-                            title: Text(customer.name),
+                            title: Text(
+                              customer.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                                color: Color(0xFF1A1A1A),
+                              ),
+                            ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 if (customer.phone != null)
-                                  Text('Phone: ${customer.phone}'),
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      'Phone: ${customer.phone}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ),
+                                const SizedBox(height: 6),
                                 Text(
-                                  'Credit: ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditBalance)} / ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditLimit)}',
+                                  'Balance: ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditBalance)}',
                                   style: TextStyle(
-                                    color: hasCredit ? brand : Colors.grey[700],
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: hasCredit
+                                        ? Colors.grey[900]
+                                        : Colors.grey[800],
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Limit: ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditLimit)}',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey[600],
                                   ),
                                 ),
                               ],
@@ -277,13 +315,14 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                     backgroundColor: Colors.white,
                                   ),
                                 IconButton(
-                                  icon: const Icon(Icons.edit),
+                                  icon: Icon(Icons.edit, color: Colors.grey[800]),
                                   onPressed: () =>
                                       _showEditCustomerDialog(customer),
                                 ),
                                 IconButton(
-                                  icon:
-                                      const Icon(Icons.account_balance_wallet),
+                                  icon: Icon(
+                                      Icons.account_balance_wallet,
+                                      color: Colors.grey[800]),
                                   onPressed: () {
                                     final customerId =
                                         customer.documentId ?? customer.id;
@@ -299,6 +338,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                               ],
                             ),
                           ),
+                        ),
                         );
                       },
                     ),
@@ -348,9 +388,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
         // Customer Summary Card
         Card(
           margin: const EdgeInsets.all(16),
-          color: customer.creditBalance > 0
-              ? const Color(0xFFFF6B6B).withOpacity(0.1)
-              : const Color(0xFF00B894).withOpacity(0.1),
+          color: Colors.white,
+          elevation: 1,
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -361,10 +400,14 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   children: [
                     Text(
                       customer.name,
-                      style: Theme.of(context).textTheme.headlineSmall,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A1A1A),
+                      ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close),
+                      icon: Icon(Icons.close, color: Colors.grey[700]),
                       onPressed: () {
                         setState(() {
                           _selectedCustomerId = null;
@@ -374,7 +417,14 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     ),
                   ],
                 ),
-                if (customer.phone != null) Text('Phone: ${customer.phone}'),
+                if (customer.phone != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Phone: ${customer.phone}',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    ),
+                  ),
                 const Divider(),
                 // Enhanced Summary Cards
                 Builder(
@@ -403,7 +453,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                               child: _buildSummaryCard(
                                 'Total Due',
                                 totalDue,
-                                const Color(0xFFFF6B6B), // Coral/Red
+                                AppTheme.errorColor,
                                 Icons.account_balance_wallet,
                               ),
                             ),
@@ -412,7 +462,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                               child: _buildSummaryCard(
                                 'Total Paid',
                                 totalPaid,
-                                const Color(0xFF00B894), // Teal/Green
+                                AppTheme.successColor,
                                 Icons.payment,
                               ),
                             ),
@@ -425,7 +475,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                               child: _buildSummaryCard(
                                 'Credit Given',
                                 totalCreditGiven,
-                                const Color(0xFF6C5CE7), // Purple/Indigo
+                                AppTheme.logoPrimary,
                                 Icons.add_card,
                               ),
                             ),
@@ -435,7 +485,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                 'Available Credit',
                                 (customer.creditLimit - customer.creditBalance)
                                     .clamp(0.0, double.infinity),
-                                const Color(0xFF00B894), // Teal/Green
+                                AppTheme.successColor,
                                 Icons.check_circle,
                               ),
                             ),
@@ -453,9 +503,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         onPressed: () => _showAddCreditDialog(customer),
                         icon: const Icon(Icons.add, color: Colors.white),
                         label: const Text('Add Credit',
-                            style: TextStyle(color: Colors.white)),
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600)),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF6C5CE7), // Purple
+                          backgroundColor: AppTheme.logoPrimary,
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -466,9 +518,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         onPressed: () => _showPaymentDialog(customer),
                         icon: const Icon(Icons.payment, color: Colors.white),
                         label: const Text('Receive Payment',
-                            style: TextStyle(color: Colors.white)),
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600)),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00B894), // Teal
+                          backgroundColor: AppTheme.logoSecondary,
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -517,18 +571,22 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   if (bills.isNotEmpty) ...[
                     Row(
                       children: [
-                        const Icon(Icons.receipt_long, size: 18),
+                        Icon(Icons.receipt_long, size: 18, color: Colors.grey[800]),
                         const SizedBox(width: 8),
                         Text(
                           'Bills (${bills.length})',
-                          style: const TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey[800]),
                         ),
                         const Spacer(),
                         Text(
                           'Total Pending: ${NumberFormat.currency(symbol: 'NPR ').format(totalPending)}',
-                          style: const TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.grey[800]),
                         ),
                       ],
                     ),
@@ -553,6 +611,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 10),
+                        color: Colors.white,
+                        elevation: 1,
                         child: ListTile(
                           leading: CircleAvatar(
                             backgroundColor:
@@ -561,8 +621,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                 color: AppTheme.logoPrimary),
                           ),
                           title: Text(orderNumber,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w700)),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1A1A1A))),
                           subtitle: Text(
                             [
                               if (date != null)
@@ -571,6 +632,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                               if (paidAmount > 0)
                                 'Paid: ${NumberFormat.currency(symbol: 'NPR ').format(paidAmount)}',
                             ].join(' • '),
+                            style: TextStyle(
+                                fontSize: 13, color: Colors.grey[600]),
                           ),
                           trailing: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -581,8 +644,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                     .format(creditAmount),
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
+                                  fontSize: 14,
                                   color: creditAmount > 0
-                                      ? AppTheme.warningColor
+                                      ? Colors.grey[900]
                                       : Colors.grey[700],
                                 ),
                               ),
@@ -615,12 +679,16 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     const SizedBox(height: 6),
                   ],
                   Row(
-                    children: const [
-                      Icon(Icons.swap_horiz, size: 18),
-                      SizedBox(width: 8),
-                      Text('Transactions',
-                          style: TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.bold)),
+                    children: [
+                      Icon(Icons.swap_horiz, size: 18, color: Colors.grey[800]),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Transactions',
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[800]),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -646,10 +714,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
+                        color: Colors.white,
+                        elevation: 1,
                         child: ListTile(
                           leading: CircleAvatar(
                             backgroundColor: isCredit
-                                ? AppTheme.warningColor
+                                ? AppTheme.logoPrimary
                                 : AppTheme.successColor,
                             child: Icon(isCredit ? Icons.add : Icons.remove,
                                 color: Colors.white),
@@ -660,12 +730,18 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                 : isPayment
                                     ? 'Payment Received'
                                     : 'Adjustment',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1A1A1A)),
                           ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(DateFormat('MMM dd, yyyy HH:mm')
-                                  .format(date)),
+                              Text(
+                                DateFormat('MMM dd, yyyy HH:mm').format(date),
+                                style: TextStyle(
+                                    fontSize: 13, color: Colors.grey[600]),
+                              ),
                               if (transaction['order_id'] != null)
                                 Text(
                                   'Order: ${transaction['order_id']}',
@@ -682,15 +758,16 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                 '${isCredit ? '+' : '-'}${NumberFormat.currency(symbol: 'NPR ').format(transaction['amount'])}',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
+                                  fontSize: 14,
                                   color: isCredit
-                                      ? AppTheme.warningColor
+                                      ? AppTheme.logoSecondary
                                       : AppTheme.successColor,
                                 ),
                               ),
                               Text(
                                 'Balance: ${NumberFormat.currency(symbol: 'NPR ').format(transaction['balance_after'])}',
                                 style: TextStyle(
-                                    fontSize: 12, color: Colors.grey[600]),
+                                    fontSize: 12, color: Colors.grey[700]),
                               ),
                             ],
                           ),
@@ -1058,7 +1135,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
                 content: Text('Credit added successfully'),
-                backgroundColor: Color(0xFF00B894)),
+                backgroundColor: AppTheme.successColor),
           );
         }
       } catch (e) {
@@ -1074,7 +1151,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
   Widget _buildSummaryCard(
       String label, double amount, Color color, IconData icon) {
     return Card(
-      color: color.withOpacity(0.1),
+      color: Colors.white,
+      elevation: 1,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -1085,7 +1163,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
               label,
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey[700],
+                color: Colors.grey[600],
               ),
             ),
             const SizedBox(height: 4),
@@ -1094,7 +1172,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: color,
+                color: Colors.grey[900],
               ),
             ),
           ],

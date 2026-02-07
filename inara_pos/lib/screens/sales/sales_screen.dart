@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/unified_database_provider.dart';
 import '../../screens/orders/order_detail_screen.dart';
+import '../../utils/performance.dart';
 import 'package:intl/intl.dart';
 
 class SalesScreen extends StatefulWidget {
@@ -210,6 +211,8 @@ class _SalesScreenState extends State<SalesScreen> {
                       : RefreshIndicator(
                           onRefresh: _loadSales,
                           child: ListView.builder(
+                            physics: platformScrollPhysics,
+                            cacheExtent: 400,
                             padding: const EdgeInsets.all(16),
                             itemCount: _sales.length + (_canLoadMore ? 1 : 0),
                             itemBuilder: (context, index) {
@@ -229,7 +232,9 @@ class _SalesScreenState extends State<SalesScreen> {
                                 );
                               }
                               final sale = _sales[index];
-                              return _buildSaleCard(sale);
+                              return RepaintBoundary(
+                                child: _buildSaleCard(sale),
+                              );
                             },
                           ),
                         ),

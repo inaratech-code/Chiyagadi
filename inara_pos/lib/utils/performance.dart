@@ -18,7 +18,7 @@ ScrollPhysics get platformScrollPhysics {
 PageRouteBuilder<T> smoothPageRoute<T>({
   required Widget builder,
   RouteSettings? settings,
-  Duration duration = const Duration(milliseconds: 250),
+  Duration duration = const Duration(milliseconds: 200),
 }) {
   return PageRouteBuilder<T>(
     settings: settings,

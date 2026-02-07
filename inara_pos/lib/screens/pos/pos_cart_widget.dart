@@ -8,6 +8,7 @@ import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../services/order_service.dart';
 import '../../utils/number_formatter.dart';
 import '../../utils/theme.dart';
+import '../../utils/performance.dart';
 
 class POSCartWidget extends StatefulWidget {
   final Order? order;
@@ -214,6 +215,8 @@ class _POSCartWidgetState extends State<POSCartWidget> {
                         ),
                       )
                     : ListView.builder(
+                        physics: platformScrollPhysics,
+                        cacheExtent: 200,
                         itemCount: _items.length,
                         padding: const EdgeInsets.all(8),
                         itemBuilder: (context, index) {

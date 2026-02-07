@@ -184,6 +184,7 @@ class _POSProductGridState extends State<POSProductGrid> {
                   : GridView.builder(
                       padding: const EdgeInsets.all(12),
                       physics: platformScrollPhysics,
+                      cacheExtent: 400,
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 4,
