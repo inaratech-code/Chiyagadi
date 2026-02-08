@@ -234,16 +234,14 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        appBar: _selectedIndex == 0
+        appBar: _selectedIndex == 0 || _selectedIndex == 1
             ? null
             : AppBar(
-                leading: _selectedIndex == 1
-                    ? null
-                    : IconButton(
-                        icon: const Icon(Icons.arrow_back),
-                        onPressed: () => setState(() => _selectedIndex = 0),
-                        tooltip: 'Back to Dashboard',
-                      ),
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => setState(() => _selectedIndex = 0),
+                  tooltip: 'Back to Dashboard',
+                ),
                 title: Row(
                   children: [
                     Container(
@@ -273,15 +271,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-                actions: _selectedIndex == 1
-                    ? null
-                    : [
-                        IconButton(
-                          icon: const Icon(Icons.refresh),
-                          onPressed: _refreshCurrentScreen,
-                          tooltip: 'Refresh',
-                        ),
-                      ],
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    onPressed: _refreshCurrentScreen,
+                    tooltip: 'Refresh',
+                  ),
+                ],
               ),
         drawer: isCompact ? _buildDrawer(context, authProvider) : null,
         body: kIsWeb
