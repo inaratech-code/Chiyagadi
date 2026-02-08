@@ -215,59 +215,22 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
         debugPrint('Error loading lock mode: $e');
       });
 
-      // If user is already signed in with Firebase Auth, restore session
+      // If user is already signed in with Firebase Auth, restore session (all users)
       if (auth.currentUser != null && mounted) {
         debugPrint(
-            'AuthWrapper: Firebase Auth user already signed in: ${auth.currentUser!.email}');
-        // Restore session by checking Firestore document
-        final email = auth.currentUser!.email;
-        if (email != null && email.toLowerCase() == 'chiyagadi@gmail.com') {
-          // This is admin - restore session (non-blocking)
-          _restoreAdminSession(authProvider, email).catchError((e) {
-            debugPrint('AuthWrapper: Error restoring session: $e');
-          });
+            'AuthWrapper: Firebase Auth user signed in, restoring session: ${auth.currentUser!.email}');
+        authProvider.setContext(context);
+        final restored = await authProvider.restoreSessionFromFirebaseUser(
+            auth.currentUser!);
+        if (restored && mounted) {
+          debugPrint('AuthWrapper: Session restored successfully');
+        } else if (!restored && mounted) {
+          debugPrint(
+              'AuthWrapper: Could not restore session (user not in DB or disabled)');
         }
       }
     } catch (e) {
       debugPrint('Error checking Firebase Auth: $e');
-    }
-  }
-
-  Future<void> _restoreAdminSession(
-      InaraAuthProvider authProvider, String email) async {
-    try {
-      final dbProvider = context.read<UnifiedDatabaseProvider>();
-      // Init won't throw - it handles errors internally
-      await dbProvider.init();
-
-      // Only restore if database is available
-      if (dbProvider.isAvailable && mounted) {
-        // Check for admin document ID: dSc8mQzHPsftOpqb200d7xPhS7K2
-        const adminDocumentId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
-        final adminUsers = await dbProvider.query(
-          'users',
-          where: 'documentId = ?',
-          whereArgs: [adminDocumentId],
-        );
-
-        if (adminUsers.isNotEmpty) {
-          final adminUser = adminUsers.first;
-          final adminEmail = adminUser['email'] as String?;
-
-          if (adminEmail?.toLowerCase() == email.toLowerCase() && mounted) {
-            authProvider.setContext(context);
-            debugPrint('AuthWrapper: Restoring admin session for $email');
-          }
-        } else {
-          debugPrint(
-              'AuthWrapper: Admin document not found, will be created on login');
-        }
-      } else {
-        debugPrint(
-            'AuthWrapper: Database not available, cannot restore session');
-      }
-    } catch (e) {
-      debugPrint('AuthWrapper: Error restoring session: $e');
     }
   }
 

@@ -426,6 +426,82 @@ class InaraAuthProvider with ChangeNotifier {
     }
   }
 
+  /// Restore session when Firebase Auth has a persisted user (e.g. after app restart).
+  /// Returns true if session was restored.
+  Future<bool> restoreSessionFromFirebaseUser(dynamic firebaseUser) async {
+    try {
+      final email = firebaseUser?.email;
+      if (email == null || (email as String).trim().isEmpty) {
+        debugPrint('restoreSessionFromFirebaseUser: No email');
+        return false;
+      }
+      final trimmedEmail = (email as String).trim().toLowerCase();
+
+      final dbProvider = _getDatabaseProvider();
+      await dbProvider.init();
+
+      const adminDocumentId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
+
+      // Look up user by email (works on both SQLite and Firestore)
+      try {
+        final users = await dbProvider.query(
+          'users',
+          where: 'email = ?',
+          whereArgs: [trimmedEmail],
+        );
+        if (users.isEmpty) {
+          debugPrint(
+              'restoreSessionFromFirebaseUser: User not found in DB for $trimmedEmail');
+          return false;
+        }
+        final user = users.first;
+        final isActive = (user['is_active'] as num?)?.toInt();
+        if (isActive != null && isActive == 0) {
+          debugPrint('restoreSessionFromFirebaseUser: User is disabled');
+          return false;
+        }
+
+        final docId = user['documentId'];
+        final dbId = user['id'];
+        String? uid;
+        try {
+          uid = firebaseUser.uid as String? ?? firebaseUser.uid?.toString();
+        } catch (_) {
+          uid = firebaseUser.toString();
+        }
+        _isAuthenticated = true;
+        // Use documentId on web (Firestore), id on mobile (SQLite), else Firebase UID
+        _currentUserId = ((docId is String) ? docId : (docId?.toString())) ??
+            (dbId?.toString()) ??
+            uid;
+        // Admin on web uses documentId; on mobile use id. Normalize admin userId for consistency.
+        if (user['role'] == 'admin' && kIsWeb) {
+          _currentUserId = adminDocumentId;
+        }
+        _currentUserRole = user['role'] as String? ?? 'cashier';
+        _currentUsername =
+            user['username'] as String? ?? trimmedEmail.split('@').first;
+
+        if (_lockMode == 'timeout') {
+          _resetInactivityTimer();
+        } else {
+          _inactivityTimer?.cancel();
+          _inactivityTimer = null;
+        }
+        notifyListeners();
+        debugPrint(
+            'restoreSessionFromFirebaseUser: Restored session for $trimmedEmail (${_currentUserRole})');
+        return true;
+      } catch (e) {
+        debugPrint('restoreSessionFromFirebaseUser: User lookup error: $e');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('restoreSessionFromFirebaseUser: Error: $e');
+      return false;
+    }
+  }
+
   /// Clear stored session info (called after successful login or when login screen loads).
   /// Public so login screen can clear any leftover auto-login data.
   Future<void> clearStoredSession() async {
