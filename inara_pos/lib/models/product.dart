@@ -71,6 +71,12 @@ class Product {
         idValue = idData.toInt();
       }
     }
+    // Firestore query results may only set documentId (not id)
+    if (docId == null && map['documentId'] != null) {
+      docId = map['documentId'] is String
+          ? map['documentId'] as String
+          : map['documentId'].toString();
+    }
 
     // Handle both int (SQLite) and String (Firestore) category IDs
     final categoryIdData = map['category_id'];

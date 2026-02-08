@@ -226,6 +226,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ],
             ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'inventory_fab',
         onPressed: () {
           // Navigate to purchases screen to add inventory items
           Navigator.of(context).push(

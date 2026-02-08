@@ -336,11 +336,16 @@ class _MenuScreenState extends State<MenuScreen> {
 
     Widget fallback() => const Icon(Icons.image, size: 40, color: Colors.grey);
 
-    // Handle data URLs (base64 encoded images)
+    // Use fixed size for caching - menu cards ~200px; avoid oversized decode
+    const int cacheW = 400;
+    const int cacheH = 400;
+
     if (effectiveUrl.startsWith('data:image/')) {
       return Image.network(
         effectiveUrl,
         fit: BoxFit.cover,
+        cacheWidth: cacheW,
+        cacheHeight: cacheH,
         errorBuilder: (context, error, stackTrace) => fallback(),
       );
     }
@@ -349,6 +354,8 @@ class _MenuScreenState extends State<MenuScreen> {
       return Image.network(
         effectiveUrl,
         fit: BoxFit.cover,
+        cacheWidth: cacheW,
+        cacheHeight: cacheH,
         errorBuilder: (context, error, stackTrace) => fallback(),
       );
     }
@@ -357,15 +364,18 @@ class _MenuScreenState extends State<MenuScreen> {
       return Image.asset(
         effectiveUrl,
         fit: BoxFit.cover,
+        cacheWidth: cacheW,
+        cacheHeight: cacheH,
         errorBuilder: (context, error, stackTrace) => fallback(),
       );
     }
 
-    // Web: XFile from ImagePicker returns a blob/object URL which can be loaded via network.
     if (kIsWeb) {
       return Image.network(
         effectiveUrl,
         fit: BoxFit.cover,
+        cacheWidth: cacheW,
+        cacheHeight: cacheH,
         errorBuilder: (context, error, stackTrace) => fallback(),
       );
     }
@@ -373,6 +383,8 @@ class _MenuScreenState extends State<MenuScreen> {
     return Image.file(
       io.File(effectiveUrl),
       fit: BoxFit.cover,
+      cacheWidth: cacheW,
+      cacheHeight: cacheH,
       errorBuilder: (context, error, stackTrace) => fallback(),
     );
   }
@@ -1151,12 +1163,13 @@ class _MenuScreenState extends State<MenuScreen> {
                                   );
                                 },
                               ),
-                              // FIXED: Increased spacing between categories to prevent overlap
                               SizedBox(height: !kIsWeb ? 40 : 24),
                             ],
                           );
                         },
                         childCount: _productsByCategory.length,
+                        addRepaintBoundaries: true,
+                        addAutomaticKeepAlives: false,
                       ),
                     ),
                   ),
@@ -1297,6 +1310,7 @@ class _MenuScreenState extends State<MenuScreen> {
                       right: 24,
                     ),
                     child: FloatingActionButton.extended(
+                      heroTag: 'menu_view_order_fab',
                       onPressed: _isAddingToOrder
                           ? null
                           : () {
@@ -1323,6 +1337,7 @@ class _MenuScreenState extends State<MenuScreen> {
                       right: 24,
                     ),
                     child: FloatingActionButton.extended(
+                      heroTag: 'menu_add_item_fab',
                       onPressed: () => _showAddProductDialog(),
                       backgroundColor: Theme.of(context).primaryColor,
                       icon: const Icon(Icons.add),
@@ -1385,9 +1400,9 @@ class _MenuScreenState extends State<MenuScreen> {
                   ),
                 ),
 
-                // FIXED: Content area - show name and price within card frame, shifted up for visibility
+                // Content area - minHeight reduced to prevent overflow on small cards
                 Container(
-                  constraints: const BoxConstraints(minHeight: 80),
+                  constraints: const BoxConstraints(minHeight: 70),
                   padding: const EdgeInsets.only(
                       left: 6,
                       right: 6,

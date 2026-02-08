@@ -257,6 +257,7 @@ class _TablesScreenState extends State<TablesScreen> {
                 ),
       floatingActionButton: _tables.isNotEmpty
           ? FloatingActionButton.extended(
+              heroTag: 'tables_fab',
               onPressed: () => _showAddTableDialog(),
               backgroundColor: AppTheme.logoPrimary,
               icon: const Icon(Icons.add),

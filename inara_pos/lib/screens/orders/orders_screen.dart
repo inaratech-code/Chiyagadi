@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../../providers/unified_database_provider.dart';
 import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../services/order_service.dart';
-import '../../services/inventory_ledger_service.dart';
 import '../../models/product.dart';
 import '../../widgets/responsive_wrapper.dart';
 import '../../utils/theme.dart';
@@ -16,6 +15,7 @@ import 'order_payment_dialog.dart';
 import 'package:intl/intl.dart';
 import '../../utils/loading_constants.dart';
 import '../../utils/performance.dart';
+import '../../utils/loading_skeleton.dart';
 
 class OrdersScreen extends StatefulWidget {
   final bool hideAppBar;
@@ -241,10 +241,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
+      // Load all orders (dine_in + takeaway). No order_type filter so takeaway orders appear.
       final allOrders = await dbProvider.query(
         'orders',
-        where: 'order_type = ?',
-        whereArgs: ['dine_in'],
         orderBy: 'created_at DESC',
         limit: _ordersLimit * 2,
       );
@@ -424,6 +423,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ],
             ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'orders_fab',
         onPressed: () {
           if (widget.onNewOrder != null) {
             widget.onNewOrder!(context);
@@ -439,6 +439,41 @@ class _OrdersScreenState extends State<OrdersScreen> {
           .endFloat, // FIXED: Ensure FAB stays visible
       body: Column(
         children: [
+          // Top bar with Back and Refresh when embedded (hideAppBar)
+          if (widget.hideAppBar)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+                ),
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => Navigator.of(context).pop(),
+                    tooltip: 'Back',
+                  ),
+                  const Expanded(
+                    child: Text(
+                      'Orders',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    onPressed: _loadOrders,
+                    tooltip: 'Refresh',
+                  ),
+                ],
+              ),
+            ),
           // Filter chips
           Container(
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -471,7 +506,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 ? ResponsiveWrapper(
                     padding: EdgeInsets.zero,
                     child: _isLoading
-                        ? const Center(child: CircularProgressIndicator())
+                        ? ListView.builder(
+                            physics: const NeverScrollableScrollPhysics(),
+                            shrinkWrap: true,
+                            itemCount: 5,
+                            itemBuilder: (_, i) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: buildCardSkeleton(lines: 2),
+                            ),
+                          )
                         : _filteredOrders.isEmpty
                             ? Center(
                                 child: Column(
@@ -497,7 +540,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 onRefresh: _loadOrders,
                                 child: ListView.builder(
                                   physics: platformScrollPhysics,
-                                  cacheExtent: 400,
+                                  cacheExtent: kDefaultCacheExtent,
                                   padding: const EdgeInsets.only(
                                     left: 16,
                                     right: 16,
@@ -525,13 +568,23 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                       );
                                     }
                                     final order = _filteredOrders[index];
-                                    return _buildOrderCard(order);
+                                    return RepaintBoundary(
+                                      child: _buildOrderCard(order),
+                                    );
                                   },
                                 ),
                               ),
                   )
                 : _isLoading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? ListView.builder(
+                        physics: const NeverScrollableScrollPhysics(),
+                        shrinkWrap: true,
+                        itemCount: 5,
+                        itemBuilder: (_, i) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: buildCardSkeleton(lines: 2),
+                        ),
+                      )
                     : _filteredOrders.isEmpty
                         ? Center(
                             child: Column(
@@ -557,7 +610,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             onRefresh: _loadOrders,
                             child: ListView.builder(
                               physics: platformScrollPhysics,
-                              cacheExtent: 400,
+                              cacheExtent: kDefaultCacheExtent,
                               padding: const EdgeInsets.only(
                                 left: 16,
                                 right: 16,
@@ -585,7 +638,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                   );
                                 }
                                 final order = _filteredOrders[index];
-                                return _buildOrderCard(order);
+                                return RepaintBoundary(
+                                  child: _buildOrderCard(order),
+                                );
                               },
                             ),
                           ),
@@ -649,7 +704,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 Navigator.push(
                   context,
                   smoothPageRoute(
-                    builder: OrderDetailScreen(
+                    builder: (context) => OrderDetailScreen(
                       orderId: orderId,
                       orderNumber: order['order_number'] as String? ?? 'Order',
                     ),
@@ -771,7 +826,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       Navigator.push(
                         context,
                         smoothPageRoute(
-                          builder: OrderDetailScreen(
+                          builder: (context) => OrderDetailScreen(
                             orderId: orderId,
                             orderNumber:
                                 order['order_number'] as String? ?? 'Order',
@@ -1032,10 +1087,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
       );
     }
     final products = productMaps.map((m) => Product.fromMap(m)).toList();
-
-    // PERF: Don't prefetch stock for all products (slow on web for large catalogs).
-    // We validate stock for ONLY the selected items right before creating the order.
-    final ledgerService = InventoryLedgerService();
 
     double calcSubtotal() {
       double sum = 0.0;
@@ -1333,18 +1384,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
     try {
       if (result == true) {
-        // Validate stock for selected items only (fast).
-        final selectedEntries = qty.entries.where((e) => e.value > 0).toList();
-        final selectedIds = selectedEntries.map((e) => e.key).toList();
-        final selectedStock = await ledgerService.getCurrentStockBatch(
-            context: context, productIds: selectedIds);
-        for (final e in selectedEntries) {
-          final available = selectedStock[e.key] ?? 0.0;
-          if (e.value > available.floor()) {
-            throw Exception(
-                'Insufficient stock for ${products.firstWhere((p) => (kIsWeb ? p.documentId : p.id) == e.key).name}. Available: ${available.toStringAsFixed(1)}, Required: ${e.value}');
-          }
-        }
+        // Stock is not enforced here so orders can always be created.
+        // Inventory is managed from Menu/Inventory; addItemToOrder does not block on stock.
 
         final orderId = await _orderService.createOrder(
           dbProvider: dbProvider,
@@ -1366,10 +1407,17 @@ class _OrdersScreenState extends State<OrdersScreen> {
         try {
           for (final entry in qty.entries) {
             if (entry.value <= 0) continue;
-            final product = products.firstWhere((p) {
+            // Match by string so int and String IDs (web vs mobile) compare equal
+            final keyStr = entry.key.toString();
+            final matches = products.where((p) {
               final pid = kIsWeb ? p.documentId : p.id;
-              return pid == entry.key;
-            });
+              return pid != null && pid.toString() == keyStr;
+            }).toList();
+            if (matches.isEmpty) {
+              debugPrint('CreateOrder: product not found for key $keyStr');
+              continue;
+            }
+            final product = matches.first;
             await _orderService.addItemToOrder(
               dbProvider: dbProvider,
               context: context,
@@ -1420,9 +1468,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
           leadingIcon: Icons.receipt_long,
         );
       }
-    } catch (e) {
-      AppMessenger.showSnackBar('Error creating order: $e',
-          backgroundColor: Colors.red);
+    } catch (e, stack) {
+      debugPrint('CreateOrder error: $e');
+      debugPrint('CreateOrder stack: $stack');
+      AppMessenger.showSnackBar(
+        'Error creating order: ${e is Exception ? e.toString().replaceFirst('Exception: ', '') : e}',
+        backgroundColor: Colors.red,
+      );
     } finally {
       searchDebounce?.cancel();
       nameController.dispose();

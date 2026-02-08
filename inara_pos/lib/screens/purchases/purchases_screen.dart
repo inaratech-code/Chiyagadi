@@ -369,6 +369,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                 ),
       floatingActionButton: authProvider.isAdmin && _purchases.isNotEmpty
           ? FloatingActionButton.extended(
+              heroTag: 'purchases_fab',
               onPressed: () => _showAddPurchaseDialog(),
               backgroundColor: AppTheme.logoPrimary,
               icon: const Icon(Icons.add),

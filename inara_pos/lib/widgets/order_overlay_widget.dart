@@ -561,7 +561,7 @@ class _OrderOverlayWidgetState extends State<OrderOverlayWidget> {
         );
         Navigator.of(context).push(
           smoothPageRoute(
-            builder: OrdersScreen(
+            builder: (context) => OrdersScreen(
               hideAppBar: true,
               onNewOrder: (ctx) => Navigator.of(ctx).pop(),
             ),

@@ -123,18 +123,17 @@ class InaraAuthProvider with ChangeNotifier {
             // Get the email from the current user
             final email = currentUser.email;
             if (email != null && email.isNotEmpty) {
-              // Store current user info to restore session
               final currentEmail = email;
 
-              // Try to sign in with the provided password to verify it
+              // Verify PIN via reauthentication without changing auth state
               try {
-                await authInstance.signInWithEmailAndPassword(
+                final credential = EmailAuthProvider.credential(
                   email: currentEmail,
                   password: pin,
                 );
+                await currentUser.reauthenticateWithCredential(credential);
                 debugPrint(
                     'verifyAdminPin: Password verified via Firebase Auth');
-                // Session is already restored by signInWithEmailAndPassword
                 return true;
               } catch (e) {
                 final errorStr = e.toString();
@@ -427,8 +426,9 @@ class InaraAuthProvider with ChangeNotifier {
     }
   }
 
-  /// NEW: Clear stored session info (called after successful login with credentials)
-  Future<void> _clearStoredSession() async {
+  /// Clear stored session info (called after successful login or when login screen loads).
+  /// Public so login screen can clear any leftover auto-login data.
+  Future<void> clearStoredSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('last_logout_user_id');
@@ -441,18 +441,25 @@ class InaraAuthProvider with ChangeNotifier {
     }
   }
 
+  /// Admin credentials from secure config (--dart-define=ADMIN_EMAIL=... --dart-define=ADMIN_PASSWORD=...).
+  /// When not provided, fallback login is disabled for security.
+  static String _getAdminEmail() =>
+      const String.fromEnvironment('ADMIN_EMAIL', defaultValue: '');
+  static String _getAdminPassword() =>
+      const String.fromEnvironment('ADMIN_PASSWORD', defaultValue: '');
+
+  bool _isAdminCredentials(String email, String password) {
+    final adminEmail = _getAdminEmail().trim().toLowerCase();
+    final adminPassword = _getAdminPassword();
+    if (adminEmail.isEmpty || adminPassword.isEmpty) return false;
+    return email.trim().toLowerCase() == adminEmail && password == adminPassword;
+  }
+
   /// Login using Firebase Authentication
   /// Connects to Firestore document with ID dSc8mQzHPsftOpqb200d7xPhS7K2 for admin
-  /// FALLBACK: If Firebase Auth fails but credentials match admin, allow login anyway
+  /// FALLBACK: If Firebase Auth fails but credentials match secure admin config, allow login.
+  /// Auto-login disabled: admin and all role-based users must enter email/password every time.
   Future<bool> login(String email, String password) async {
-    // NEW: Check for auto-login first (within 1 hour of logout)
-    if (email.isEmpty && password.isEmpty) {
-      final canAuto = await canAutoLogin();
-      if (canAuto) {
-        return await autoLogin();
-      }
-    }
-
     if (email.isEmpty || password.isEmpty) {
       debugPrint('Login: Email and password are required');
       return false;
@@ -464,12 +471,7 @@ class InaraAuthProvider with ChangeNotifier {
           'Login: Attempting Firebase Auth login for email: $trimmedEmail');
       debugPrint('Login: Password length: ${password.length}');
 
-      // FALLBACK: Check if this is admin credentials - if so, we'll allow login even if Firebase Auth fails
-      const adminEmail = 'chiyagadi@gmail.com';
-      const adminPassword = 'Chiyagadi15@';
-      final isAdminCredentials =
-          trimmedEmail == adminEmail && password == adminPassword;
-
+      final isAdminCredentials = _isAdminCredentials(trimmedEmail, password);
       if (isAdminCredentials) {
         debugPrint(
             'Login: Admin credentials detected - will allow login even if Firebase Auth fails');
@@ -552,10 +554,7 @@ class InaraAuthProvider with ChangeNotifier {
 
           // Try to extract error code from the error message
           if (errorStr.contains('user-not-found')) {
-            debugPrint('Login: CRITICAL - Firebase Auth user does not exist!');
-            debugPrint('Login: Please create user in Firebase Console:');
-            debugPrint('Login:   Email: chiyagadi@gmail.com');
-            debugPrint('Login:   Password: Chiyagadi15@');
+            debugPrint('Login: Firebase Auth user does not exist. Create user in Firebase Console.');
           } else if (errorStr.contains('wrong-password')) {
             debugPrint('Login: Password is incorrect');
           }
@@ -769,7 +768,7 @@ class InaraAuthProvider with ChangeNotifier {
             debugPrint(
                 'Login: Success! Admin authenticated with document ID: $_currentUserId');
             // NEW: Clear old session info on successful login
-            await _clearStoredSession();
+            await clearStoredSession();
             if (_lockMode == 'timeout') {
               _resetInactivityTimer();
             } else {
@@ -819,7 +818,7 @@ class InaraAuthProvider with ChangeNotifier {
           debugPrint(
               'Login: Success! User authenticated - ID: $_currentUserId, Role: $_currentUserRole');
           // NEW: Clear old session info on successful login
-          await _clearStoredSession();
+          await clearStoredSession();
           if (_lockMode == 'timeout') {
             _resetInactivityTimer();
           } else {
@@ -834,7 +833,9 @@ class InaraAuthProvider with ChangeNotifier {
       }
 
       // If user document not found, check if this is the admin email and create admin document
-      if (trimmedEmail.toLowerCase() == 'chiyagadi@gmail.com') {
+      final configAdminEmail = _getAdminEmail().trim().toLowerCase();
+      if (configAdminEmail.isNotEmpty &&
+          trimmedEmail.toLowerCase() == configAdminEmail) {
         debugPrint(
             'Login: Admin email detected but Firestore document not found. Creating admin document...');
 
@@ -878,7 +879,7 @@ class InaraAuthProvider with ChangeNotifier {
           debugPrint(
               'Login: Success! Admin authenticated with document ID: $_currentUserId');
           // NEW: Clear old session info on successful login
-          await _clearStoredSession();
+          await clearStoredSession();
           if (_lockMode == 'timeout') {
             _resetInactivityTimer();
           } else {
@@ -930,7 +931,7 @@ class InaraAuthProvider with ChangeNotifier {
       }
 
       // NEW: Clear old session info on successful login
-      await _clearStoredSession();
+      await clearStoredSession();
       if (_lockMode == 'timeout') {
         _resetInactivityTimer();
       } else {
@@ -946,13 +947,9 @@ class InaraAuthProvider with ChangeNotifier {
 
       // Provide more specific error information
       if (e.code == 'user-not-found') {
-        debugPrint('Login: CRITICAL - Firebase Auth user does not exist!');
-        debugPrint('Login: Please create user in Firebase Console:');
-        debugPrint('Login:   Email: chiyagadi@gmail.com');
-        debugPrint('Login:   Password: Chiyagadi15@');
+        debugPrint('Login: Firebase Auth user does not exist. Create user in Firebase Console.');
       } else if (e.code == 'wrong-password') {
-        debugPrint('Login: Password is incorrect');
-        debugPrint('Login: Expected password: Chiyagadi15@');
+        debugPrint('Login: Incorrect password');
       }
 
       return false;
@@ -964,8 +961,8 @@ class InaraAuthProvider with ChangeNotifier {
     }
   }
 
-  /// [storeForAutoLogin] - when true, stores session for auto-login within 1 hour.
-  /// Pass false for explicit user logout so user stays logged out.
+  /// Logout: manual only. [storeForAutoLogin] is always false in app (no auto-login).
+  /// User must enter email/password again after logout.
   Future<void> logout({bool storeForAutoLogin = false}) async {
     // Clear state immediately
     final prevUserId = _currentUserId;
@@ -1190,27 +1187,30 @@ class InaraAuthProvider with ChangeNotifier {
     }
   }
 
-  // Create new user (admin only)
-  /// Create a user with better error handling
-  /// Returns a String? where null means success, and non-null means error message
-  Future<String?> createUserWithError(String username, String pin, String role,
+  /// Result of createUserWithError: error is null on success; signedOut is true when admin was signed out (web).
+  Future<({String? error, bool signedOut})> createUserWithError(
+      String username, String pin, String role,
       {String? email}) async {
     if (username.trim().isEmpty) {
-      return 'Username cannot be empty';
+      return (error: 'Username cannot be empty', signedOut: false);
     }
 
     if (!_isValidPassword(pin)) {
-      return 'Password must be 4-20 characters and contain only letters, numbers, and special characters';
+      return (
+        error:
+            'Password must be 4-20 characters and contain only letters, numbers, and special characters',
+        signedOut: false,
+      );
     }
 
     // UPDATED: Allow any role (not just admin/cashier) to support custom roles
     if (role.trim().isEmpty) {
-      return 'Role cannot be empty';
+      return (error: 'Role cannot be empty', signedOut: false);
     }
 
     // Email is required only for admin role
     if (role == 'admin' && (email == null || email.trim().isEmpty)) {
-      return 'Email is required for admin users';
+      return (error: 'Email is required for admin users', signedOut: false);
     }
 
     try {
@@ -1225,7 +1225,10 @@ class InaraAuthProvider with ChangeNotifier {
       );
 
       if (existing.isNotEmpty) {
-        return 'Username already exists. Please choose a different username';
+        return (
+          error: 'Username already exists. Please choose a different username',
+          signedOut: false,
+        );
       }
 
       final pinHash = _hashPin(pin);
@@ -1259,17 +1262,28 @@ class InaraAuthProvider with ChangeNotifier {
                 'createUser: Email already in Firebase Auth, linking with Firestore');
           } else if (errorMsg.contains('weak-password') ||
               errorMsg.contains('invalid-email')) {
-            return 'Invalid email or password format. Please check your input.';
+            return (
+              error: 'Invalid email or password format. Please check your input.',
+              signedOut: false,
+            );
           } else if (errorMsg.contains('requests-from-referer') ||
               errorMsg.contains('are-blocked')) {
-            return 'This domain is not authorized. In Firebase Console go to Authentication → Settings → Authorized domains and add your domain (e.g. localhost).';
+            return (
+              error:
+                  'This domain is not authorized. In Firebase Console go to Authentication → Settings → Authorized domains and add your domain (e.g. localhost).',
+              signedOut: false,
+            );
           } else {
             // e.g. operation-not-allowed, network - show short hint; Email/Password may already be enabled
             final hint = errorMsg.length > 80
                 ? '${errorMsg.substring(0, 77)}...'
                 : errorMsg;
             debugPrint('createUser: Auth error detail: $hint');
-            return 'Could not create login account. If Email/Password is enabled, check Authentication → Settings → Authorized domains, or try again.';
+            return (
+              error:
+                  'Could not create login account. If Email/Password is enabled, check Authentication → Settings → Authorized domains, or try again.',
+              signedOut: false,
+            );
           }
         }
       }
@@ -1285,13 +1299,13 @@ class InaraAuthProvider with ChangeNotifier {
         'updated_at': now,
       });
 
-      // After creating a new Firebase Auth user, sign out so the app doesn't stay as the new user.
-      // Admin will see login screen and can log back in; the new user can log in from any device.
+      // After creating a new Firebase Auth user, sign out from Firebase only (release new user session).
+      // Admin stays logged in - no automatic app logout; user must manually tap Logout.
       if (kIsWeb && firebaseAuthUserCreated) {
         try {
           await FirebaseAuth.instance.signOut();
           debugPrint(
-              'createUser: Signed out so new user can log in with their credentials');
+              'createUser: Signed out from Firebase so new user can log in; admin stays in app');
         } catch (e) {
           debugPrint('createUser: signOut after create: $e');
         }
@@ -1299,15 +1313,22 @@ class InaraAuthProvider with ChangeNotifier {
 
       debugPrint(
           'createUser: User created - username: ${username.trim()}, email: $normalizedEmail, role: ${role.trim()}');
-      return null; // Success
+      return (error: null, signedOut: false);
     } catch (e) {
       debugPrint('Error creating user: $e');
       final errorStr = e.toString();
       if (errorStr.contains('UNIQUE constraint') ||
           errorStr.contains('unique')) {
-        return 'Username already exists. Please choose a different username';
+        return (
+          error: 'Username already exists. Please choose a different username',
+          signedOut: false,
+        );
       }
-      return 'Failed to create user: ${errorStr.length > 100 ? "${errorStr.substring(0, 100)}..." : errorStr}';
+      return (
+        error:
+            'Failed to create user: ${errorStr.length > 100 ? "${errorStr.substring(0, 100)}..." : errorStr}',
+        signedOut: false,
+      );
     }
   }
 
@@ -1315,8 +1336,9 @@ class InaraAuthProvider with ChangeNotifier {
   /// UPDATED: Now supports custom roles (not just admin/cashier)
   Future<bool> createUser(String username, String pin, String role,
       {String? email}) async {
-    final error = await createUserWithError(username, pin, role, email: email);
-    return error == null; // Return true if no error
+    final result =
+        await createUserWithError(username, pin, role, email: email);
+    return result.error == null; // Return true if no error
   }
 
   /// Create a user with a specific document ID (for Firestore) or regular insert (SQLite)
@@ -1445,7 +1467,7 @@ class InaraAuthProvider with ChangeNotifier {
               'id': _currentUserId,
               'documentId': kIsWeb ? _currentUserId : null,
               'username': _currentUsername ?? 'admin',
-              'email': 'chiyagadi@gmail.com',
+              'email': _getAdminEmail().isNotEmpty ? _getAdminEmail() : null,
               'role': 'admin',
               'is_active': 1,
             }
@@ -1466,7 +1488,7 @@ class InaraAuthProvider with ChangeNotifier {
             'id': _currentUserId,
             'documentId': kIsWeb ? _currentUserId : null,
             'username': _currentUsername ?? 'admin',
-            'email': 'chiyagadi@gmail.com',
+            'email': _getAdminEmail().isNotEmpty ? _getAdminEmail() : null,
             'role': 'admin',
             'is_active': 1,
           }

@@ -133,6 +133,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
               : _buildCreditsView(),
       floatingActionButton: _viewMode == 'list' && _customers.isNotEmpty
           ? FloatingActionButton.extended(
+              heroTag: 'customers_fab',
               onPressed: () => _showAddCustomerDialog(),
               backgroundColor: AppTheme.logoPrimary,
               icon: const Icon(Icons.add),

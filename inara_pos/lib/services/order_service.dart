@@ -82,6 +82,8 @@ class OrderService {
       'tax_percent': 0.0, // VAT removed
       'total_amount': 0,
       'payment_status': 'unpaid',
+      'credit_amount': 0,
+      'paid_amount': 0,
       'created_by': createdBy,
       'created_at': now,
       'updated_at': now,
@@ -93,6 +95,10 @@ class OrderService {
 
     final orderId = await dbProvider.insert('orders', values);
 
+    if (orderId == null) {
+      throw Exception(
+          'Could not create order. Database may be unavailable. Please try again.');
+    }
     return orderId;
   }
 
@@ -129,12 +135,32 @@ class OrderService {
     debugPrint(
         'OrderService: Adding ${product.name} (ID: $productId) - quantity: $quantity (inventory check disabled)');
 
-    // Check if item already exists in order
-    final existingItems = await dbProvider.query(
-      'order_items',
-      where: 'order_id = ? AND product_id = ?',
-      whereArgs: [orderId, productId],
-    );
+    // Check if item already exists in order (compound query may require Firestore index)
+    List<Map<String, dynamic>> existingItems;
+    try {
+      existingItems = await dbProvider.query(
+        'order_items',
+        where: 'order_id = ? AND product_id = ?',
+        whereArgs: [orderId, productId],
+      );
+    } catch (e) {
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('index') || msg.contains('failed-precondition')) {
+        // Firestore compound query failed; fallback: filter by order_id then product_id in memory
+        final byOrder = await dbProvider.query(
+          'order_items',
+          where: 'order_id = ?',
+          whereArgs: [orderId],
+        );
+        existingItems = byOrder
+            .where((m) =>
+                m['product_id'] == productId ||
+                m['product_id'].toString() == productId.toString())
+            .toList();
+      } else {
+        rethrow;
+      }
+    }
 
     if (existingItems.isNotEmpty) {
       // Update quantity

@@ -4,7 +4,7 @@ import '../../models/product.dart';
 import '../../models/category.dart';
 import '../../providers/unified_database_provider.dart';
 import '../../utils/number_formatter.dart';
-import '../../utils/performance.dart';
+import '../../utils/performance.dart' show platformScrollPhysics, kDefaultCacheExtent;
 
 class POSProductGrid extends StatefulWidget {
   final Function(Product) onProductSelected;
@@ -184,7 +184,7 @@ class _POSProductGridState extends State<POSProductGrid> {
                   : GridView.builder(
                       padding: const EdgeInsets.all(12),
                       physics: platformScrollPhysics,
-                      cacheExtent: 400,
+                      cacheExtent: kDefaultCacheExtent,
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 4,

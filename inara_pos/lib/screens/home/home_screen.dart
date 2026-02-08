@@ -15,6 +15,7 @@ import '../expenses/expenses_screen.dart';
 import '../settings/settings_screen.dart';
 import '../../widgets/responsive_wrapper.dart';
 import '../../utils/theme.dart';
+import '../../utils/performance.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -236,11 +237,13 @@ class _HomeScreenState extends State<HomeScreen> {
         appBar: _selectedIndex == 0
             ? null
             : AppBar(
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => setState(() => _selectedIndex = 0),
-                  tooltip: 'Back to Dashboard',
-                ),
+                leading: _selectedIndex == 1
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.arrow_back),
+                        onPressed: () => setState(() => _selectedIndex = 0),
+                        tooltip: 'Back to Dashboard',
+                      ),
                 title: Row(
                   children: [
                     Container(
@@ -256,6 +259,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Image.asset(
                           'assets/images/logo.jpeg',
                           fit: BoxFit.cover,
+                          cacheWidth: 60,
+                          cacheHeight: 60,
                           errorBuilder: (_, __, ___) =>
                               const Icon(Icons.local_cafe, size: 18),
                         ),
@@ -268,13 +273,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: _refreshCurrentScreen,
-                    tooltip: 'Refresh',
-                  ),
-                ],
+                actions: _selectedIndex == 1
+                    ? null
+                    : [
+                        IconButton(
+                          icon: const Icon(Icons.refresh),
+                          onPressed: _refreshCurrentScreen,
+                          tooltip: 'Refresh',
+                        ),
+                      ],
               ),
         drawer: isCompact ? _buildDrawer(context, authProvider) : null,
         body: kIsWeb
@@ -402,7 +409,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Navigator.pop(context);
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            smoothSlidePageRoute(builder: (context) => const SettingsScreen()),
           );
         },
       ),
@@ -625,7 +632,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (isSettings) {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            smoothSlidePageRoute(builder: (context) => const SettingsScreen()),
           );
         } else {
           _selectIndex(index);

@@ -7,7 +7,7 @@
     "background_color": "#FFFFFF",
     "theme_color": "#D4A574",
     "description": "InaraPOS - Single Café Edition. Offline-first POS system for small cafés in Nepal.",
-    "orientation": "any",
+    "orientation": "portrait",
     "prefer_related_applications": false,
     "categories": [
         "business",

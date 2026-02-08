@@ -194,6 +194,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       ),
       floatingActionButton: _filteredSuppliers.isNotEmpty
           ? FloatingActionButton.extended(
+              heroTag: 'suppliers_fab',
               onPressed: () => _showAddSupplierDialog(),
               backgroundColor: AppTheme.logoPrimary,
               icon: const Icon(Icons.add),

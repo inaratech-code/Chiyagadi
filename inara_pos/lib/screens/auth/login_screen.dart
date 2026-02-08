@@ -75,15 +75,8 @@ class _LoginScreenState extends State<LoginScreen>
       // Set context for AuthProvider to access UnifiedDatabaseProvider
       authProvider.setContext(context);
 
-      // NEW: Check for auto-login (within 1 hour of logout)
-      final canAuto = await authProvider.canAutoLogin();
-      if (canAuto) {
-        final autoLoginSuccess = await authProvider.autoLogin();
-        if (autoLoginSuccess && mounted) {
-          // AuthWrapper (Consumer) will rebuild and show HomeScreen.
-          return;
-        }
-      }
+      // Auto-login disabled: all roles and admin must enter email/password every time.
+      await authProvider.clearStoredSession();
 
       // Load in background without blocking UI
       final hasPin = await authProvider.checkPinExists();
@@ -572,10 +565,7 @@ class _LoginScreenState extends State<LoginScreen>
                                                   _errorMessage!.contains(
                                                       'no such table') ||
                                                   _errorMessage!.contains(
-                                                      'Reset failed') ||
-                                                  (                                                  _errorMessage != null &&
-                                                      _errorMessage!.contains('Invalid') &&
-                                                      !_isFirstTime))
+                                                      'Reset failed'))
                                                 Padding(
                                                   padding:
                                                       const EdgeInsets.only(

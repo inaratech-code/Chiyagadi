@@ -19,6 +19,7 @@ import '../menu/menu_screen.dart';
 import '../expenses/expenses_screen.dart';
 import 'recent_activity_screen.dart';
 import '../../utils/loading_constants.dart';
+import '../../utils/performance.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Function(int)? onNavigate;
@@ -412,6 +413,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: Image.asset(
                       'assets/images/logo.jpeg',
                       fit: BoxFit.cover,
+                      cacheWidth: 80,
+                      cacheHeight: 80,
                       errorBuilder: (context, error, stackTrace) {
                         return const Icon(
                           Icons.local_cafe,
@@ -474,7 +477,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                smoothSlidePageRoute(builder: (context) => const SettingsScreen()),
               );
             },
             tooltip: 'Settings',

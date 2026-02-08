@@ -329,7 +329,7 @@ class _UsersAndRolesManagementScreenState
     }
 
     // Pass email only if admin entered one (no auto-generation)
-    final error = await auth.createUserWithError(
+    final createResult = await auth.createUserWithError(
       username,
       pin,
       selectedRole,
@@ -337,13 +337,18 @@ class _UsersAndRolesManagementScreenState
     );
     if (!mounted) return;
 
-    if (error == null) {
-      // Success
-      await _loadUsers();
-      final createdUser = _users.firstWhere(
-        (u) => u['username'] == username,
-        orElse: () => {},
-      );
+    if (createResult.error == null) {
+      // Success (skip _loadUsers when signed out - we're navigating to login)
+      if (!createResult.signedOut) {
+        await _loadUsers();
+      }
+      if (!mounted) return;
+      final createdUser = createResult.signedOut
+          ? <String, dynamic>{}
+          : _users.firstWhere(
+              (u) => u['username'] == username,
+              orElse: () => <String, dynamic>{},
+            );
 
       String message = 'User "$username" created successfully';
       if (createdUser.isNotEmpty && createdUser['email'] != null) {
@@ -358,11 +363,24 @@ class _UsersAndRolesManagementScreenState
             backgroundColor: AppTheme.successColor,
             duration: const Duration(seconds: 5)),
       );
+
+      // Show notification if admin was signed out (web: Firebase Auth switches to new user, so we sign out)
+      if (createResult.signedOut && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'You have been logged out. Please sign in again with your admin credentials.',
+            ),
+            backgroundColor: AppTheme.warningColor,
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
     } else {
       // Show specific error message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(error),
+            content: Text(createResult.error!),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 5)),
       );
@@ -1641,6 +1659,7 @@ class _UsersAndRolesManagementScreenState
       ),
       floatingActionButton: _currentTab == 0
           ? FloatingActionButton.extended(
+              heroTag: 'users_add_user_fab',
               onPressed: _showAddUserDialog,
               backgroundColor: AppTheme.logoPrimary,
               foregroundColor: AppTheme.logoAccent,
@@ -1648,6 +1667,7 @@ class _UsersAndRolesManagementScreenState
               label: const Text('Add User'),
             )
           : FloatingActionButton.extended(
+              heroTag: 'users_add_role_fab',
               onPressed: () => _showAddRoleDialog(),
               backgroundColor: AppTheme.logoSecondary,
               foregroundColor: Colors.white,
