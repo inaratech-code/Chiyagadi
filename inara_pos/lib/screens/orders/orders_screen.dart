@@ -13,7 +13,6 @@ import 'order_detail_screen.dart';
 import 'order_details_dialog.dart';
 import 'order_payment_dialog.dart';
 import 'package:intl/intl.dart';
-import '../../utils/loading_constants.dart';
 import '../../utils/performance.dart';
 import '../../utils/loading_skeleton.dart';
 
@@ -232,10 +231,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Future<void> _loadOrders() async {
     if (!mounted) return;
     _loadDeferTimer?.cancel();
-    // Show loading only after a short delay so fast loads don't flash a spinner.
-    _loadDeferTimer = Timer(Duration(milliseconds: kDeferLoadingMs), () {
-      if (mounted) setState(() => _isLoading = true);
-    });
+    if (mounted) setState(() => _isLoading = true);
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);

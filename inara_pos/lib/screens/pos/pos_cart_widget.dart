@@ -17,6 +17,8 @@ class POSCartWidget extends StatefulWidget {
   final Function(Order?)? onOrderUpdated;
   final Function(int?)? onTableSelected;
   final VoidCallback? onPayPressed;
+  final Order? optimisticOrder;
+  final List<OrderItem> optimisticItems;
 
   const POSCartWidget({
     super.key,
@@ -26,6 +28,8 @@ class POSCartWidget extends StatefulWidget {
     this.onOrderUpdated,
     this.onTableSelected,
     this.onPayPressed,
+    this.optimisticOrder,
+    this.optimisticItems = const [],
   });
 
   @override
@@ -37,9 +41,20 @@ class _POSCartWidgetState extends State<POSCartWidget> {
   List<OrderItem> _items = [];
   bool _isLoading = false;
 
+  Order? get _displayOrder => widget.optimisticOrder ?? widget.order;
+
   dynamic _currentOrderId() {
-    if (widget.order == null) return null;
-    return kIsWeb ? widget.order!.documentId : widget.order!.id;
+    final o = _displayOrder;
+    if (o == null) return null;
+    return kIsWeb ? o.documentId : o.id;
+  }
+
+  List<OrderItem> get _displayItems {
+    final base = List<OrderItem>.from(_items);
+    if (widget.optimisticItems.isNotEmpty) {
+      base.addAll(widget.optimisticItems);
+    }
+    return base;
   }
 
   @override
@@ -51,7 +66,7 @@ class _POSCartWidgetState extends State<POSCartWidget> {
   @override
   void didUpdateWidget(POSCartWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Reload if order identity changes OR order gets updated (items/totals changed)
+    if (widget.optimisticItems.isNotEmpty) return;
     final oldOrderId =
         kIsWeb ? oldWidget.order?.documentId : oldWidget.order?.id;
     final newOrderId = kIsWeb ? widget.order?.documentId : widget.order?.id;
@@ -92,7 +107,7 @@ class _POSCartWidgetState extends State<POSCartWidget> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.order == null) {
+    if (_displayOrder == null) {
       return Container(
         color: const Color(0xFF2D2D2D),
         child: Center(
@@ -162,7 +177,7 @@ class _POSCartWidgetState extends State<POSCartWidget> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.order!.orderNumber,
+                            _displayOrder!.orderNumber,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 14,
@@ -205,9 +220,9 @@ class _POSCartWidgetState extends State<POSCartWidget> {
 
           // Items list
           Expanded(
-            child: _isLoading
+            child: _isLoading && widget.optimisticItems.isEmpty
                 ? const Center(child: CircularProgressIndicator())
-                : _items.isEmpty
+                : _displayItems.isEmpty
                     ? const Center(
                         child: Text(
                           'Cart is empty',
@@ -217,10 +232,10 @@ class _POSCartWidgetState extends State<POSCartWidget> {
                     : ListView.builder(
                         physics: platformScrollPhysics,
                         cacheExtent: 200,
-                        itemCount: _items.length,
+                        itemCount: _displayItems.length,
                         padding: const EdgeInsets.all(8),
                         itemBuilder: (context, index) {
-                          final item = _items[index];
+                          final item = _displayItems[index];
                           return _buildCartItem(item);
                         },
                       ),
@@ -239,10 +254,10 @@ class _POSCartWidgetState extends State<POSCartWidget> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Bill format: Subtotal, Discount (%), Total
-                _buildTotalRow('Subtotal', widget.order!.subtotal),
+                _buildTotalRow('Subtotal', _displayOrder!.subtotal),
                 _buildTotalRow(
-                  'Discount (${widget.order!.discountPercent.toStringAsFixed(1)}%)',
-                  -widget.order!.discountAmount,
+                  'Discount (${_displayOrder!.discountPercent.toStringAsFixed(1)}%)',
+                  -_displayOrder!.discountAmount,
                 ),
                 const SizedBox(height: 8),
                 Container(
@@ -252,7 +267,7 @@ class _POSCartWidgetState extends State<POSCartWidget> {
                 const SizedBox(height: 8),
                 _buildTotalRow(
                   'Total',
-                  widget.order!.totalAmount,
+                  _displayOrder!.totalAmount,
                   isTotal: true,
                 ),
                 const SizedBox(height: 16),
@@ -260,7 +275,8 @@ class _POSCartWidgetState extends State<POSCartWidget> {
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: widget.order!.totalAmount > 0
+                    onPressed: _displayOrder!.totalAmount > 0 &&
+                            widget.optimisticItems.isEmpty
                         ? widget.onPayPressed
                         : null,
                     style: ElevatedButton.styleFrom(
@@ -308,7 +324,7 @@ class _POSCartWidgetState extends State<POSCartWidget> {
               children: [
                 Expanded(
                   child: Text(
-                    'Item ${item.productId}', // In real app, show product name
+                    item.product?.name ?? 'Item ${item.productId}',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 15,

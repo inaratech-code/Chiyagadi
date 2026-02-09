@@ -76,19 +76,21 @@ class _LoginScreenState extends State<LoginScreen>
       // Set context for AuthProvider to access UnifiedDatabaseProvider
       authProvider.setContext(context);
 
-      // Auto-login disabled: all roles and admin must enter email/password every time.
-      await authProvider.clearStoredSession();
+      // Auto-login disabled: clear stored session in background (don't block)
+      authProvider.clearStoredSession();
 
-      // Load in background without blocking UI
-      final hasPin = await authProvider.checkPinExists();
-      final prefs = await SharedPreferences.getInstance();
-      final rememberedEmail = prefs.getString('remembered_email');
-      final rememberedPassword = prefs.getString('remembered_password');
-      final rememberMe = prefs.getBool('remember_me') ?? false;
+      // Load in parallel
+      final prefs = SharedPreferences.getInstance();
+      final hasPin = authProvider.checkPinExists();
+      final prefsInstance = await prefs;
+      final hasPinResult = await hasPin;
+      final rememberedEmail = prefsInstance.getString('remembered_email');
+      final rememberedPassword = prefsInstance.getString('remembered_password');
+      final rememberMe = prefsInstance.getBool('remember_me') ?? false;
 
       if (mounted) {
         setState(() {
-          _isFirstTime = !hasPin;
+          _isFirstTime = !hasPinResult;
           _rememberMe = rememberMe;
           if (rememberMe && rememberedEmail != null) {
             _emailController.text = rememberedEmail;

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/order.dart';
+import '../../models/order_item.dart';
 import '../../models/product.dart';
 import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../providers/unified_database_provider.dart';
@@ -24,9 +25,12 @@ class _POSScreenState extends State<POSScreen> {
   final PrinterService _printerService = PrinterService();
 
   Order? _currentOrder;
-  String _orderType = 'dine_in'; // 'dine_in' or 'takeaway'
+  String _orderType = 'dine_in';
   int? _selectedTableId;
   bool _isAddingItem = false;
+  List<OrderItem> _optimisticItems = [];
+  Order? _optimisticOrder;
+  final List<Product> _pendingPersist = [];
 
   @override
   void initState() {
@@ -40,18 +44,76 @@ class _POSScreenState extends State<POSScreen> {
     });
   }
 
-  Future<void> _addProductToCart(Product product) async {
+  void _addProductToCart(Product product) {
     if (_isAddingItem) return;
-    setState(() => _isAddingItem = true);
 
-    final dbProvider =
-        Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-    final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
+    final baseOrder = _optimisticOrder ?? _currentOrder;
+    final baseSub = baseOrder?.subtotal ?? 0;
+    final baseDiscount = baseOrder?.discountAmount ?? 0;
+    final baseDiscountPct = baseOrder?.discountPercent ?? 0;
+    final price = product.price;
+    final newSub = baseSub + price;
+    final newDiscount = newSub * (baseDiscountPct / 100);
+    final newTotal = newSub - newDiscount;
 
+    final tempOrderId = baseOrder != null
+        ? (kIsWeb ? baseOrder.documentId : baseOrder.id)
+        : null;
+    final optItem = OrderItem(
+      id: null,
+      orderId: tempOrderId,
+      productId: kIsWeb ? product.documentId : product.id,
+      quantity: 1,
+      unitPrice: price,
+      totalPrice: price,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      product: product,
+    );
+
+    Order? optOrder;
+    if (baseOrder != null) {
+      optOrder = baseOrder.copyWith(
+        subtotal: newSub,
+        discountAmount: newDiscount,
+        totalAmount: newTotal,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+    } else {
+      optOrder = Order(
+        orderNumber: '...',
+        orderType: _orderType,
+        tableId: _selectedTableId,
+        subtotal: newSub,
+        discountAmount: newDiscount,
+        discountPercent: baseDiscountPct,
+        totalAmount: newTotal,
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+    }
+
+    setState(() {
+      _isAddingItem = true;
+      _optimisticOrder = optOrder;
+      _optimisticItems = [..._optimisticItems, optItem];
+      _pendingPersist.add(product);
+    });
+
+    _processPendingPersist();
+  }
+
+  Future<void> _processPendingPersist() async {
+    if (_pendingPersist.isEmpty) {
+      if (mounted) setState(() => _isAddingItem = false);
+      return;
+    }
+    final product = _pendingPersist.removeAt(0);
     try {
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      final authProvider = Provider.of<InaraAuthProvider>(context, listen: false);
       await dbProvider.init();
 
-      // Ensure an order exists in DB (so cart can load items)
       dynamic orderId;
       if (_currentOrder == null) {
         orderId = await _orderService.createOrder(
@@ -66,7 +128,6 @@ class _POSScreenState extends State<POSScreen> {
         );
       } else {
         orderId = kIsWeb ? _currentOrder!.documentId : _currentOrder!.id;
-        // Safety: if current order somehow has no id, create a new one.
         if (orderId == null) {
           orderId = await _orderService.createOrder(
             dbProvider: dbProvider,
@@ -81,7 +142,6 @@ class _POSScreenState extends State<POSScreen> {
         }
       }
 
-      // Add the selected product
       await _orderService.addItemToOrder(
         dbProvider: dbProvider,
         context: context,
@@ -95,22 +155,49 @@ class _POSScreenState extends State<POSScreen> {
             : null,
       );
 
-      // Reload order (totals + updatedAt) so cart refreshes
       final updatedOrder =
           await _orderService.getOrderById(dbProvider, orderId);
       if (mounted) {
+        final persistedProductId =
+            kIsWeb ? product.documentId : product.id;
         setState(() {
           _currentOrder = updatedOrder;
+          final newOpt = _optimisticItems.toList();
+          final idx = newOpt.indexWhere((i) => i.productId == persistedProductId);
+          if (idx >= 0) newOpt.removeAt(idx);
+          _optimisticItems = newOpt;
+          if (_optimisticItems.isEmpty) {
+            _optimisticOrder = null;
+          } else {
+            final base = updatedOrder!;
+            double sub = base.subtotal;
+            for (final oi in _optimisticItems) {
+              sub += oi.totalPrice;
+            }
+            final dPct = base.discountPercent;
+            final dAmt = sub * (dPct / 100);
+            _optimisticOrder = base.copyWith(
+              subtotal: sub,
+              discountAmount: dAmt,
+              totalAmount: sub - dAmt,
+              updatedAt: DateTime.now().millisecondsSinceEpoch,
+            );
+          }
         });
+        _processPendingPersist();
       }
     } catch (e) {
       if (mounted) {
+        setState(() {
+          _optimisticOrder = null;
+          _optimisticItems = [];
+          _pendingPersist.clear();
+          _isAddingItem = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Unable to add item: $e')),
         );
       }
-    } finally {
-      if (mounted) setState(() => _isAddingItem = false);
     }
   }
 
@@ -197,7 +284,9 @@ class _POSScreenState extends State<POSScreen> {
   }
 
   Future<void> _showPaymentDialog() async {
-    if (_currentOrder == null || _currentOrder!.totalAmount <= 0) {
+    if (_currentOrder == null ||
+        _currentOrder!.totalAmount <= 0 ||
+        _optimisticItems.isNotEmpty) {
       return;
     }
 
@@ -229,6 +318,9 @@ class _POSScreenState extends State<POSScreen> {
       setState(() {
         _currentOrder = null;
         _selectedTableId = null;
+        _optimisticOrder = null;
+        _optimisticItems = [];
+        _pendingPersist.clear();
       });
 
       if (mounted) {
@@ -353,6 +445,8 @@ class _POSScreenState extends State<POSScreen> {
                     order: _currentOrder,
                     orderType: _orderType,
                     selectedTableId: _selectedTableId,
+                    optimisticOrder: _optimisticOrder,
+                    optimisticItems: _optimisticItems,
                     onOrderUpdated: (order) {
                       setState(() {
                         _currentOrder = order;

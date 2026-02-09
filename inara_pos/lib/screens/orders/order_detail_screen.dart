@@ -58,72 +58,26 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         whereArgs: [widget.orderId],
       );
       if (orders.isNotEmpty) {
-        _order = orders.first;
-        // Initialize Discount controller
-        _discountController.text =
-            (_order!['discount_percent'] as num? ?? 0.0).toStringAsFixed(1);
-
-        // Ensure totals are recalculated
-        final dbProvider =
-            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
-        // Trigger recalculation by updating Discount with current values
-        await _orderService.updateVATAndDiscount(
-          dbProvider: dbProvider,
-          orderId: widget.orderId,
-          vatPercent: 0.0,
-          discountPercent:
-              (_order!['discount_percent'] as num?)?.toDouble() ?? 0.0,
-        );
-        // Reload to get updated values
-        final updatedOrders = await dbProvider.query(
-          'orders',
-          where: kIsWeb ? 'documentId = ?' : 'id = ?',
-          whereArgs: [widget.orderId],
-        );
-        if (updatedOrders.isNotEmpty) {
-          setState(() {
-            _order = updatedOrders.first;
-          });
-        }
+        setState(() {
+          _order = orders.first;
+          _discountController.text =
+              (_order!['discount_percent'] as num? ?? 0.0).toStringAsFixed(1);
+        });
       }
 
-      // Load order items
-      _orderItems = await dbProvider.query(
-        'order_items',
-        where: 'order_id = ?',
-        whereArgs: [widget.orderId],
-      );
+      // Load order items, products, categories in parallel
+      final itemsF = dbProvider.query('order_items', where: 'order_id = ?', whereArgs: [widget.orderId]);
+      final productsF = kIsWeb
+          ? dbProvider.query('products', where: 'is_active = ?', whereArgs: [1])
+          : dbProvider.query('products', where: 'is_active = ? AND (is_sellable = ? OR is_sellable IS NULL)', whereArgs: [1, 1]);
+      final catsF = dbProvider.query('categories', orderBy: 'display_order ASC');
 
-      // Load products - only sellable items for orders
-      // FIXED: Handle Firestore query limitations (no OR with IS NULL)
-      List<Map<String, dynamic>> productMaps;
-      if (kIsWeb) {
-        // For Firestore: Query all active products, filter in memory
-        final allProducts = await dbProvider.query(
-          'products',
-          where: 'is_active = ?',
-          whereArgs: [1],
-        );
-        productMaps = allProducts.where((p) {
-          final isSellable = p['is_sellable'];
-          // Include if is_sellable is 1, null, or not set (default to sellable)
-          return isSellable == null || isSellable == 1;
-        }).toList();
-      } else {
-        // For SQLite: Can use OR clause
-        productMaps = await dbProvider.query(
-          'products',
-          where: 'is_active = ? AND (is_sellable = ? OR is_sellable IS NULL)',
-          whereArgs: [1, 1],
-        );
-      }
-      _products = productMaps.map((map) => Product.fromMap(map)).toList();
-      debugPrint('Loaded ${_products.length} products for order');
-
-      // Load categories
-      _categories =
-          await dbProvider.query('categories', orderBy: 'display_order ASC');
-      debugPrint('Loaded ${_categories.length} categories');
+      final res = await Future.wait([itemsF, productsF, catsF]);
+      _orderItems = res[0] as List<Map<String, dynamic>>;
+      var pm = res[1] as List<Map<String, dynamic>>;
+      if (kIsWeb) pm = pm.where((p) => p['is_sellable'] == null || p['is_sellable'] == 1).toList();
+      _products = pm.map((m) => Product.fromMap(m)).toList();
+      _categories = res[2] as List<Map<String, dynamic>>;
 
       // Permission: can view/edit order items (Orders section)
       final auth = Provider.of<InaraAuthProvider>(context, listen: false);
