@@ -101,6 +101,7 @@ class _POSProductGridState extends State<POSProductGrid> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               physics: platformScrollPhysics,
+              cacheExtent: 300,
               itemCount: _categories.length,
               itemBuilder: (context, index) {
                 final category = _categories[index];

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/database_provider.dart';
 import '../screens/customers/customers_screen.dart';
+import '../utils/performance.dart';
 import 'package:intl/intl.dart';
 
 class CreditSummaryWidget extends StatefulWidget {
@@ -61,7 +62,7 @@ class _CreditSummaryWidgetState extends State<CreditSummaryWidget> {
           // Navigate to customers screen
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const CustomersScreen()),
+            smoothPageRoute(builder: (_) => const CustomersScreen()),
           );
         },
         child: Padding(

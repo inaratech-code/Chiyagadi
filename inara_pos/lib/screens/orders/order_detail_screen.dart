@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../models/product.dart';
 import '../../services/order_service.dart';
 import '../../utils/theme.dart';
+import '../../utils/performance.dart';
 import 'package:intl/intl.dart';
 import '../dashboard/dashboard_screen.dart';
 
@@ -169,11 +170,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ),
       body: _isLoading || _order == null
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Column(
-                children: [
-                  // Order Info Card
-                  Card(
+          : CustomScrollView(
+              physics: platformScrollPhysics,
+              cacheExtent: 200,
+              slivers: [
+                // Order Info Card
+                SliverToBoxAdapter(
+                  child: Card(
                     margin: const EdgeInsets.all(16),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
@@ -233,10 +236,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ),
                     ),
                   ),
+                ),
 
-                  // Items List
-                  _orderItems.isEmpty
-                      ? Padding(
+                // Items List
+                if (_orderItems.isEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
                           padding: const EdgeInsets.all(32.0),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -256,63 +261,75 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               ),
                             ],
                           ),
-                        )
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _orderItems.length,
-                          itemBuilder: (context, index) {
-                            final item = _orderItems[index];
-                            // FIXED: Handle both int (SQLite) and String (Firestore) product IDs
-                            final productId = item['product_id'];
-                            final product = _products.firstWhere(
-                              (p) {
-                                final pId = kIsWeb ? p.documentId : p.id;
-                                return pId == productId;
-                              },
-                              orElse: () => Product(
-                                categoryId: 0,
-                                name: 'Unknown Product',
-                                price: 0,
-                                createdAt: 0,
-                                updatedAt: 0,
-                              ),
-                            );
-                            return _buildOrderItemCard(item, product);
-                          },
-                        ),
-
-                  // Add item from same page (when order is not paid)
-                  if (_order?['payment_status'] != 'paid') ...[
-                    const SizedBox(height: 12),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => _showAddItemDialog(),
-                              icon: const Icon(Icons.add, size: 20),
-                              label: const Text('Add Item'),
+                  ),
+                )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final item = _orderItems[index];
+                          final productId = item['product_id'];
+                          final product = _products.firstWhere(
+                            (p) {
+                              final pId = kIsWeb ? p.documentId : p.id;
+                              return pId == productId;
+                            },
+                            orElse: () => Product(
+                              categoryId: 0,
+                              name: 'Unknown Product',
+                              price: 0,
+                              createdAt: 0,
+                              updatedAt: 0,
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => _showAddMultipleItemsDialog(),
-                              icon: const Icon(Icons.playlist_add, size: 20),
-                              label: const Text('Add Multiple'),
-                            ),
-                          ),
-                        ],
+                          );
+                          return RepaintBoundary(
+                            child: _buildOrderItemCard(item, product),
+                          );
+                        },
+                        childCount: _orderItems.length,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                  ],
+                  ),
 
-                  // Totals and Payment
-                  Container(
+                // Add item from same page (when order is not paid)
+                if (_order?['payment_status'] != 'paid')
+                  SliverToBoxAdapter(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(height: 12),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () => _showAddItemDialog(),
+                                  icon: const Icon(Icons.add, size: 20),
+                                  label: const Text('Add Item'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () => _showAddMultipleItemsDialog(),
+                                  icon: const Icon(Icons.playlist_add, size: 20),
+                                  label: const Text('Add Multiple'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
+
+                // Totals and Payment
+                SliverToBoxAdapter(
+                  child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -555,10 +572,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
-    );
+                ),
+              ],
+            );
   }
 
   Widget _buildOrderItemCard(Map<String, dynamic> item, Product product) {

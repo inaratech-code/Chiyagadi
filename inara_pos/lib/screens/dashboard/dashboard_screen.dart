@@ -528,7 +528,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               // Navigate to full recent activity screen
               Navigator.push(
                 context,
-                MaterialPageRoute(
+                smoothPageRoute(
                   builder: (_) => const RecentActivityScreen(),
                 ),
               );
@@ -751,7 +751,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   } else {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
+                      smoothPageRoute(
                           builder: (_) => const CustomersScreen()),
                     );
                   }
@@ -892,7 +892,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   } else {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
+                      smoothPageRoute(
                           builder: (_) => const InventoryScreen()),
                     );
                   }
@@ -1007,7 +1007,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       } else {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => screen),
+          smoothPageRoute(builder: (_) => screen),
         );
       }
     }
@@ -1056,7 +1056,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         'color': AppTheme.logoPrimary, // Golden yellow from logo
         'onTap': () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const SuppliersScreen()),
+              smoothPageRoute(builder: (_) => const SuppliersScreen()),
             ),
       },
       {
@@ -1225,7 +1225,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           } else {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(
+                              smoothPageRoute(
                                 builder: (_) => const OrdersScreen(),
                               ),
                             );

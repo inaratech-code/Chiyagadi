@@ -71,14 +71,25 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
   List<Customer> get _filteredCustomers {
     final q = _customerSearch.trim().toLowerCase();
-    if (q.isEmpty) return _customers;
-    return _customers.where((c) {
-      final name = (c.name).toLowerCase();
-      final phone = (c.phone ?? '').toLowerCase();
-      final email = (c.email ?? '').toLowerCase();
-      return name.contains(q) || phone.contains(q) || email.contains(q);
-    }).toList();
+    final list = q.isEmpty
+        ? List<Customer>.from(_customers)
+        : _customers
+            .where((c) {
+              final name = (c.name).toLowerCase();
+              final phone = (c.phone ?? '').toLowerCase();
+              final email = (c.email ?? '').toLowerCase();
+              return name.contains(q) || phone.contains(q) || email.contains(q);
+            })
+            .toList();
+    list.sort((a, b) => b.creditBalance.compareTo(a.creditBalance));
+    return list;
   }
+
+  bool _isAtCreditLimit(Customer c) =>
+      c.creditLimit > 0 && c.creditBalance >= c.creditLimit;
+
+  int get _atLimitCount =>
+      _customers.where((c) => _isAtCreditLimit(c)).length;
 
   Future<List<Map<String, dynamic>>> _loadCustomerOrders(
       dynamic customerId) async {
@@ -143,10 +154,36 @@ class _CustomersScreenState extends State<CustomersScreen> {
     );
   }
 
+  static const Color _limitWarningRed = Color(0xFFFFEBEE);
+
   Widget _buildCustomersList() {
+    final atLimit = _atLimitCount;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (atLimit > 0)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: _limitWarningRed,
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    color: Colors.red[700], size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '$atLimit customer${atLimit == 1 ? '' : 's'} reached credit limit',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.red[800],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: TextField(
@@ -235,12 +272,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         }
                         final customer = _filteredCustomers[index];
                         final hasCredit = customer.creditBalance > 0;
+                        final atLimit = _isAtCreditLimit(customer);
                         final brand = AppTheme.logoPrimary;
 
                         return RepaintBoundary(
                           child: Card(
                           margin: const EdgeInsets.only(bottom: 8),
-                          color: Colors.white,
+                          color: atLimit ? _limitWarningRed : Colors.white,
                           elevation: 1,
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(
@@ -295,7 +333,21 @@ class _CustomersScreenState extends State<CustomersScreen> {
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                if (hasCredit)
+                                if (atLimit)
+                                  Chip(
+                                    label: Text(
+                                      'At limit',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.red[700],
+                                      ),
+                                    ),
+                                    side: BorderSide(
+                                        color: Colors.red.withOpacity(0.5)),
+                                    backgroundColor: _limitWarningRed,
+                                  )
+                                else if (hasCredit)
                                   Chip(
                                     label: Text(
                                       'Credit',
@@ -658,7 +710,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                               : () {
                                   Navigator.push(
                                     context,
-                                    MaterialPageRoute(
+                                    smoothPageRoute(
                                       builder: (_) => OrderDetailScreen(
                                         orderId: orderId,
                                         orderNumber: orderNumber,
@@ -1025,29 +1077,71 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Credit'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Customer: ${customer.name}'),
-            Text(
-                'Current Balance: ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditBalance)}'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: amountController,
-              decoration:
-                  const InputDecoration(labelText: 'Credit Amount (NPR)'),
-              keyboardType: TextInputType.number,
-              autofocus: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final amount = double.tryParse(amountController.text) ?? 0;
+          final balanceAfter = customer.creditBalance + amount;
+          final wouldExceedLimit = customer.creditLimit > 0 &&
+              balanceAfter > customer.creditLimit;
+
+          return AlertDialog(
+            title: const Text('Add Credit'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Customer: ${customer.name}'),
+                Text(
+                    'Current Balance: ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditBalance)}'),
+                if (customer.creditLimit > 0)
+                  Text(
+                      'Credit Limit: ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditLimit)}',
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.grey[600])),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: amountController,
+                  decoration:
+                      const InputDecoration(labelText: 'Credit Amount (NPR)'),
+                  keyboardType: TextInputType.number,
+                  autofocus: true,
+                  onChanged: (_) => setDialogState(() {}),
+                ),
+                if (wouldExceedLimit) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded,
+                            color: Colors.red[700], size: 22),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'This would exceed credit limit by ${NumberFormat.currency(symbol: 'NPR ').format(balanceAfter - customer.creditLimit)}',
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.red[800]),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                TextField(
+                  controller: notesController,
+                  decoration: const InputDecoration(labelText: 'Notes (optional)'),
+                  maxLines: 2,
+                ),
+              ],
             ),
-            TextField(
-              controller: notesController,
-              decoration: const InputDecoration(labelText: 'Notes (optional)'),
-              maxLines: 2,
-            ),
-          ],
-        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1072,6 +1166,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
             child: const Text('Add Credit'),
           ),
         ],
+          );
+        },
       ),
     );
 
