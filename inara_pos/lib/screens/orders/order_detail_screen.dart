@@ -574,7 +574,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ),
                 ),
               ],
-            );
+            ),
+    );
   }
 
   Widget _buildOrderItemCard(Map<String, dynamic> item, Product product) {
