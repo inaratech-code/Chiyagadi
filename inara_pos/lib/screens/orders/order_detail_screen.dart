@@ -1288,12 +1288,37 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
-  /// Update order item quantity and persist; then refresh.
-  Future<void> _updateItemQuantity(dynamic orderItemId, int quantity) async {
+  /// Update order item quantity with optimistic UI; persist in background.
+  void _updateItemQuantity(dynamic orderItemId, int quantity) {
     if (quantity <= 0) {
       _removeItem(orderItemId);
       return;
     }
+    final idx = _orderItems.indexWhere((i) =>
+        (i['id'] ?? i['documentId']) == orderItemId);
+    if (idx < 0) return;
+    final item = _orderItems[idx];
+    final unitPrice = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
+    final newTotalPrice = unitPrice * quantity;
+
+    setState(() {
+      item['quantity'] = quantity;
+      item['total_price'] = newTotalPrice;
+      final newSubtotal = _orderItems.fold(
+          0.0, (sum, i) => sum + (i['total_price'] as num).toDouble());
+      final discountPct = (_order?['discount_percent'] as num?)?.toDouble() ?? 0.0;
+      final discountAmt = newSubtotal * (discountPct / 100);
+      if (_order != null) {
+        _order!['subtotal'] = newSubtotal;
+        _order!['discount_amount'] = discountAmt;
+        _order!['total_amount'] = newSubtotal - discountAmt;
+      }
+    });
+
+    _persistItemQuantity(orderItemId, quantity);
+  }
+
+  Future<void> _persistItemQuantity(dynamic orderItemId, int quantity) async {
     try {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
@@ -1308,12 +1333,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         quantity: quantity,
         createdBy: createdBy,
       );
-      await _loadData();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
+        _loadData();
       }
     }
   }

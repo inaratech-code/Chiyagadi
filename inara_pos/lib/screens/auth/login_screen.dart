@@ -21,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen>
   bool _isLoading = false;
   bool _isFirstTime = false;
   bool _obscurePin = true;
+  bool _rememberMe = false;
   String? _errorMessage;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -80,11 +81,21 @@ class _LoginScreenState extends State<LoginScreen>
 
       // Load in background without blocking UI
       final hasPin = await authProvider.checkPinExists();
+      final prefs = await SharedPreferences.getInstance();
+      final rememberedEmail = prefs.getString('remembered_email');
+      final rememberedPassword = prefs.getString('remembered_password');
+      final rememberMe = prefs.getBool('remember_me') ?? false;
 
       if (mounted) {
         setState(() {
           _isFirstTime = !hasPin;
-            if (_isFirstTime) {
+          _rememberMe = rememberMe;
+          if (rememberMe && rememberedEmail != null) {
+            _emailController.text = rememberedEmail;
+            if (rememberedPassword != null) {
+              _pinController.text = rememberedPassword;
+            }
+          } else if (_isFirstTime) {
             _emailController.text = _defaultEmail;
           }
         });
@@ -130,7 +141,16 @@ class _LoginScreenState extends State<LoginScreen>
       final success = await authProvider.login(email, password);
 
       if (success && mounted) {
-        // AuthWrapper's Consumer will rebuild and show HomeScreen; no navigation needed.
+        final prefs = await SharedPreferences.getInstance();
+        if (_rememberMe) {
+          await prefs.setBool('remember_me', true);
+          await prefs.setString('remembered_email', email);
+          await prefs.setString('remembered_password', password);
+        } else {
+          await prefs.setBool('remember_me', false);
+          await prefs.remove('remembered_email');
+          await prefs.remove('remembered_password');
+        }
       } else {
         setState(() {
           _errorMessage = 'Invalid email or password. Please try again.';
@@ -479,7 +499,38 @@ class _LoginScreenState extends State<LoginScreen>
                                   );
                                 },
                               ),
-                              const SizedBox(height: 20),
+                              const SizedBox(height: 12),
+
+                              // Remember me checkbox
+                              Row(
+                                children: [
+                                  SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: Checkbox(
+                                      value: _rememberMe,
+                                      onChanged: (v) =>
+                                          setState(() => _rememberMe = v ?? false),
+                                      activeColor: const Color(0xFFFFC107),
+                                      materialTapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  GestureDetector(
+                                    onTap: () =>
+                                        setState(() => _rememberMe = !_rememberMe),
+                                    child: Text(
+                                      'Remember me',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
 
                               // Error message
                               if (_errorMessage != null)

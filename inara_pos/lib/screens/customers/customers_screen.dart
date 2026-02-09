@@ -256,6 +256,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                             ),
                             title: Text(
                               customer.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 16,
@@ -286,14 +288,6 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                     color: hasCredit
                                         ? Colors.grey[900]
                                         : Colors.grey[800],
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Limit: ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditLimit)}',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.grey[600],
                                   ),
                                 ),
                               ],
