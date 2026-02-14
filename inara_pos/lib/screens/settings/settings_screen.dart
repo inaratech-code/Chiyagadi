@@ -233,6 +233,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       fontSize: 12,
                                     ),
                                   ),
+                                ),
                             ],
                           ),
                           const SizedBox(height: 16),
