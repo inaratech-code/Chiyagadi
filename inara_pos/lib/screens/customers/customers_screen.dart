@@ -759,7 +759,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                   );
                                 },
                               ),
-                            );
+                            ),
+                          );
                           },
                           childCount: bills.length,
                         ),
@@ -793,9 +794,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     ),
                   ),
                   if (_creditTransactions.isEmpty)
-                    const SliverToBoxAdapter(
+                    SliverToBoxAdapter(
                       child: Padding(
-                        padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                         child: Text('No credit transactions',
                             style: TextStyle(color: Colors.grey[600])),
                       ),

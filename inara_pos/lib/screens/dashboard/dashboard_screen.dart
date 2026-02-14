@@ -1219,7 +1219,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   textAlign: TextAlign.center,
                 ),
               ]
-            : ListView.builder(
+            : [
+                ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: _recentActivity.length,
@@ -1311,6 +1312,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   );
                 },
               ),
+            ],
       ),
     );
   }
