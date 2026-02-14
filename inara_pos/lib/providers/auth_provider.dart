@@ -74,6 +74,38 @@ class InaraAuthProvider with ChangeNotifier {
     }
   }
 
+  /// Save timestamp when app goes to background. Used for "Ask after long inactivity"
+  /// to not require password for 12 hours when app is closed.
+  static const int _inactivityGraceHours = 12;
+
+  Future<void> saveLastActivityTimestamp() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(
+          'last_activity_timestamp', DateTime.now().millisecondsSinceEpoch);
+    } catch (e) {
+      debugPrint('AuthProvider: Error saving last activity: $e');
+    }
+  }
+
+  /// Returns true if we should require login (sign out) on app start.
+  /// - 'always': always require password when app opens
+  /// - 'timeout': require password only if app was closed for 12+ hours
+  Future<bool> shouldRequireLoginOnStart() async {
+    if (_lockMode == 'always') return true;
+    if (_lockMode != 'timeout') return false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final last = prefs.getInt('last_activity_timestamp');
+      if (last == null) return false; // No data: allow restore (first run)
+      const twelveHoursMs = _inactivityGraceHours * 60 * 60 * 1000;
+      return DateTime.now().millisecondsSinceEpoch - last > twelveHoursMs;
+    } catch (e) {
+      debugPrint('AuthProvider: Error checking last activity: $e');
+      return false;
+    }
+  }
+
   // Set context for accessing DatabaseProvider from Provider
   void setContext(BuildContext context) {
     _context = context;

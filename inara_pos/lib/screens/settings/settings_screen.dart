@@ -212,38 +212,74 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // Café Information
+                  // Café Information (Admin can edit and save)
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Café Information',
-                              style: Theme.of(context).textTheme.titleLarge),
+                          Row(
+                            children: [
+                              Text('Café Information',
+                                  style: Theme.of(context).textTheme.titleLarge),
+                              if (!authProvider.isAdmin)
+                                const Padding(
+                                  padding: EdgeInsets.only(left: 8),
+                                  child: Text(
+                                    '(View only)',
+                                    style: TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                            ],
+                          ),
                           const SizedBox(height: 16),
                           TextField(
                             controller: _cafeNameController,
+                            readOnly: !authProvider.isAdmin,
                             decoration: const InputDecoration(
                               labelText: 'Café Name (Devanagari)',
                               hintText: 'चिया गढी',
                             ),
                           ),
+                          const SizedBox(height: 12),
                           TextField(
                             controller: _cafeNameEnController,
+                            readOnly: !authProvider.isAdmin,
                             decoration: const InputDecoration(
                               labelText: 'Café Name (English)',
                               hintText: 'Chiya Gadhi',
                             ),
                           ),
+                          const SizedBox(height: 12),
                           TextField(
                             controller: _addressController,
+                            readOnly: !authProvider.isAdmin,
                             decoration: const InputDecoration(
                               labelText: 'Address',
                               hintText: 'Nepal',
                             ),
                             maxLines: 2,
                           ),
+                          if (authProvider.isAdmin) ...[
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: _saveSettings,
+                                icon: const Icon(Icons.save, size: 20),
+                                label: const Text('Save Café Info'),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 12),
+                                  backgroundColor: AppTheme.logoPrimary,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -666,6 +702,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   decoration: InputDecoration(
                     labelText: 'Current Password',
                     border: const OutlineInputBorder(),
+                    helperText: '4-20 characters',
                     suffixIcon: IconButton(
                       icon: Icon(obscureOldPin
                           ? Icons.visibility
@@ -676,8 +713,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   obscureText: obscureOldPin,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
+                  keyboardType: TextInputType.visiblePassword,
+                  maxLength: 64,
                 ),
                 const SizedBox(height: 16),
                 TextField(

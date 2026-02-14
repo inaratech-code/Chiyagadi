@@ -88,12 +88,16 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
               onSelectionChanged: (Set<String> newSelection) {
                 setState(() {
                   _selectedPaymentMethod = newSelection.first;
+                  if (_selectedPaymentMethod != 'credit') {
+                    _amountController.text =
+                        widget.order.totalAmount.toStringAsFixed(2);
+                  }
                 });
               },
             ),
             const SizedBox(height: 24),
 
-            // Amount (if partial payment)
+            // Amount (partial allowed for Cash & QR)
             TextField(
               controller: _amountController,
               keyboardType:
@@ -101,11 +105,30 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
               decoration: InputDecoration(
                 labelText: 'Amount',
                 prefixText: 'Rs. ',
+                helperText: (_selectedPaymentMethod == 'cash' ||
+                        _selectedPaymentMethod == 'digital')
+                    ? 'Partial payment allowed. Remaining will be due.'
+                    : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
             ),
+            if (_selectedPaymentMethod == 'cash' ||
+                _selectedPaymentMethod == 'digital')
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _amountController.text =
+                          widget.order.totalAmount.toStringAsFixed(2);
+                    });
+                  },
+                  icon: const Icon(Icons.account_balance_wallet, size: 18),
+                  label: const Text('Pay Full Amount'),
+                ),
+              ),
             const SizedBox(height: 24),
 
             // Buttons
@@ -178,12 +201,17 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
         throw Exception('Order ID not found');
       }
 
+      final isPartial = (_selectedPaymentMethod == 'cash' ||
+              _selectedPaymentMethod == 'digital') &&
+          amount < widget.order.totalAmount;
+
       await widget.orderService.completePayment(
         dbProvider: dbProvider,
         context: context,
         orderId: orderId,
         paymentMethod: _selectedPaymentMethod,
         amount: amount,
+        partialAmount: isPartial ? amount : null,
         createdBy: createdBy,
       );
 

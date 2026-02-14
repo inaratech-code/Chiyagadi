@@ -217,12 +217,31 @@ class _OrderPaymentDialogState extends State<OrderPaymentDialog> {
                         prefixText: 'Rs. ',
                         helperText: _selectedPaymentMethod == 'credit'
                             ? 'Enter amount received now (remaining will be credit)'
-                            : 'Enter amount to pay (partial allowed)',
+                            : (_selectedPaymentMethod == 'cash' ||
+                                    _selectedPaymentMethod == 'digital')
+                                ? 'Partial payment allowed for Cash & QR. Remaining will be due.'
+                                : 'Enter amount to pay (partial allowed)',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                     ),
+                    if (_selectedPaymentMethod == 'cash' ||
+                        _selectedPaymentMethod == 'digital')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _amountController.text =
+                                  _displayTotal.toStringAsFixed(2);
+                            });
+                          },
+                          icon: const Icon(Icons.account_balance_wallet,
+                              size: 18),
+                          label: const Text('Pay Full Amount'),
+                        ),
+                      ),
                     const SizedBox(height: 22),
 
                     Row(

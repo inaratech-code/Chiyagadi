@@ -200,8 +200,15 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Auto-logout disabled for all roles: users stay logged in until they tap Logout.
-    // No logout on app background (inactive/paused) for any login ID or role.
+    // Save last activity when app goes to background (for "Ask after long inactivity" 12h grace)
+    if ((state == AppLifecycleState.inactive ||
+            state == AppLifecycleState.paused) &&
+        mounted) {
+      final authProvider = context.read<InaraAuthProvider>();
+      if (authProvider.isAuthenticated) {
+        authProvider.saveLastActivityTimestamp();
+      }
+    }
   }
 
   Future<void> _checkAuth() async {
@@ -210,16 +217,23 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
       final auth = FirebaseAuth.instance;
       final authProvider = context.read<InaraAuthProvider>();
 
-      // Load lock mode preference (non-blocking)
-      authProvider.loadLockMode().catchError((e) {
-        debugPrint('Error loading lock mode: $e');
-      });
+      await authProvider.loadLockMode();
 
-      // If user is already signed in with Firebase Auth, restore session (all users)
       if (auth.currentUser != null && mounted) {
+        authProvider.setContext(context);
+
+        // Security: "Ask password every time" or "Ask after long inactivity" (12h expired)
+        final requireLogin = await authProvider.shouldRequireLoginOnStart();
+        if (requireLogin && mounted) {
+          await auth.signOut();
+          authProvider.onLogout?.call();
+          debugPrint(
+              'AuthWrapper: Lock mode requires login on start, signed out');
+          return;
+        }
+
         debugPrint(
             'AuthWrapper: Firebase Auth user signed in, restoring session: ${auth.currentUser!.email}');
-        authProvider.setContext(context);
         final restored = await authProvider.restoreSessionFromFirebaseUser(
             auth.currentUser!);
         if (restored && mounted) {

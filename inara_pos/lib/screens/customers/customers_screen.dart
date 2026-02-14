@@ -365,6 +365,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                   icon: Icon(Icons.edit, color: Colors.grey[800]),
                                   onPressed: () =>
                                       _showEditCustomerDialog(customer),
+                                  tooltip: 'Edit',
                                 ),
                                 IconButton(
                                   icon: Icon(
@@ -381,6 +382,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                       _loadCreditTransactions(customerId);
                                     }
                                   },
+                                  tooltip: 'Credits',
+                                ),
+                                IconButton(
+                                  icon: Icon(Icons.delete, color: AppTheme.errorColor),
+                                  onPressed: () =>
+                                      _showDeleteCustomerDialog(customer),
+                                  tooltip: 'Delete',
                                 ),
                               ],
                             ),
@@ -453,14 +461,25 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         color: Color(0xFF1A1A1A),
                       ),
                     ),
-                    IconButton(
-                      icon: Icon(Icons.close, color: Colors.grey[700]),
-                      onPressed: () {
-                        setState(() {
-                          _selectedCustomerId = null;
-                          _viewMode = 'list';
-                        });
-                      },
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.delete, color: AppTheme.errorColor),
+                          onPressed: () => _showDeleteCustomerDialog(customer),
+                          tooltip: 'Delete customer',
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.close, color: Colors.grey[700]),
+                          onPressed: () {
+                            setState(() {
+                              _selectedCustomerId = null;
+                              _viewMode = 'list';
+                            });
+                          },
+                          tooltip: 'Close',
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1067,6 +1086,88 @@ class _CustomersScreenState extends State<CustomersScreen> {
             SnackBar(content: Text('Error: $e')),
           );
         }
+      }
+    }
+  }
+
+  Future<void> _showDeleteCustomerDialog(Customer customer) async {
+    String message =
+        'Delete "${customer.name}"? This will remove their credit history. Orders linked to this customer will be unlinked. This cannot be undone.';
+    if (customer.creditBalance > 0) {
+      message += '\n\nWarning: This customer has ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditBalance)} outstanding credit.';
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Customer'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      await dbProvider.init();
+      final customerId = customer.documentId ?? customer.id;
+      if (customerId == null) return;
+
+      // Delete credit transactions for this customer
+      await dbProvider.delete(
+        'credit_transactions',
+        where: 'customer_id = ?',
+        whereArgs: [customerId],
+      );
+
+      // Unlink orders from this customer
+      await dbProvider.update(
+        'orders',
+        values: {'customer_id': null, 'customer_name': null},
+        where: 'customer_id = ?',
+        whereArgs: [customerId],
+      );
+
+      // Delete the customer
+      await dbProvider.delete(
+        'customers',
+        where: kIsWeb ? 'documentId = ?' : 'id = ?',
+        whereArgs: [customerId],
+      );
+
+      if (_selectedCustomerId == customerId) {
+        setState(() {
+          _selectedCustomerId = null;
+          _viewMode = 'list';
+          _creditTransactions = [];
+        });
+      }
+      await _loadCustomers();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${customer.name} deleted'),
+            backgroundColor: AppTheme.successColor,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.errorColor),
+        );
       }
     }
   }
