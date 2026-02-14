@@ -338,7 +338,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                           ],
                                           const SizedBox(height: 4),
                                           Text(
-                                            'Balance: ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditBalance)}',
+                                            'Balance: ${NumberFormat.currency(symbol: 'NPR ', decimalDigits: 0).format(customer.creditBalance)}',
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
@@ -352,9 +352,27 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                         ],
                                       ),
                                     ),
-                                    Row(
+                                    Column(
                                       mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
+                                        Text(
+                                          NumberFormat.currency(
+                                              symbol: 'NPR ',
+                                              decimalDigits: 0)
+                                              .format(customer.creditBalance),
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.bold,
+                                            color: hasCredit
+                                                ? Colors.grey[900]
+                                                : Colors.grey[700],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
                                         if (atLimit)
                                           Chip(
                                             label: Text(
@@ -415,6 +433,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                           onPressed: () =>
                                               _showDeleteCustomerDialog(customer),
                                           tooltip: 'Delete',
+                                        ),
+                                          ],
                                         ),
                                       ],
                                     ),
