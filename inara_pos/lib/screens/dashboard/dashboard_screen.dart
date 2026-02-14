@@ -919,52 +919,62 @@ class _DashboardScreenState extends State<DashboardScreen> {
               color: Colors.orange[200],
             ),
             const SizedBox(height: 12),
-            ..._lowStockItems.take(5).map((item) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.orange[100]!, width: 1),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.inventory_2_outlined,
-                        size: 18,
-                        color: Colors.orange[700],
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          item.productName,
-                          style: TextStyle(
-                            color: Colors.grey[800],
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _lowStockItems.length > 5 ? 5 : _lowStockItems.length,
+              itemBuilder: (context, index) {
+                final item = _lowStockItems[index];
+                return RepaintBoundary(
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.orange[100]!, width: 1),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.inventory_2_outlined,
+                          size: 18,
+                          color: Colors.orange[700],
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            item.productName,
+                            style: TextStyle(
+                              color: Colors.grey[800],
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.red[50],
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'Stock: ${item.stock.toStringAsFixed(item.stock.truncateToDouble() == item.stock ? 0 : 1)}',
-                          style: TextStyle(
-                            color: Colors.red[700],
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.red[50],
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'Stock: ${item.stock.toStringAsFixed(item.stock.truncateToDouble() == item.stock ? 0 : 1)}',
+                            style: TextStyle(
+                              color: Colors.red[700],
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                )),
+                );
+              },
+            ),
             if (_lowStockItems.length > 5)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
@@ -1209,92 +1219,98 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   textAlign: TextAlign.center,
                 ),
               ]
-            : _recentActivity.map((a) {
-                final dt = a.createdAt > 0
-                    ? DateTime.fromMillisecondsSinceEpoch(a.createdAt)
-                    : null;
-                // NEW: Make order items clickable to navigate to orders section
-                final isOrder =
-                    a.icon == Icons.receipt_long && a.orderId != null;
-                return InkWell(
-                  onTap: isOrder
-                      ? () {
-                          // Navigate to orders section
-                          if (widget.onNavigate != null) {
-                            widget.onNavigate!(1); // Orders screen index
-                          } else {
-                            Navigator.push(
-                              context,
-                              smoothPageRoute(
-                                builder: (_) => const OrdersScreen(),
+            : ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _recentActivity.length,
+                itemBuilder: (context, index) {
+                  final a = _recentActivity[index];
+                  final dt = a.createdAt > 0
+                      ? DateTime.fromMillisecondsSinceEpoch(a.createdAt)
+                      : null;
+                  final isOrder =
+                      a.icon == Icons.receipt_long && a.orderId != null;
+                  return RepaintBoundary(
+                    child: InkWell(
+                      onTap: isOrder
+                          ? () {
+                              if (widget.onNavigate != null) {
+                                widget.onNavigate!(1);
+                              } else {
+                                Navigator.push(
+                                  context,
+                                  smoothPageRoute(
+                                    builder: (_) => const OrdersScreen(),
+                                  ),
+                                );
+                              }
+                            }
+                          : null,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: a.color.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                            );
-                          }
-                        }
-                      : null,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: a.color.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(a.icon, color: a.color, size: 20),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                a.title,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: isOrder
-                                      ? Theme.of(context).primaryColor
-                                      : null,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              child: Icon(a.icon, color: a.color, size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    a.title,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: isOrder
+                                          ? Theme.of(context).primaryColor
+                                          : null,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    [
+                                      a.subtitle,
+                                      if (dt != null) timeFmt.format(dt),
+                                    ].join(' • '),
+                                    style: TextStyle(
+                                        color: Colors.grey[600], fontSize: 12),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                [
-                                  a.subtitle,
-                                  if (dt != null) timeFmt.format(dt),
-                                ].join(' • '),
-                                style: TextStyle(
-                                    color: Colors.grey[600], fontSize: 12),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              currency.format(a.amount),
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            if (isOrder) ...[
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                size: 14,
+                                color: Colors.grey[400],
                               ),
                             ],
-                          ),
+                          ],
                         ),
-                        const SizedBox(width: 10),
-                        Text(
-                          currency.format(a.amount),
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        if (isOrder) ...[
-                          const SizedBox(width: 8),
-                          Icon(
-                            Icons.arrow_forward_ios,
-                            size: 14,
-                            color: Colors.grey[400],
-                          ),
-                        ],
-                      ],
+                      ),
                     ),
-                  ),
-                );
-              }).toList(),
+                  );
+                },
+              ),
       ),
     );
   }

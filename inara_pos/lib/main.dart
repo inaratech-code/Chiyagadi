@@ -100,46 +100,38 @@ class _WarmStartState extends State<_WarmStart> {
     if (_started) return;
     _started = true;
 
-    // Run after first frame paint.
+    // Run after first frame paint - don't block UI.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // Warm up DB (and Firebase on web via UnifiedDatabaseProvider).
       try {
         final dbProvider = context.read<UnifiedDatabaseProvider>();
         await dbProvider.init();
 
-        // Add admin user with specific document ID if on web
+        // PERF: Defer admin check so app feels instant. Run 1.5s after first paint.
         if (kIsWeb) {
           final authProvider = context.read<InaraAuthProvider>();
-          // Add admin user with document ID: dSc8mQzHPsftOpqb200d7xPhS7K2
-          const adminDocumentId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
-          try {
-            // Check if user already exists
-            final existing = await dbProvider.query(
-              'users',
-              where: 'documentId = ?',
-              whereArgs: [adminDocumentId],
-            );
-
-            if (existing.isEmpty) {
-              // Create admin user with this document ID
-              await addAdminUserWithId(
-                dbProvider,
-                authProvider,
-                adminDocumentId,
-                username: 'admin',
-                pin: 'Chiyagadi15@', // Admin password
-                email: 'chiyagadi@gmail.com', // Admin email
+          Future.delayed(const Duration(milliseconds: 1500), () async {
+            try {
+              const adminDocumentId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
+              final existing = await dbProvider.query(
+                'users',
+                where: 'documentId = ?',
+                whereArgs: [adminDocumentId],
               );
-              debugPrint(
-                  'Main: Created admin user with document ID: $adminDocumentId');
-            } else {
-              debugPrint(
-                  'Main: Admin user with document ID $adminDocumentId already exists');
+              if (existing.isEmpty) {
+                await addAdminUserWithId(
+                  dbProvider,
+                  authProvider,
+                  adminDocumentId,
+                  username: 'admin',
+                  pin: 'Chiyagadi15@',
+                  email: 'chiyagadi@gmail.com',
+                );
+                debugPrint('Main: Created admin user: $adminDocumentId');
+              }
+            } catch (e) {
+              debugPrint('Main: Error creating admin user: $e');
             }
-          } catch (e) {
-            debugPrint(
-                'Main: Error creating admin user with ID $adminDocumentId: $e');
-          }
+          });
         }
       } catch (e) {
         debugPrint('WarmStart: DB init failed: $e');

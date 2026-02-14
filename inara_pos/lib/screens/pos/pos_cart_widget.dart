@@ -231,12 +231,12 @@ class _POSCartWidgetState extends State<POSCartWidget> {
                       )
                     : ListView.builder(
                         physics: platformScrollPhysics,
-                        cacheExtent: 200,
+                        cacheExtent: kDefaultCacheExtent,
                         itemCount: _displayItems.length,
                         padding: const EdgeInsets.all(8),
                         itemBuilder: (context, index) {
                           final item = _displayItems[index];
-                          return _buildCartItem(item);
+                          return RepaintBoundary(child: _buildCartItem(item));
                         },
                       ),
           ),

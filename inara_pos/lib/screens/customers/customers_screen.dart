@@ -631,55 +631,76 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 );
               }
 
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                children: [
-                  if (bills.isNotEmpty) ...[
-                    Row(
-                      children: [
-                        Icon(Icons.receipt_long, size: 18, color: Colors.grey[800]),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Bills (${bills.length})',
-                          style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey[800]),
+              return CustomScrollView(
+                physics: platformScrollPhysics,
+                cacheExtent: 200,
+                slivers: [
+                  if (bills.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.receipt_long,
+                                    size: 18, color: Colors.grey[800]),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Bills (${bills.length})',
+                                  style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey[800]),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  'Total Pending: ${NumberFormat.currency(symbol: 'NPR ').format(totalPending)}',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.grey[800]),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                          ],
                         ),
-                        const Spacer(),
-                        Text(
-                          'Total Pending: ${NumberFormat.currency(symbol: 'NPR ').format(totalPending)}',
-                          style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.grey[800]),
-                        ),
-                      ],
+                      ),
                     ),
-                    const SizedBox(height: 10),
-                    ...bills.map((order) {
-                      final orderId = kIsWeb
-                          ? (order['documentId'] ?? order['id'])
-                          : order['id'];
-                      final orderNumber =
-                          (order['order_number'] as String?) ?? 'N/A';
-                      final createdAt =
-                          (order['created_at'] as num?)?.toInt() ?? 0;
-                      final date = createdAt > 0
-                          ? DateTime.fromMillisecondsSinceEpoch(createdAt)
-                          : null;
-                      final creditAmount =
-                          (order['credit_amount'] as num? ?? 0).toDouble();
-                      final paidAmount =
-                          (order['paid_amount'] as num? ?? 0).toDouble();
-                      final totalAmount =
-                          (order['total_amount'] as num? ?? 0).toDouble();
+                  if (bills.isNotEmpty)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final order = bills[index];
+                            final orderId = kIsWeb
+                                ? (order['documentId'] ?? order['id'])
+                                : order['id'];
+                            final orderNumber =
+                                (order['order_number'] as String?) ?? 'N/A';
+                            final createdAt =
+                                (order['created_at'] as num?)?.toInt() ?? 0;
+                            final date = createdAt > 0
+                                ? DateTime.fromMillisecondsSinceEpoch(createdAt)
+                                : null;
+                            final creditAmount =
+                                (order['credit_amount'] as num? ?? 0)
+                                    .toDouble();
+                            final paidAmount =
+                                (order['paid_amount'] as num? ?? 0).toDouble();
+                            final totalAmount =
+                                (order['total_amount'] as num? ?? 0)
+                                    .toDouble();
 
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        color: Colors.white,
-                        elevation: 1,
-                        child: ListTile(
+                            return RepaintBoundary(
+                              child: Card(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                color: Colors.white,
+                                elevation: 1,
+                                child: ListTile(
                           leading: CircleAvatar(
                             backgroundColor:
                                 AppTheme.logoPrimary.withOpacity(0.12),
@@ -737,52 +758,77 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                     ),
                                   );
                                 },
+                              ),
+                            );
+                          },
+                          childCount: bills.length,
                         ),
-                      );
-                    }),
-                    const SizedBox(height: 6),
-                    const Divider(),
-                    const SizedBox(height: 6),
-                  ],
-                  Row(
-                    children: [
-                      Icon(Icons.swap_horiz, size: 18, color: Colors.grey[800]),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Transactions',
-                        style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey[800]),
                       ),
-                    ],
+                    ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Divider(height: 1),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(Icons.swap_horiz,
+                                  size: 18, color: Colors.grey[800]),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Transactions',
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey[800]),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 10),
                   if (_creditTransactions.isEmpty)
-                    Text('No credit transactions',
-                        style: TextStyle(color: Colors.grey[600]))
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Text('No credit transactions',
+                            style: TextStyle(color: Colors.grey[600])),
+                      ),
+                    )
                   else
-                    ..._creditTransactions.map((transaction) {
-                      final createdAtRaw = transaction['created_at'];
-                      final createdAt = createdAtRaw is int
-                          ? createdAtRaw
-                          : createdAtRaw is num
-                              ? createdAtRaw.toInt()
-                              : createdAtRaw is String
-                                  ? (int.tryParse(createdAtRaw) ?? 0)
-                                  : 0;
-                      final date =
-                          DateTime.fromMillisecondsSinceEpoch(createdAt);
-                      final isCredit =
-                          transaction['transaction_type'] == 'credit';
-                      final isPayment =
-                          transaction['transaction_type'] == 'payment';
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final transaction =
+                                _creditTransactions[index];
+                            final createdAtRaw = transaction['created_at'];
+                            final createdAt = createdAtRaw is int
+                                ? createdAtRaw
+                                : createdAtRaw is num
+                                    ? createdAtRaw.toInt()
+                                    : createdAtRaw is String
+                                        ? (int.tryParse(createdAtRaw) ?? 0)
+                                        : 0;
+                            final date =
+                                DateTime.fromMillisecondsSinceEpoch(createdAt);
+                            final isCredit =
+                                transaction['transaction_type'] == 'credit';
+                            final isPayment =
+                                transaction['transaction_type'] == 'payment';
 
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        color: Colors.white,
-                        elevation: 1,
-                        child: ListTile(
+                            return RepaintBoundary(
+                              child: Card(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                color: Colors.white,
+                                elevation: 1,
+                                child: ListTile(
                           leading: CircleAvatar(
                             backgroundColor: isCredit
                                 ? AppTheme.logoPrimary
@@ -838,8 +884,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
                             ],
                           ),
                         ),
-                      );
-                    }),
+                      ),
+                            );
+                          },
+                          childCount: _creditTransactions.length,
+                        ),
+                      ),
+                    ),
                 ],
               );
             },
