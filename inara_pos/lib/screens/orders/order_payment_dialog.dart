@@ -470,18 +470,27 @@ class _OrderPaymentDialogState extends State<OrderPaymentDialog> {
       final isCredit = _selectedPaymentMethod == 'credit';
       final creditPaidNow = isCredit ? amount : 0.0;
 
+      dynamic customerId = _selectedCustomer == null
+          ? null
+          : (kIsWeb
+              ? (_selectedCustomer!.documentId ??
+                  _selectedCustomer!.id?.toString())
+              : _selectedCustomer!.id);
+
+      if (isPartial && customerId == null) {
+        customerId = await widget.orderService.createWalkInCustomerForPartial(
+          dbProvider,
+          widget.orderNumber,
+        );
+      }
+
       await widget.orderService.completePayment(
         dbProvider: dbProvider,
         context: context,
         orderId: widget.orderId,
         paymentMethod: _selectedPaymentMethod,
         amount: isCredit ? creditPaidNow : amount,
-        customerId: _selectedCustomer == null
-            ? null
-            : (kIsWeb
-                ? (_selectedCustomer!.documentId ??
-                    _selectedCustomer!.id?.toString())
-                : _selectedCustomer!.id),
+        customerId: customerId,
         partialAmount: isCredit
             ? (creditPaidNow > 0 ? creditPaidNow : null)
             : (isPartial ? amount : null),

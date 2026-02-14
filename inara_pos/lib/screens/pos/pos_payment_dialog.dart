@@ -209,6 +209,14 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
               _selectedPaymentMethod == 'digital') &&
           amount < widget.order.totalAmount;
 
+      dynamic customerId;
+      if (isPartial) {
+        customerId = await widget.orderService.createWalkInCustomerForPartial(
+          dbProvider,
+          widget.order.orderNumber,
+        );
+      }
+
       await widget.orderService.completePayment(
         dbProvider: dbProvider,
         context: context,
@@ -216,6 +224,7 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
         paymentMethod: _selectedPaymentMethod,
         amount: amount,
         partialAmount: isPartial ? amount : null,
+        customerId: customerId,
         createdBy: createdBy,
       );
 

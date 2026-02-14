@@ -1654,7 +1654,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     : null,
                 subtitle: paymentMethod != 'credit'
                     ? const Text(
-                        'Pay less than total amount (requires customer)')
+                        'Pay less than total; customer auto-created if not selected')
                     : null,
               ),
               if (allowPartial && paymentMethod != 'credit') ...[
@@ -1832,8 +1832,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               onPressed: (paymentMethod == 'credit' &&
                           selectedCustomerId == null) ||
                       (allowPartial &&
-                          (selectedCustomerId == null ||
-                              partialAmountController.text.isEmpty ||
+                          (partialAmountController.text.isEmpty ||
                               double.tryParse(partialAmountController.text) ==
                                   null ||
                               double.parse(partialAmountController.text) <= 0 ||
@@ -1858,10 +1857,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       try {
         final authProvider =
             Provider.of<InaraAuthProvider>(context, listen: false);
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
 
         // Calculate payment amounts
         double? partialAmount;
-        int? customerId;
+        dynamic customerId;
 
         if (allowPartial && partialAmountController.text.isNotEmpty) {
           partialAmount = double.tryParse(partialAmountController.text);
@@ -1870,16 +1871,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               partialAmount > _total) {
             throw Exception('Invalid partial amount');
           }
-          if (selectedCustomerId == null) {
-            throw Exception('Please select a customer for partial payment');
+          if (selectedCustomerId != null) {
+            customerId = selectedCustomerId;
+          } else {
+            customerId = await _orderService.createWalkInCustomerForPartial(
+              dbProvider,
+              widget.orderNumber,
+            );
           }
-          customerId = selectedCustomerId;
         } else if (paymentMethod == 'credit') {
           customerId = selectedCustomerId;
         }
 
-        final dbProvider =
-            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
         await _orderService.completePayment(
           dbProvider: dbProvider,
           context: context,

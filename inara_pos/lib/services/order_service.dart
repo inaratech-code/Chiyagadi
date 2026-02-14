@@ -12,6 +12,30 @@ import '../services/inventory_ledger_service.dart';
 /// UPDATED: When items are added to orders, inventory is automatically deducted
 /// if the product has inventory tracking enabled.
 class OrderService {
+  /// Creates a walk-in customer for partial payments when no customer is selected.
+  /// Returns customer id (int for SQLite, String for Firestore).
+  Future<dynamic> createWalkInCustomerForPartial(
+    UnifiedDatabaseProvider dbProvider,
+    String orderNumber,
+  ) async {
+    await dbProvider.init();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final name = 'Walk-in - $orderNumber';
+    final id = await dbProvider.insert('customers', {
+      'name': name,
+      'phone': null,
+      'email': null,
+      'address': null,
+      'credit_limit': 0.0,
+      'credit_balance': 0.0,
+      'notes': 'Auto-created for partial payment',
+      'created_at': now,
+      'updated_at': now,
+      'synced': 0,
+    });
+    return id;
+  }
+
   // Generate unique order number (ORD yymmdd/000 format)
   Future<String> generateOrderNumber(UnifiedDatabaseProvider dbProvider) async {
     await dbProvider.init();
