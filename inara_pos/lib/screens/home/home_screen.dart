@@ -148,6 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _ensureAlive(3); // Pre-warm Menu so it opens instantly
             _selectIndex(3);
           },
+          onBack: () => setState(() => _selectedIndex = 0),
         );
       case 2:
         return TablesScreen(key: _screenKeys[2], hideAppBar: true);

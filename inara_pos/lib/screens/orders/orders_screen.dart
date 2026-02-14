@@ -24,10 +24,15 @@ class OrdersScreen extends StatefulWidget {
   /// Callback receives context so it can pop when OrdersScreen was pushed.
   final void Function(BuildContext)? onNewOrder;
 
+  /// When set (e.g. when embedded in HomeScreen tabs), back button calls this
+  /// instead of Navigator.pop to avoid white blank page.
+  final VoidCallback? onBack;
+
   const OrdersScreen({
     super.key,
     this.hideAppBar = false,
     this.onNewOrder,
+    this.onBack,
   });
 
   @override
@@ -449,7 +454,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.arrow_back),
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () {
+                      if (widget.onBack != null) {
+                        widget.onBack!();
+                      } else {
+                        Navigator.of(context).pop();
+                      }
+                    },
                     tooltip: 'Back',
                   ),
                   const Expanded(

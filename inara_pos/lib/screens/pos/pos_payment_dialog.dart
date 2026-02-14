@@ -105,9 +105,13 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
               decoration: InputDecoration(
                 labelText: 'Amount',
                 prefixText: 'Rs. ',
+                hintText: (_selectedPaymentMethod == 'cash' ||
+                        _selectedPaymentMethod == 'digital')
+                    ? 'Enter full or partial amount'
+                    : null,
                 helperText: (_selectedPaymentMethod == 'cash' ||
                         _selectedPaymentMethod == 'digital')
-                    ? 'Partial payment allowed. Remaining will be due.'
+                    ? 'Partial payment allowed for Cash & QR. Enter less than total; remaining will be due.'
                     : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),

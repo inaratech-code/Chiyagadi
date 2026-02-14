@@ -215,11 +215,15 @@ class _OrderPaymentDialogState extends State<OrderPaymentDialog> {
                       decoration: InputDecoration(
                         labelText: 'Amount',
                         prefixText: 'Rs. ',
+                        hintText: (_selectedPaymentMethod == 'cash' ||
+                                _selectedPaymentMethod == 'digital')
+                            ? 'Enter full or partial amount'
+                            : null,
                         helperText: _selectedPaymentMethod == 'credit'
                             ? 'Enter amount received now (remaining will be credit)'
                             : (_selectedPaymentMethod == 'cash' ||
                                     _selectedPaymentMethod == 'digital')
-                                ? 'Partial payment allowed for Cash & QR. Remaining will be due.'
+                                ? 'Partial payment allowed for Cash & QR. Enter less than total; remaining will be due.'
                                 : 'Enter amount to pay (partial allowed)',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
