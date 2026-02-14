@@ -248,7 +248,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   : ListView.builder(
                       physics: platformScrollPhysics,
                       cacheExtent: 400,
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
                       itemCount: _filteredCustomers.length +
                           (_canLoadMoreCustomers && _customerSearch.isEmpty
                               ? 1
@@ -277,123 +277,152 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
                         return RepaintBoundary(
                           child: Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          color: atLimit ? _limitWarningRed : Colors.white,
-                          elevation: 1,
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            leading: CircleAvatar(
-                              backgroundColor: brand,
-                              child: Text(
-                                customer.name.substring(0, 1).toUpperCase(),
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600),
+                            margin: const EdgeInsets.only(bottom: 8),
+                            color: atLimit ? _limitWarningRed : Colors.white,
+                            elevation: 1,
+                            child: InkWell(
+                              onTap: () {
+                                final customerId =
+                                    customer.documentId ?? customer.id;
+                                if (customerId != null) {
+                                  setState(() {
+                                    _selectedCustomerId = customerId;
+                                    _viewMode = 'credits';
+                                  });
+                                  _loadCreditTransactions(customerId);
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      backgroundColor: brand,
+                                      child: Text(
+                                        customer.name.substring(0, 1).toUpperCase(),
+                                        style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            customer.name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 16,
+                                              color: Color(0xFF1A1A1A),
+                                            ),
+                                          ),
+                                          if (customer.phone != null) ...[
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              'Phone: ${customer.phone}',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[600],
+                                              ),
+                                            ),
+                                          ],
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Balance: ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditBalance)}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: hasCredit
+                                                  ? Colors.grey[900]
+                                                  : Colors.grey[800],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (atLimit)
+                                          Chip(
+                                            label: Text(
+                                              'At limit',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.red[700],
+                                              ),
+                                            ),
+                                            side: BorderSide(
+                                                color: Colors.red.withOpacity(0.5)),
+                                            backgroundColor: _limitWarningRed,
+                                          )
+                                        else if (hasCredit)
+                                          Chip(
+                                            label: Text(
+                                              'Credit',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w600,
+                                                color: brand,
+                                              ),
+                                            ),
+                                            side: BorderSide(
+                                                color: brand.withOpacity(0.35)),
+                                            backgroundColor: Colors.white,
+                                          ),
+                                        IconButton(
+                                          icon: Icon(Icons.edit,
+                                              color: Colors.grey[800], size: 22),
+                                          onPressed: () =>
+                                              _showEditCustomerDialog(customer),
+                                          tooltip: 'Edit',
+                                        ),
+                                        IconButton(
+                                          icon: Icon(
+                                              Icons.account_balance_wallet,
+                                              color: Colors.grey[800],
+                                              size: 22),
+                                          onPressed: () {
+                                            final customerId =
+                                                customer.documentId ?? customer.id;
+                                            setState(() {
+                                              _selectedCustomerId = customerId;
+                                              _viewMode = 'credits';
+                                            });
+                                            if (customerId != null) {
+                                              _loadCreditTransactions(customerId);
+                                            }
+                                          },
+                                          tooltip: 'Credits',
+                                        ),
+                                        IconButton(
+                                          icon: Icon(Icons.delete,
+                                              color: AppTheme.errorColor,
+                                              size: 22),
+                                          onPressed: () =>
+                                              _showDeleteCustomerDialog(customer),
+                                          tooltip: 'Delete',
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                            title: Text(
-                              customer.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
-                                color: Color(0xFF1A1A1A),
-                              ),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (customer.phone != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2),
-                                    child: Text(
-                                      'Phone: ${customer.phone}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey[600],
-                                      ),
-                                    ),
-                                  ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Balance: ${NumberFormat.currency(symbol: 'NPR ').format(customer.creditBalance)}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: hasCredit
-                                        ? Colors.grey[900]
-                                        : Colors.grey[800],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (atLimit)
-                                  Chip(
-                                    label: Text(
-                                      'At limit',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.red[700],
-                                      ),
-                                    ),
-                                    side: BorderSide(
-                                        color: Colors.red.withOpacity(0.5)),
-                                    backgroundColor: _limitWarningRed,
-                                  )
-                                else if (hasCredit)
-                                  Chip(
-                                    label: Text(
-                                      'Credit',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                        color: brand,
-                                      ),
-                                    ),
-                                    side: BorderSide(
-                                        color: brand.withOpacity(0.35)),
-                                    backgroundColor: Colors.white,
-                                  ),
-                                IconButton(
-                                  icon: Icon(Icons.edit, color: Colors.grey[800]),
-                                  onPressed: () =>
-                                      _showEditCustomerDialog(customer),
-                                  tooltip: 'Edit',
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                      Icons.account_balance_wallet,
-                                      color: Colors.grey[800]),
-                                  onPressed: () {
-                                    final customerId =
-                                        customer.documentId ?? customer.id;
-                                    setState(() {
-                                      _selectedCustomerId = customerId;
-                                      _viewMode = 'credits';
-                                    });
-                                    if (customerId != null) {
-                                      _loadCreditTransactions(customerId);
-                                    }
-                                  },
-                                  tooltip: 'Credits',
-                                ),
-                                IconButton(
-                                  icon: Icon(Icons.delete, color: AppTheme.errorColor),
-                                  onPressed: () =>
-                                      _showDeleteCustomerDialog(customer),
-                                  tooltip: 'Delete',
-                                ),
-                              ],
                             ),
                           ),
-                        ),
                         );
                       },
                     ),
