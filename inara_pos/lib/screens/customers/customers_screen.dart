@@ -316,7 +316,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                         children: [
                                           Text(
                                             customer.name,
-                                            maxLines: 1,
+                                            maxLines: 3,
                                             overflow: TextOverflow.ellipsis,
                                             style: const TextStyle(
                                               fontWeight: FontWeight.w600,
@@ -327,7 +327,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                           if (customer.phone != null) ...[
                                             const SizedBox(height: 2),
                                             Text(
-                                              'Phone: ${customer.phone}',
+                                              customer.phone!,
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: TextStyle(
@@ -336,19 +336,6 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                               ),
                                             ),
                                           ],
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'Balance: ${NumberFormat.currency(symbol: 'NPR ', decimalDigits: 0).format(customer.creditBalance)}',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              color: hasCredit
-                                                  ? Colors.grey[900]
-                                                  : Colors.grey[800],
-                                            ),
-                                          ),
                                         ],
                                       ),
                                     ),
@@ -357,10 +344,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
                                         Text(
-                                          NumberFormat.currency(
-                                              symbol: 'NPR ',
-                                              decimalDigits: 0)
-                                              .format(customer.creditBalance),
+                                          customer.creditBalance
+                                                  .truncateToDouble() ==
+                                              customer.creditBalance
+                                              ? '${customer.creditBalance.toInt()}'
+                                              : customer.creditBalance
+                                                  .toStringAsFixed(1),
                                           style: TextStyle(
                                             fontSize: 15,
                                             fontWeight: FontWeight.bold,
