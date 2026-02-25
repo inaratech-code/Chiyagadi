@@ -1561,6 +1561,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     int? selectedCustomerId;
     List<Map<String, dynamic>> customers = [];
     final partialAmountController = TextEditingController();
+    final qrAmountController = TextEditingController(text: '0');
+    final cashAmountController = TextEditingController(text: '0');
     bool allowPartial = false;
 
     // Load customers for credit payment
@@ -1639,6 +1641,62 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   });
                 },
               ),
+              RadioListTile<String>(
+                title: const Row(
+                  children: [
+                    Icon(Icons.qr_code, color: Colors.blue),
+                    SizedBox(width: 4),
+                    Icon(Icons.money, color: Colors.green, size: 20),
+                    SizedBox(width: 8),
+                    Text('QR + Cash'),
+                  ],
+                ),
+                value: 'qr_and_cash',
+                groupValue: paymentMethod,
+                onChanged: (value) {
+                  setDialogState(() {
+                    paymentMethod = value!;
+                    selectedCustomerId = null;
+                    allowPartial = false;
+                    qrAmountController.text = '0';
+                    cashAmountController.text = '0';
+                  });
+                },
+              ),
+              if (paymentMethod == 'qr_and_cash') ...[
+                const SizedBox(height: 8),
+                const Divider(),
+                const SizedBox(height: 8),
+                const Text(
+                  'Enter amounts for each method:',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: qrAmountController,
+                  decoration: const InputDecoration(
+                    labelText: 'QR Amount (NPR)',
+                    border: OutlineInputBorder(),
+                    prefixText: 'NPR ',
+                  ),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  onChanged: (_) => setDialogState(() {}),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: cashAmountController,
+                  decoration: const InputDecoration(
+                    labelText: 'Cash Amount (NPR)',
+                    border: OutlineInputBorder(),
+                    prefixText: 'NPR ',
+                  ),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  onChanged: (_) => setDialogState(() {}),
+                ),
+                const SizedBox(height: 8),
+              ],
               CheckboxListTile(
                 title: const Text('Allow Partial Payment'),
                 value: allowPartial,
@@ -1831,6 +1889,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ElevatedButton(
               onPressed: (paymentMethod == 'credit' &&
                           selectedCustomerId == null) ||
+                      (paymentMethod == 'qr_and_cash' &&
+                          ((double.tryParse(qrAmountController.text) ?? 0) +
+                                  (double.tryParse(cashAmountController.text) ?? 0) <=
+                              0 ||
+                              (double.tryParse(qrAmountController.text) ?? 0) +
+                                  (double.tryParse(cashAmountController.text) ?? 0) >
+                                  _total)) ||
                       (allowPartial &&
                           (partialAmountController.text.isEmpty ||
                               double.tryParse(partialAmountController.text) ==
@@ -1863,6 +1928,41 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         // Calculate payment amounts
         double? partialAmount;
         dynamic customerId;
+
+        if (paymentMethod == 'qr_and_cash') {
+          final qrAmount = double.tryParse(qrAmountController.text) ?? 0.0;
+          final cashAmount = double.tryParse(cashAmountController.text) ?? 0.0;
+          if (qrAmount <= 0 && cashAmount <= 0) {
+            throw Exception('Enter at least one amount (QR or Cash)');
+          }
+          if (qrAmount + cashAmount > _total) {
+            throw Exception('Total (QR + Cash) cannot exceed order total');
+          }
+          await _orderService.completePaymentSplit(
+            dbProvider: dbProvider,
+            context: context,
+            orderId: widget.orderId,
+            qrAmount: qrAmount,
+            cashAmount: cashAmount,
+            createdBy: authProvider.currentUserId != null
+                ? (kIsWeb
+                    ? authProvider.currentUserId!
+                    : int.tryParse(authProvider.currentUserId!))
+                : null,
+          );
+          DashboardScreen.refreshDashboard();
+          await _loadData();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Payment completed (QR + Cash)'),
+                backgroundColor: Colors.green,
+              ),
+            );
+            Navigator.pop(context);
+          }
+          return;
+        }
 
         if (allowPartial && partialAmountController.text.isNotEmpty) {
           partialAmount = double.tryParse(partialAmountController.text);
@@ -1943,6 +2043,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         return 'QR Payment';
       case 'credit':
         return 'Credit';
+      case 'qr_and_cash':
+        return 'QR + Cash';
       default:
         return method ?? 'Cash';
     }

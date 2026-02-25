@@ -30,6 +30,8 @@ class OrderPaymentDialog extends StatefulWidget {
 class _OrderPaymentDialogState extends State<OrderPaymentDialog> {
   String _selectedPaymentMethod = 'cash';
   final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _qrAmountController = TextEditingController();
+  final TextEditingController _cashAmountController = TextEditingController();
   bool _isProcessing = false;
   Customer? _selectedCustomer;
 
@@ -77,6 +79,8 @@ class _OrderPaymentDialogState extends State<OrderPaymentDialog> {
   @override
   void dispose() {
     _amountController.dispose();
+    _qrAmountController.dispose();
+    _cashAmountController.dispose();
     super.dispose();
   }
 
@@ -140,7 +144,7 @@ class _OrderPaymentDialogState extends State<OrderPaymentDialog> {
                     SegmentedButton<String>(
                       segments: const [
                         ButtonSegment(value: 'cash', label: Text('Cash')),
-                        ButtonSegment(value: 'card', label: Text('Card')),
+                        ButtonSegment(value: 'qr_and_cash', label: Text('QR + Cash')),
                         ButtonSegment(value: 'digital', label: Text('QR Payment')),
                         ButtonSegment(value: 'credit', label: Text('Credit')),
                       ],
@@ -154,6 +158,8 @@ class _OrderPaymentDialogState extends State<OrderPaymentDialog> {
                             _selectedPaymentMethod = 'credit';
                             _selectedCustomer = picked;
                             _amountController.text = '0';
+                            _qrAmountController.text = '';
+                            _cashAmountController.text = '';
                           });
                         } else {
                           setState(() {
@@ -162,12 +168,57 @@ class _OrderPaymentDialogState extends State<OrderPaymentDialog> {
                               _selectedCustomer = null;
                               _amountController.text =
                                   widget.totalAmount.toStringAsFixed(2);
+                              if (next != 'qr_and_cash') {
+                                _qrAmountController.text = '';
+                                _cashAmountController.text = '';
+                              } else {
+                                _qrAmountController.text = '0';
+                                _cashAmountController.text = '0';
+                              }
                             }
                           });
                         }
                       },
                     ),
                     const SizedBox(height: 18),
+
+                    if (_selectedPaymentMethod == 'qr_and_cash') ...[
+                      Text(
+                        'Enter amounts for each method',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.grey[700],
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _qrAmountController,
+                        enabled: !_isProcessing,
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(
+                          labelText: 'QR Amount (Rs.)',
+                          prefixText: 'Rs. ',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _cashAmountController,
+                        enabled: !_isProcessing,
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(
+                          labelText: 'Cash Amount (Rs.)',
+                          prefixText: 'Rs. ',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                    ],
 
                     if (_selectedPaymentMethod == 'credit') ...[
                       Container(
@@ -207,29 +258,30 @@ class _OrderPaymentDialogState extends State<OrderPaymentDialog> {
                       const SizedBox(height: 18),
                     ],
 
-                    TextField(
-                      controller: _amountController,
-                      enabled: !_isProcessing,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      decoration: InputDecoration(
-                        labelText: 'Amount',
-                        prefixText: 'Rs. ',
-                        hintText: (_selectedPaymentMethod == 'cash' ||
-                                _selectedPaymentMethod == 'digital')
-                            ? 'Enter full or partial amount'
-                            : null,
-                        helperText: _selectedPaymentMethod == 'credit'
-                            ? 'Enter amount received now (remaining will be credit)'
-                            : (_selectedPaymentMethod == 'cash' ||
-                                    _selectedPaymentMethod == 'digital')
-                                ? 'Partial payment allowed for Cash & QR. Enter less than total; remaining will be due.'
-                                : 'Enter amount to pay (partial allowed)',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
+                    if (_selectedPaymentMethod != 'qr_and_cash')
+                      TextField(
+                        controller: _amountController,
+                        enabled: !_isProcessing,
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(
+                          labelText: 'Amount',
+                          prefixText: 'Rs. ',
+                          hintText: (_selectedPaymentMethod == 'cash' ||
+                                  _selectedPaymentMethod == 'digital')
+                              ? 'Enter full or partial amount'
+                              : null,
+                          helperText: _selectedPaymentMethod == 'credit'
+                              ? 'Enter amount received now (remaining will be credit)'
+                              : (_selectedPaymentMethod == 'cash' ||
+                                      _selectedPaymentMethod == 'digital')
+                                  ? 'Partial payment allowed for Cash & QR. Enter less than total; remaining will be due.'
+                                  : 'Enter amount to pay (partial allowed)',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
-                    ),
                     if (_selectedPaymentMethod == 'cash' ||
                         _selectedPaymentMethod == 'digital')
                       Padding(
@@ -426,6 +478,55 @@ class _OrderPaymentDialogState extends State<OrderPaymentDialog> {
   }
 
   Future<void> _processPayment() async {
+    if (_selectedPaymentMethod == 'qr_and_cash') {
+      final qrAmount = double.tryParse(_qrAmountController.text) ?? 0.0;
+      final cashAmount = double.tryParse(_cashAmountController.text) ?? 0.0;
+      if (qrAmount <= 0 && cashAmount <= 0) {
+        AppMessenger.showSnackBar('Enter at least one amount (QR or Cash)');
+        return;
+      }
+      if (qrAmount + cashAmount > widget.totalAmount) {
+        AppMessenger.showSnackBar('Total (QR + Cash) cannot exceed order total');
+        return;
+      }
+      setState(() => _isProcessing = true);
+      try {
+        final authProvider =
+            Provider.of<InaraAuthProvider>(context, listen: false);
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final createdBy = authProvider.currentUserId != null
+            ? (kIsWeb
+                ? authProvider.currentUserId!
+                : int.tryParse(authProvider.currentUserId!))
+            : null;
+        await widget.orderService.completePaymentSplit(
+          dbProvider: dbProvider,
+          context: context,
+          orderId: widget.orderId,
+          qrAmount: qrAmount,
+          cashAmount: cashAmount,
+          createdBy: createdBy,
+        );
+        DashboardScreen.refreshDashboard();
+        if (mounted) {
+          AppMessenger.showSnackBar(
+            'Payment done (QR + Cash)',
+            backgroundColor: Colors.green,
+            leadingAssetPath: 'assets/images/payment_done.jpg',
+            leadingIcon: Icons.check_circle,
+          );
+          Navigator.of(context).pop({'success': true});
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isProcessing = false);
+          AppMessenger.showSnackBar('Error: $e', backgroundColor: Colors.red);
+        }
+      }
+      return;
+    }
+
     final amount = double.tryParse(_amountController.text);
     if (amount == null || (_selectedPaymentMethod != 'credit' && amount <= 0)) {
       AppMessenger.showSnackBar('Please enter a valid amount');

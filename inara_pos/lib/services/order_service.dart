@@ -895,6 +895,182 @@ class OrderService {
     }
   }
 
+  /// Complete payment with QR + Cash split: two amounts, two payment records.
+  Future<void> completePaymentSplit({
+    required UnifiedDatabaseProvider dbProvider,
+    required BuildContext context,
+    required dynamic orderId,
+    required double qrAmount,
+    required double cashAmount,
+    dynamic customerId,
+    dynamic createdBy,
+  }) async {
+    if (qrAmount <= 0 && cashAmount <= 0) {
+      throw Exception('Enter at least one amount (QR or Cash)');
+    }
+    final totalPay = qrAmount + cashAmount;
+    await dbProvider.init();
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    final orders = await dbProvider.query(
+      'orders',
+      where: kIsWeb ? 'documentId = ?' : 'id = ?',
+      whereArgs: [orderId],
+    );
+    if (orders.isEmpty) throw Exception('Order not found');
+    final order = orders.first;
+    final totalAmount = (order['total_amount'] as num).toDouble();
+    final paidAmount = (order['paid_amount'] as num? ?? 0).toDouble();
+
+    final newPaidAmount = paidAmount + totalPay;
+    final creditAmount = (totalAmount - newPaidAmount).clamp(0.0, double.infinity);
+    final paymentStatus = creditAmount > 0 ? 'partial' : 'paid';
+
+    if (creditAmount > 0 && customerId == null) {
+      customerId = await createWalkInCustomerForPartial(
+        dbProvider,
+        order['order_number'] as String? ?? 'Order',
+      );
+    }
+
+    final updateData = {
+      'payment_status': paymentStatus,
+      'payment_method': 'qr_and_cash',
+      'customer_id': customerId,
+      'credit_amount': creditAmount,
+      'paid_amount': newPaidAmount,
+      'status': paymentStatus == 'paid' ? 'completed' : 'confirmed',
+      'updated_at': now,
+    };
+
+    if (kIsWeb) {
+      if (qrAmount > 0) {
+        await dbProvider.insert('payments', {
+          'order_id': orderId,
+          'amount': qrAmount,
+          'payment_method': 'digital',
+          'created_by': createdBy,
+          'created_at': now,
+          'synced': 0,
+        });
+      }
+      if (cashAmount > 0) {
+        await dbProvider.insert('payments', {
+          'order_id': orderId,
+          'amount': cashAmount,
+          'payment_method': 'cash',
+          'created_by': createdBy,
+          'created_at': now,
+          'synced': 0,
+        });
+      }
+      await dbProvider.update(
+        'orders',
+        values: updateData,
+        where: 'documentId = ?',
+        whereArgs: [orderId.toString()],
+      );
+      if (creditAmount > 0 && customerId != null) {
+        final customerDocs = await dbProvider.query(
+          'customers',
+          where: customerId is String ? 'documentId = ?' : 'id = ?',
+          whereArgs: [customerId],
+        );
+        if (customerDocs.isNotEmpty) {
+          final customer = customerDocs.first;
+          final currentBalance =
+              (customer['credit_balance'] as num? ?? 0).toDouble();
+          final newBalance = currentBalance + creditAmount;
+          final customerDocId = (customer['id'] as String?) ??
+              (customer['documentId'] as String?);
+          if (customerDocId != null) {
+            await dbProvider.update(
+              'customers',
+              values: {'credit_balance': newBalance, 'updated_at': now},
+              where: 'documentId = ?',
+              whereArgs: [customerDocId],
+            );
+          }
+          await dbProvider.insert('credit_transactions', {
+            'customer_id': customerId,
+            'order_id': orderId,
+            'transaction_type': 'credit',
+            'amount': creditAmount,
+            'balance_before': currentBalance,
+            'balance_after': newBalance,
+            'notes': 'Order payment: ${order['order_number']}',
+            'created_by': createdBy,
+            'created_at': now,
+            'synced': 0,
+          });
+        }
+      }
+    } else {
+      final intCustomerId = customerId is int
+          ? customerId
+          : int.tryParse(customerId?.toString() ?? '');
+      await dbProvider.transaction((txn) async {
+        if (qrAmount > 0) {
+          await txn.insert('payments', {
+            'order_id': orderId,
+            'amount': qrAmount,
+            'payment_method': 'digital',
+            'created_by': createdBy,
+            'created_at': now,
+            'synced': 0,
+          });
+        }
+        if (cashAmount > 0) {
+          await txn.insert('payments', {
+            'order_id': orderId,
+            'amount': cashAmount,
+            'payment_method': 'cash',
+            'created_by': createdBy,
+            'created_at': now,
+            'synced': 0,
+          });
+        }
+        await txn.update(
+          'orders',
+          updateData,
+          where: 'id = ?',
+          whereArgs: [orderId],
+        );
+        if (creditAmount > 0 && intCustomerId != null) {
+          final customers = await txn.query(
+            'customers',
+            where: 'id = ?',
+            whereArgs: [intCustomerId],
+          );
+          if (customers.isNotEmpty) {
+            final customer = customers.first;
+            final currentBalance =
+                (customer['credit_balance'] as num? ?? 0).toDouble();
+            final newBalance = currentBalance + creditAmount;
+            await txn.update(
+              'customers',
+              {'credit_balance': newBalance, 'updated_at': now},
+              where: 'id = ?',
+              whereArgs: [intCustomerId],
+            );
+            await txn.insert('credit_transactions', {
+              'customer_id': intCustomerId,
+              'order_id': orderId,
+              'transaction_type': 'credit',
+              'amount': creditAmount,
+              'balance_before': currentBalance,
+              'balance_after': newBalance,
+              'notes': 'Order payment: ${order['order_number']}',
+              'created_by': createdBy,
+              'created_at': now,
+              'synced': 0,
+            });
+          }
+        }
+      });
+    }
+  }
+
   // Pay credit (reduce customer balance when credit is paid later)
   Future<void> payCredit({
     required UnifiedDatabaseProvider dbProvider,

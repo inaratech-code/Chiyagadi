@@ -25,12 +25,16 @@ class POSPaymentDialog extends StatefulWidget {
 class _POSPaymentDialogState extends State<POSPaymentDialog> {
   String _selectedPaymentMethod = 'cash';
   final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _qrAmountController = TextEditingController();
+  final TextEditingController _cashAmountController = TextEditingController();
   bool _isProcessing = false;
 
   @override
   void initState() {
     super.initState();
     _amountController.text = widget.order.totalAmount.toStringAsFixed(2);
+    _qrAmountController.text = '0';
+    _cashAmountController.text = '0';
   }
 
   @override
@@ -81,14 +85,17 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
             SegmentedButton<String>(
               segments: const [
                 ButtonSegment(value: 'cash', label: Text('Cash')),
-                ButtonSegment(value: 'card', label: Text('Card')),
+                ButtonSegment(value: 'qr_and_cash', label: Text('QR + Cash')),
                 ButtonSegment(value: 'digital', label: Text('QR Payment')),
               ],
               selected: {_selectedPaymentMethod},
               onSelectionChanged: (Set<String> newSelection) {
                 setState(() {
                   _selectedPaymentMethod = newSelection.first;
-                  if (_selectedPaymentMethod != 'credit') {
+                  if (_selectedPaymentMethod == 'qr_and_cash') {
+                    _qrAmountController.text = '0';
+                    _cashAmountController.text = '0';
+                  } else {
                     _amountController.text =
                         widget.order.totalAmount.toStringAsFixed(2);
                   }
@@ -97,6 +104,45 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
             ),
             const SizedBox(height: 24),
 
+            if (_selectedPaymentMethod == 'qr_and_cash') ...[
+              Text(
+                'Enter amounts for each method',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.grey[700],
+                    ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _qrAmountController,
+                enabled: !_isProcessing,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'QR Amount (Rs.)',
+                  prefixText: 'Rs. ',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _cashAmountController,
+                enabled: !_isProcessing,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Cash Amount (Rs.)',
+                  prefixText: 'Rs. ',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            if (_selectedPaymentMethod != 'qr_and_cash') ...[
             // Amount (partial allowed for Cash & QR)
             TextField(
               controller: _amountController,
@@ -134,6 +180,7 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
                 ),
               ),
             const SizedBox(height: 24),
+            ],
 
             // Buttons
             Row(
@@ -170,6 +217,60 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
   }
 
   Future<void> _processPayment() async {
+    final orderId = kIsWeb ? widget.order.documentId : widget.order.id;
+    if (orderId == null) {
+      throw Exception('Order ID not found');
+    }
+
+    if (_selectedPaymentMethod == 'qr_and_cash') {
+      final qrAmount = double.tryParse(_qrAmountController.text) ?? 0.0;
+      final cashAmount = double.tryParse(_cashAmountController.text) ?? 0.0;
+      if (qrAmount <= 0 && cashAmount <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Enter at least one amount (QR or Cash)')),
+        );
+        return;
+      }
+      if (qrAmount + cashAmount > widget.order.totalAmount) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Total (QR + Cash) cannot exceed order total')),
+        );
+        return;
+      }
+      setState(() => _isProcessing = true);
+      try {
+        final authProvider =
+            Provider.of<InaraAuthProvider>(context, listen: false);
+        final dbProvider =
+            Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final createdBy = authProvider.currentUserId != null
+            ? (kIsWeb
+                ? authProvider.currentUserId!
+                : int.tryParse(authProvider.currentUserId!))
+            : null;
+        await widget.orderService.completePaymentSplit(
+          dbProvider: dbProvider,
+          context: context,
+          orderId: orderId,
+          qrAmount: qrAmount,
+          cashAmount: cashAmount,
+          createdBy: createdBy,
+        );
+        DashboardScreen.refreshDashboard();
+        if (mounted) {
+          Navigator.of(context).pop({'success': true, 'order_id': orderId});
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isProcessing = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e')),
+          );
+        }
+      }
+      return;
+    }
+
     final amount = double.tryParse(_amountController.text);
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -200,11 +301,6 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
               : int.tryParse(authProvider.currentUserId!))
           : null;
 
-      final orderId = kIsWeb ? widget.order.documentId : widget.order.id;
-      if (orderId == null) {
-        throw Exception('Order ID not found');
-      }
-
       final isPartial = (_selectedPaymentMethod == 'cash' ||
               _selectedPaymentMethod == 'digital') &&
           amount < widget.order.totalAmount;
@@ -228,7 +324,6 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
         createdBy: createdBy,
       );
 
-      // NEW: Refresh dashboard to update sales and credit immediately
       DashboardScreen.refreshDashboard();
 
       if (mounted) {
@@ -252,6 +347,8 @@ class _POSPaymentDialogState extends State<POSPaymentDialog> {
   @override
   void dispose() {
     _amountController.dispose();
+    _qrAmountController.dispose();
+    _cashAmountController.dispose();
     super.dispose();
   }
 }

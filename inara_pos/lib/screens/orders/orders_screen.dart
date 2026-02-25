@@ -392,6 +392,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
         return 'QR Payment';
       case 'credit':
         return 'Credit';
+      case 'qr_and_cash':
+        return 'QR + Cash';
       default:
         return method;
     }
