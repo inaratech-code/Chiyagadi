@@ -1577,7 +1577,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (context, setDialogState) {
+          double qrCashTotal() =>
+              (double.tryParse(qrAmountController.text) ?? 0) +
+              (double.tryParse(cashAmountController.text) ?? 0);
+          return AlertDialog(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('Complete Payment'),
@@ -1890,12 +1894,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               onPressed: (paymentMethod == 'credit' &&
                           selectedCustomerId == null) ||
                       (paymentMethod == 'qr_and_cash' &&
-                          ((double.tryParse(qrAmountController.text) ?? 0) +
-                                  (double.tryParse(cashAmountController.text) ?? 0) <=
-                              0 ||
-                              (double.tryParse(qrAmountController.text) ?? 0) +
-                                  (double.tryParse(cashAmountController.text) ?? 0) >
-                                  _total)) ||
+                          (qrCashTotal() <= 0 || qrCashTotal() > _total)) ||
                       (allowPartial &&
                           (partialAmountController.text.isEmpty ||
                               double.tryParse(partialAmountController.text) ==
@@ -1914,7 +1913,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               child: const Text('Complete Payment'),
             ),
           ],
-        ),
+        );
+        },
       ),
     );
 
@@ -1924,8 +1924,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             Provider.of<InaraAuthProvider>(context, listen: false);
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final createdBy = authProvider.currentUserId != null
+            ? (kIsWeb
+                ? authProvider.currentUserId!
+                : int.tryParse(authProvider.currentUserId!))
+            : null;
 
-        // Calculate payment amounts
         double? partialAmount;
         dynamic customerId;
 
@@ -1944,11 +1948,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             orderId: widget.orderId,
             qrAmount: qrAmount,
             cashAmount: cashAmount,
-            createdBy: authProvider.currentUserId != null
-                ? (kIsWeb
-                    ? authProvider.currentUserId!
-                    : int.tryParse(authProvider.currentUserId!))
-                : null,
+            createdBy: createdBy,
           );
           DashboardScreen.refreshDashboard();
           await _loadData();
@@ -1991,12 +1991,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           amount: _total,
           customerId: customerId,
           partialAmount: partialAmount,
-          // FIXED: Handle both int (SQLite) and String (Firestore) user IDs
-          createdBy: authProvider.currentUserId != null
-              ? (kIsWeb
-                  ? authProvider.currentUserId!
-                  : int.tryParse(authProvider.currentUserId!))
-              : null,
+          createdBy: createdBy,
         );
 
         // NEW: Refresh dashboard to update sales and credit immediately
@@ -2008,19 +2003,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                paymentMethod == 'credit'
-                    ? 'Payment completed via Credit'
-                    : paymentMethod == 'cash'
-                        ? 'Payment completed via Cash'
-                        : 'Payment completed via QR Payment',
-              ),
+                  'Payment completed via ${_getPaymentMethodLabel(paymentMethod)}'),
               backgroundColor: Colors.green,
             ),
           );
-          // Navigate back immediately
-          if (mounted) {
-            Navigator.pop(context);
-          }
+          Navigator.pop(context);
         }
       } catch (e) {
         if (mounted) {
@@ -2033,6 +2020,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         }
       }
     }
+    partialAmountController.dispose();
+    qrAmountController.dispose();
+    cashAmountController.dispose();
   }
 
   String _getPaymentMethodLabel(String? method) {
@@ -2118,17 +2108,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             Provider.of<InaraAuthProvider>(context, listen: false);
         final dbProvider =
             Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+        final createdBy = authProvider.currentUserId != null
+            ? (kIsWeb
+                ? authProvider.currentUserId!
+                : int.tryParse(authProvider.currentUserId!))
+            : null;
         await _orderService.payCredit(
           dbProvider: dbProvider,
           orderId: widget.orderId,
           amount: amount,
           paymentMethod: paymentMethod,
-          // FIXED: Handle both int (SQLite) and String (Firestore) user IDs
-          createdBy: authProvider.currentUserId != null
-              ? (kIsWeb
-                  ? authProvider.currentUserId!
-                  : int.tryParse(authProvider.currentUserId!))
-              : null,
+          createdBy: createdBy,
         );
 
         await _loadData(); // Await to ensure data is loaded
