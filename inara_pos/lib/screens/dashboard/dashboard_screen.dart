@@ -48,7 +48,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Timer? _loadDeferTimer;
 
   bool _isPaidOrPartial(dynamic paymentStatus) {
-    final s = (paymentStatus ?? '').toString();
+    final s = (paymentStatus ?? '').toString().toLowerCase();
     return s == 'paid' || s == 'partial';
   }
 
@@ -108,12 +108,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final results = await Future.wait<List<Map<String, dynamic>>>([
         // 0: settings
         dbProvider.query('settings'),
-        // 1: orders in today's range (filter paid/partial in-memory on web)
+        // 1: orders in today's range (orderBy required for Firestore range query)
         kIsWeb
             ? dbProvider.query(
                 'orders',
                 where: 'created_at >= ? AND created_at <= ?',
                 whereArgs: [startOfDay, endOfDay],
+                orderBy: 'created_at ASC',
               )
             : dbProvider.query(
                 'orders',
@@ -121,12 +122,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     'created_at >= ? AND created_at <= ? AND payment_status IN (?, ?)',
                 whereArgs: [startOfDay, endOfDay, 'paid', 'partial'],
               ),
-        // 2: today's credit transactions
+        // 2: today's credit transactions (orderBy required for Firestore range query)
         dbProvider.query(
           'credit_transactions',
-          // Web/Firestore: Fetch by date range only and filter in-memory to avoid index requirement
           where: 'created_at >= ? AND created_at <= ?',
           whereArgs: [startOfDay, endOfDay],
+          orderBy: 'created_at ASC',
         ),
         // 3: products that track inventory (Food, Cold Drinks, Cigarettes, Smokes, Snacks)
         // Only fetch products with track_inventory = 1 for better performance
@@ -176,7 +177,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
 
       final todayCreditTransactions = todayCreditTransactionsRaw
-          .where((t) => (t['transaction_type'] ?? '').toString() == 'credit')
+          .where((t) =>
+              (t['transaction_type'] ?? '').toString().toLowerCase() == 'credit')
           .toList();
 
       nextTodayCredit = todayCreditTransactions.fold<double>(
@@ -831,8 +833,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             style: TextStyle(
               fontSize: kIsWeb ? 24 : 26,
               fontWeight: FontWeight.bold,
-              color: Colors.black87, // Dark/black text
+              color: Colors.black,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.visible,
           ),
         ],
       ),
