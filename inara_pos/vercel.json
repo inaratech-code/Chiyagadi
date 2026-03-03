@@ -1,5 +1,6 @@
 {
-  "buildCommand": "flutter pub get && flutter build web",
+  "installCommand": "git clone https://github.com/flutter/flutter.git -b stable --depth 1 .flutter && .flutter/bin/flutter config --enable-web && .flutter/bin/flutter precache -w && .flutter/bin/flutter pub get",
+  "buildCommand": ".flutter/bin/flutter build web",
   "outputDirectory": "build/web",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
