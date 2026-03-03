@@ -1,19 +1,20 @@
-var CACHE_SHELL = "pos-shell-v2";
-var CACHE_STATIC = "pos-static-v2";
-var CACHE_RUNTIME = "pos-runtime-v2";
+var CACHE_SHELL = "pos-shell-v3";
+var CACHE_STATIC = "pos-static-v3";
+var CACHE_RUNTIME = "pos-runtime-v3";
 
 var PRECACHE_URLS = ["/", "/login", "/menu", "/orders", "/offline.html"];
 
 self.addEventListener("install", function (e) {
   e.waitUntil(
-    caches
-      .open(CACHE_SHELL)
-      .then(function (cache) {
-        return cache.addAll(PRECACHE_URLS);
-      })
-      .then(function () {
-        return self.skipWaiting();
-      })
+    caches.open(CACHE_SHELL).then(function (cache) {
+      return Promise.all(
+        PRECACHE_URLS.map(function (url) {
+          return cache.add(url).catch(function () {});
+        })
+      );
+    }).then(function () {
+      return self.skipWaiting();
+    })
   );
 });
 
