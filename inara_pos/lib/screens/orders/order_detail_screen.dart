@@ -103,7 +103,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   double get _subtotal {
-    // FIXED: Calculate from order items, or use order's subtotal if available
+    // Calculate from order items, or use order's subtotal if available
     final calculatedSubtotal = _orderItems.fold(
         0.0, (sum, item) => sum + (item['total_price'] as num).toDouble());
     final orderSubtotal = (_order?['subtotal'] as num?)?.toDouble();
@@ -815,7 +815,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _showAddItemDialog() async {
-    // FIXED: Handle both int (SQLite) and String (Firestore) category IDs
+    // Handle both int (SQLite) and String (Firestore) category IDs
     // Use Object? instead of dynamic to avoid type inference issues
     Object? selectedCategoryId;
     List<Product> filteredProducts = _products;
@@ -845,7 +845,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 const SizedBox(height: 16),
 
                 // Category Filter
-                // FIXED: Use Object? to handle both int and String IDs without type errors
+                // Use Object? to handle both int and String IDs without type errors
                 DropdownButtonFormField<Object?>(
                   value: selectedCategoryId,
                   decoration: const InputDecoration(
@@ -856,7 +856,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     const DropdownMenuItem<Object?>(
                         value: null, child: Text('All Categories')),
                     ..._categories.map((cat) {
-                      // FIXED: Handle both int (SQLite) and String (Firestore) IDs
+                      // Handle both int (SQLite) and String (Firestore) IDs
                       // Explicitly convert to Object? to avoid type inference issues
                       final catIdData = cat['id'];
                       final catId = catIdData is int
@@ -872,9 +872,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ],
                   onChanged: (Object? value) {
                     setDialogState(() {
-                      // FIXED: Explicitly handle Object? type - no type checking
+                      // Explicitly handle Object? type - no type checking
                       selectedCategoryId = value;
-                      // FIXED: Compare category IDs safely, handling null and different types
+                      // Compare category IDs safely, handling null and different types
                       if (value == null) {
                         // Show all products when "All Categories" is selected
                         filteredProducts = _products;
@@ -902,7 +902,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 const SizedBox(height: 16),
 
                 // Product Selection
-                // FIXED: Handle both int (SQLite) and String (Firestore) product IDs
+                // Handle both int (SQLite) and String (Firestore) product IDs
                 filteredProducts.isEmpty
                     ? Padding(
                         padding: const EdgeInsets.all(16.0),
@@ -1209,7 +1209,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
-  // FIXED: Handle both int (SQLite) and String (Firestore) order item IDs
+  // Handle both int (SQLite) and String (Firestore) order item IDs
   Future<void> _removeItem(dynamic itemId) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -1431,7 +1431,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _deleteOrder() async {
-    // NEW: Role-based + password-protected deletion
+    // Role-based + password-protected deletion
     final auth = Provider.of<InaraAuthProvider>(context, listen: false);
     final pinController = TextEditingController();
     bool obscurePassword = true;
@@ -2080,7 +2080,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           createdBy: createdBy,
         );
 
-        // NEW: Refresh dashboard to update sales and credit immediately
+        // Refresh dashboard to update sales and credit immediately
         DashboardScreen.refreshDashboard();
 
         await _loadData(); // Await to ensure data is loaded

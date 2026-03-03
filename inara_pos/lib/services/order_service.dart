@@ -9,7 +9,7 @@ import '../services/inventory_ledger_service.dart';
 
 /// Order Service
 ///
-/// UPDATED: When items are added to orders, inventory is automatically deducted
+/// When items are added to orders, inventory is automatically deducted
 /// if the product has inventory tracking enabled.
 class OrderService {
   /// Creates a walk-in customer for partial payments when no customer is selected.
@@ -59,7 +59,7 @@ class OrderService {
     );
 
     // Extract sequential numbers from today's orders
-    // FIXED: Start from 0 so first order is 001 (not 000)
+    // Start from 0 so first order is 001 (not 000)
     int maxSequence = 0;
     final pattern = RegExp(r'ORD \d{6}/(\d+)');
 
@@ -82,12 +82,12 @@ class OrderService {
   }
 
   // Create new order
-  // FIXED: createdBy can be int (SQLite) or String (Firestore)
+  // createdBy can be int (SQLite) or String (Firestore)
   Future<dynamic> createOrder({
     required UnifiedDatabaseProvider dbProvider,
     required String orderType,
     dynamic tableId, // Can be int (SQLite) or String (Firestore)
-    dynamic createdBy, // FIXED: Can be int (SQLite) or String (Firestore)
+    dynamic createdBy, // Can be int (SQLite) or String (Firestore)
     String? customerName, // Optional name for the order (guest/customer name)
   }) async {
     await dbProvider.init();
@@ -138,7 +138,7 @@ class OrderService {
   }) async {
     await dbProvider.init();
 
-    // FIXED: Only allow sellable products (menu items) to be added to orders
+    // Only allow sellable products (menu items) to be added to orders
     // Purchase items (raw materials) cannot be sold
     if (!product.isSellable) {
       throw Exception(
@@ -153,7 +153,7 @@ class OrderService {
     final unitPrice = product.price;
     final totalPrice = unitPrice * quantity;
 
-    // UPDATED: Removed inventory check - items can be added to orders regardless of stock
+    // Removed inventory check - items can be added to orders regardless of stock
     // Inventory is managed manually from the menu section
     // Stock deduction will happen on payment completion if needed
     debugPrint(
@@ -189,12 +189,12 @@ class OrderService {
     if (existingItems.isNotEmpty) {
       // Update quantity
       final existingItem = existingItems.first;
-      // FIXED: Handle both int and double for quantity
+      // Handle both int and double for quantity
       final currentQty = (existingItem['quantity'] as num?)?.toInt() ?? 0;
       final newQuantity = currentQty + quantity;
       final newTotalPrice = unitPrice * newQuantity;
 
-      // FIXED: Handle both int and String for order item ID
+      // Handle both int and String for order item ID
       final itemId = existingItem['id'];
 
       await dbProvider.update(
@@ -242,7 +242,7 @@ class OrderService {
   }
 
   // Remove item from order (with inventory reversal)
-  // FIXED: Handle both int (SQLite) and String (Firestore) order item IDs
+  // Handle both int (SQLite) and String (Firestore) order item IDs
   Future<void> removeItemFromOrder({
     required UnifiedDatabaseProvider dbProvider,
     required BuildContext context,
@@ -264,7 +264,7 @@ class OrderService {
       final unitPrice = (item.first['unit_price'] as num?)?.toDouble() ?? 0.0;
       final productName = item.first['product_name'] as String? ?? '';
 
-      // UPDATED: Reverse inventory deduction if product has inventory
+      // Reverse inventory deduction if product has inventory
       if (quantity > 0) {
         try {
           final inventoryLedgerService = InventoryLedgerService();
@@ -356,7 +356,7 @@ class OrderService {
       final oldQuantity = (item.first['quantity'] as num?)?.toInt() ?? 0;
       final productName = item.first['product_name'] as String? ?? '';
 
-      // UPDATED: Adjust inventory if quantity changed
+      // Adjust inventory if quantity changed
       if (oldQuantity != quantity) {
         try {
           final inventoryLedgerService = InventoryLedgerService();
@@ -509,7 +509,7 @@ class OrderService {
       return;
     }
 
-    // FIXED: Recalculate subtotal from current order items (in case items changed)
+    // Recalculate subtotal from current order items (in case items changed)
     final items = await dbProvider.query(
       'order_items',
       where: 'order_id = ?',
@@ -587,7 +587,7 @@ class OrderService {
   Future<Order?> getOrderById(
       UnifiedDatabaseProvider dbProvider, dynamic orderId) async {
     await dbProvider.init();
-    // FIXED: Handle both SQLite (id) and Firestore (documentId) queries
+    // Handle both SQLite (id) and Firestore (documentId) queries
     final orders = await dbProvider.query(
       'orders',
       where: kIsWeb ? 'documentId = ?' : 'id = ?',
@@ -603,7 +603,7 @@ class OrderService {
   Future<List<Map<String, dynamic>>> getOrderItems(
       UnifiedDatabaseProvider dbProvider, dynamic orderId) async {
     await dbProvider.init();
-    // UPDATED: Query by order_id only, sort in-memory to avoid Firestore composite index
+    // Query by order_id only, sort in-memory to avoid Firestore composite index
     final items = await dbProvider.query(
       'order_items',
       where: 'order_id = ?',
@@ -660,7 +660,7 @@ class OrderService {
   }
 
   // Delete order (permanently remove order and its items)
-  // FIXED: Handle both SQLite (id) and Firestore (documentId) queries
+  // Handle both SQLite (id) and Firestore (documentId) queries
   Future<void> deleteOrder({
     required UnifiedDatabaseProvider dbProvider,
     required BuildContext context,
@@ -690,7 +690,7 @@ class OrderService {
   }
 
   // Complete payment (supports partial payment and credit)
-  // FIXED: Added BuildContext parameter for ledger service
+  // Added BuildContext parameter for ledger service
   Future<void> completePayment({
     required UnifiedDatabaseProvider dbProvider,
     required BuildContext context,
@@ -699,7 +699,7 @@ class OrderService {
     required double amount,
     dynamic customerId, // int (SQLite) or String (Firestore)
     double? partialAmount,
-    dynamic createdBy, // FIXED: Can be int (SQLite) or String (Firestore)
+    dynamic createdBy, // Can be int (SQLite) or String (Firestore)
     String? transactionId,
   }) async {
     await dbProvider.init();
@@ -1077,7 +1077,7 @@ class OrderService {
     required dynamic orderId,
     required double amount,
     String paymentMethod = 'cash',
-    dynamic createdBy, // FIXED: Can be int (SQLite) or String (Firestore)
+    dynamic createdBy, // Can be int (SQLite) or String (Firestore)
   }) async {
     await dbProvider.init();
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -1123,7 +1123,7 @@ class OrderService {
         'synced': 0,
       });
 
-      // FIXED: Update order - unified approach
+      // Update order - unified approach
       final orderUpdateData = {
         'credit_amount': newCredit,
         'paid_amount': newPaid,
@@ -1139,14 +1139,14 @@ class OrderService {
             where: 'id = ?', whereArgs: [orderId]);
       }
 
-      // FIXED: Update customer credit balance - unified approach
+      // Update customer credit balance - unified approach
       final customers = await txn.query(
         'customers',
         where: kIsWeb ? 'documentId = ?' : 'id = ?',
         whereArgs: [customerId.toString()],
       );
 
-      // FIXED: Handle customer update and credit transaction creation
+      // Handle customer update and credit transaction creation
       double? currentBalance;
       double? newBalance;
       bool customerUpdated = false;

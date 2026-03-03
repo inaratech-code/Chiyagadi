@@ -47,12 +47,10 @@
     // The value below is injected by flutter build, do not touch.
     var serviceWorkerVersion = null;
   </script>
-  <!-- Register service worker for offline support -->
+  <!-- Unregister any existing SW so app always loads fresh and dashboard data (sales/credit) loads from Firestore -->
   <script>
     if ("serviceWorker" in navigator) {
-      window.addEventListener("load", function () {
-        navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(function () {});
-      });
+      navigator.serviceWorker.getRegistrations().then(function(regs) { regs.forEach(function(r) { r.unregister(); }); });
     }
   </script>
   <!-- This script adds the flutter initialization JS code -->

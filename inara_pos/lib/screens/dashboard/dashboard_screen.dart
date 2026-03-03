@@ -28,7 +28,7 @@ class DashboardScreen extends StatefulWidget {
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 
-  // NEW: Static reference to refresh dashboard from anywhere
+  // Static reference to refresh dashboard from anywhere
   static _DashboardScreenState? _currentState;
 
   static void refreshDashboard() {
@@ -41,7 +41,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _todayCredit = 0.0;
   int _lowStockCount = 0;
   List<_LowStockItem> _lowStockItems =
-      []; // NEW: Store specific low stock items
+      []; // Store specific low stock items
   String _shopName = 'Shop';
   List<_ActivityItem> _recentActivity = const [];
   bool _isLoading = false;
@@ -55,7 +55,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // NEW: Register this state for global refresh access
+    // Register this state for global refresh access
     DashboardScreen._currentState = this;
     // PERF: Show UI immediately, then load data asynchronously
     // This ensures the page appears instantly on Android/iOS
@@ -103,7 +103,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59)
           .millisecondsSinceEpoch;
 
-      // UPDATED: Run independent queries in parallel for faster loading
+      // Run independent queries in parallel for faster loading
       // Optimized to fetch only necessary data
       final results = await Future.wait<List<Map<String, dynamic>>>([
         // 0: settings
@@ -129,7 +129,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           whereArgs: [startOfDay, endOfDay],
         ),
         // 3: products that track inventory (Food, Cold Drinks, Cigarettes, Smokes, Snacks)
-        // UPDATED: Only fetch products with track_inventory = 1 for better performance
+        // Only fetch products with track_inventory = 1 for better performance
         dbProvider.query(
           'products',
           where: 'track_inventory = ?',
@@ -186,13 +186,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
 
       // Load stock data - use stockQuantity directly from products that track inventory
-      // UPDATED: Only show low stock for countable categories (Food, Cold Drinks, Cigarettes, Smokes, Snacks)
+      // Only show low stock for countable categories (Food, Cold Drinks, Cigarettes, Smokes, Snacks)
       if (mounted && products.isNotEmpty) {
         // Process stock data directly from products (no async ledger call needed)
         int lowStockCount = 0;
         List<_LowStockItem> lowStockItems = [];
 
-        // UPDATED: Build category map from already fetched categories (no extra query)
+        // Build category map from already fetched categories (no extra query)
         final categoryMap = <dynamic, String>{};
         for (final cat in categories) {
           final catId = kIsWeb ? cat['id'] : cat['id'];
@@ -256,7 +256,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             title: orderNumber,
             subtitle: 'Order • ${paymentStatus.toUpperCase()}',
             amount: total,
-            orderId: orderId, // NEW: Store order ID for navigation
+            orderId: orderId, // Store order ID for navigation
           ),
         );
       }
@@ -839,7 +839,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // UPDATED: Cleaner low stock alert with better UI
+  // Cleaner low stock alert with better UI
   Widget _buildLowStockAlert() {
     return Container(
       width: double.infinity,
@@ -911,7 +911,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ],
           ),
-          // UPDATED: Display specific low stock items with cleaner design
+          // Display specific low stock items with cleaner design
           if (_lowStockItems.isNotEmpty) ...[
             const SizedBox(height: 12),
             Container(
@@ -1327,7 +1327,7 @@ class _ActivityItem {
   final String title;
   final String subtitle;
   final double amount;
-  final String? orderId; // NEW: Store order ID for navigation
+  final String? orderId; // Store order ID for navigation
 
   const _ActivityItem({
     required this.createdAt,
@@ -1336,11 +1336,11 @@ class _ActivityItem {
     required this.title,
     required this.subtitle,
     required this.amount,
-    this.orderId, // NEW: Optional order ID
+    this.orderId, // Optional order ID
   });
 }
 
-// NEW: Class to represent low stock items
+// Class to represent low stock items
 class _LowStockItem {
   final dynamic productId;
   final String productName;
