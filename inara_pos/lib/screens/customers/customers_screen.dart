@@ -114,7 +114,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
       appBar: widget.hideAppBar
           ? null
           : AppBar(
-              title: const Text('Customer Credits'),
+              title: const Text('Customers'),
               actions: [
                 IconButton(
                   icon: Icon(_viewMode == 'list'
@@ -185,21 +185,25 @@ class _CustomersScreenState extends State<CustomersScreen> {
             ),
           ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
           child: TextField(
             decoration: InputDecoration(
-              hintText: 'Search customers by name, phone or email...',
-              prefixIcon: const Icon(Icons.search),
+              hintText: 'Search by name, phone or email',
+              prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
               ),
               filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 14),
               suffixIcon: _customerSearch.isNotEmpty
                   ? IconButton(
                       icon: const Icon(Icons.clear),
                       onPressed: () {
                         setState(() => _customerSearch = '');
                       },
+                      tooltip: 'Clear',
                     )
                   : null,
             ),
@@ -209,20 +213,44 @@ class _CustomersScreenState extends State<CustomersScreen> {
         Expanded(
           child: _customers.isEmpty
               ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.people, size: 64, color: Colors.grey[400]),
-                      const SizedBox(height: 16),
-                      Text('No customers found',
-                          style: TextStyle(color: Colors.grey[600])),
-                      const SizedBox(height: 8),
-                      ElevatedButton.icon(
-                        onPressed: () => _showAddCustomerDialog(),
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add Customer'),
-                      ),
-                    ],
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.people_outline,
+                            size: 72, color: Colors.grey[400]),
+                        const SizedBox(height: 20),
+                        Text(
+                          'No customers yet',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Add your first customer to manage credits and orders.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: () => _showAddCustomerDialog(),
+                          icon: const Icon(Icons.add, size: 20),
+                          label: const Text('Add Customer'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 24, vertical: 12),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 )
               : _filteredCustomers.isEmpty
@@ -280,6 +308,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
                             margin: const EdgeInsets.only(bottom: 8),
                             color: atLimit ? _limitWarningRed : Colors.white,
                             elevation: 1,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                             child: InkWell(
                               onTap: () {
                                 final customerId =
@@ -316,7 +347,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                         children: [
                                           Text(
                                             customer.name,
-                                            maxLines: 3,
+                                            maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             style: const TextStyle(
                                               fontWeight: FontWeight.w600,
@@ -390,12 +421,17 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                                 color: brand.withOpacity(0.35)),
                                             backgroundColor: Colors.white,
                                           ),
+                                        const SizedBox(width: 4),
                                         IconButton(
                                           icon: Icon(Icons.edit,
                                               color: Colors.grey[800], size: 22),
                                           onPressed: () =>
                                               _showEditCustomerDialog(customer),
                                           tooltip: 'Edit',
+                                          style: IconButton.styleFrom(
+                                            minimumSize: const Size(44, 44),
+                                            padding: const EdgeInsets.all(8),
+                                          ),
                                         ),
                                         IconButton(
                                           icon: Icon(
@@ -414,6 +450,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                             }
                                           },
                                           tooltip: 'Credits',
+                                          style: IconButton.styleFrom(
+                                            minimumSize: const Size(44, 44),
+                                            padding: const EdgeInsets.all(8),
+                                          ),
                                         ),
                                         IconButton(
                                           icon: Icon(Icons.delete,
@@ -422,6 +462,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                           onPressed: () =>
                                               _showDeleteCustomerDialog(customer),
                                           tooltip: 'Delete',
+                                          style: IconButton.styleFrom(
+                                            minimumSize: const Size(44, 44),
+                                            padding: const EdgeInsets.all(8),
+                                          ),
                                         ),
                                           ],
                                         ),
@@ -483,20 +527,45 @@ class _CustomersScreenState extends State<CustomersScreen> {
           margin: const EdgeInsets.all(16),
           color: Colors.white,
           elevation: 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(20.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      customer.name,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1A1A1A),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => _showEditCustomerDialog(customer),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 4, horizontal: 0),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  customer.name,
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF1A1A1A),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Icon(Icons.edit,
+                                  size: 20, color: Colors.grey[600]),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                     Row(
@@ -506,6 +575,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
                           icon: Icon(Icons.delete, color: AppTheme.errorColor),
                           onPressed: () => _showDeleteCustomerDialog(customer),
                           tooltip: 'Delete customer',
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size(44, 44),
+                          ),
                         ),
                         IconButton(
                           icon: Icon(Icons.close, color: Colors.grey[700]),
@@ -516,6 +588,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
                             });
                           },
                           tooltip: 'Close',
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size(44, 44),
+                          ),
                         ),
                       ],
                     ),
@@ -523,13 +598,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 ),
                 if (customer.phone != null)
                   Padding(
-                    padding: const EdgeInsets.only(top: 4),
+                    padding: const EdgeInsets.only(top: 8),
                     child: Text(
                       'Phone: ${customer.phone}',
                       style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                     ),
                   ),
-                const Divider(),
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 16),
                 // Enhanced Summary Cards
                 Builder(
                   builder: (context) {
@@ -561,7 +638,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                 Icons.account_balance_wallet,
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: _buildSummaryCard(
                                 'Total Paid',
@@ -572,7 +649,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 10),
                         Row(
                           children: [
                             Expanded(
@@ -583,7 +660,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                 Icons.add_card,
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: _buildSummaryCard(
                                 'Available Credit',
@@ -599,35 +676,45 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     );
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 Row(
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: () => _showAddCreditDialog(customer),
-                        icon: const Icon(Icons.add, color: Colors.white),
+                        icon: const Icon(Icons.add, color: Colors.white, size: 20),
                         label: const Text('Add Credit',
                             style: TextStyle(
                                 color: Colors.white,
-                                fontWeight: FontWeight.w600)),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.logoPrimary,
                           foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: () => _showPaymentDialog(customer),
-                        icon: const Icon(Icons.payment, color: Colors.white),
+                        icon: const Icon(Icons.payment, color: Colors.white, size: 20),
                         label: const Text('Receive Payment',
                             style: TextStyle(
                                 color: Colors.white,
-                                fontWeight: FontWeight.w600)),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.logoSecondary,
                           foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                       ),
                     ),
@@ -676,33 +763,37 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   if (bills.isNotEmpty)
                     SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                        child: Row(
                           children: [
-                            Row(
-                              children: [
-                                Icon(Icons.receipt_long,
-                                    size: 18, color: Colors.grey[800]),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Bills (${bills.length})',
-                                  style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey[800]),
-                                ),
-                                const Spacer(),
-                                Text(
-                                  'Total Pending: ${NumberFormat.currency(symbol: 'NPR ').format(totalPending)}',
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.grey[800]),
-                                ),
-                              ],
+                            Icon(Icons.receipt_long,
+                                size: 20, color: Colors.grey[800]),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Bills (${bills.length})',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[800],
+                              ),
                             ),
-                            const SizedBox(height: 10),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'Total Pending: ${NumberFormat.currency(symbol: 'NPR ').format(totalPending)}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey[800],
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -738,6 +829,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                 margin: const EdgeInsets.only(bottom: 10),
                                 color: Colors.white,
                                 elevation: 1,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
                                 child: ListTile(
                           leading: CircleAvatar(
                             backgroundColor:
@@ -1435,27 +1529,36 @@ class _CustomersScreenState extends State<CustomersScreen> {
     return Card(
       color: Colors.white,
       elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 24),
+            Icon(icon, color: color, size: 26),
             const SizedBox(height: 8),
             Text(
               label,
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
               ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 4),
             Text(
               NumberFormat.currency(symbol: 'NPR ').format(amount),
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 15,
                 fontWeight: FontWeight.bold,
                 color: Colors.grey[900],
               ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

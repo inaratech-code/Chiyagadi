@@ -215,23 +215,40 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               'Type: ${_order?['order_type'] == 'dine_in' ? 'Dine-In' : 'Takeaway'}'),
                           Text(
                               'Payment: ${_order?['payment_status'] == 'paid' ? 'Paid' : 'Unpaid'}'),
-                          if ((_order?['customer_name'] as String?)?.trim().isNotEmpty == true) ...[
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(Icons.person_outline, size: 18),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    'Customer: ${_order!['customer_name']}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w500,
+                          const SizedBox(height: 4),
+                          InkWell(
+                            onTap: _order?['payment_status'] == 'paid'
+                                ? null
+                                : () => _showEditCustomerDialog(),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 4, horizontal: 0),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.person_outline, size: 18),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      (_order?['customer_name'] as String?)
+                                              ?.trim().isNotEmpty == true
+                                          ? 'Customer: ${_order!['customer_name']}'
+                                          : 'Customer: — Tap to add',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w500,
+                                        color: (_order?['customer_name'] as String?)?.trim().isNotEmpty != true
+                                            ? Theme.of(context).hintColor
+                                            : null,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                  if (_order?['payment_status'] != 'paid')
+                                    Icon(Icons.edit,
+                                        size: 18, color: Colors.grey[600]),
+                                ],
+                              ),
                             ),
-                          ],
+                          ),
                         ],
                       ),
                     ),
@@ -1553,6 +1570,75 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Share functionality coming soon')),
       );
+    }
+  }
+
+  Future<void> _showEditCustomerDialog() async {
+    final nameController = TextEditingController(
+      text: (_order?['customer_name'] as String?)?.trim() ?? '',
+    );
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Customer'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(
+            labelText: 'Customer name',
+            hintText: 'Enter name or leave blank',
+            border: OutlineInputBorder(),
+          ),
+          textCapitalization: TextCapitalization.words,
+          autofocus: true,
+          onSubmitted: (_) => Navigator.pop(context, true),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (result != true || !mounted) return;
+    final name = nameController.text.trim();
+    nameController.dispose();
+    try {
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
+      await dbProvider.init();
+      await dbProvider.update(
+        'orders',
+        values: {
+          'customer_name': name.isEmpty ? null : name,
+          'updated_at': DateTime.now().millisecondsSinceEpoch,
+        },
+        where: kIsWeb ? 'documentId = ?' : 'id = ?',
+        whereArgs: [widget.orderId],
+      );
+      await _loadData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                name.isEmpty ? 'Customer cleared' : 'Customer name saved'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
