@@ -345,15 +345,39 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                             CrossAxisAlignment.start,
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Text(
-                                            customer.name,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 16,
-                                              color: Color(0xFF1A1A1A),
-                                            ),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  customer.name,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 16,
+                                                    color: Color(0xFF1A1A1A),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                child: Text(
+                                                  NumberFormat.currency(
+                                                          symbol: 'NPR ',
+                                                          decimalDigits: 0)
+                                                      .format(
+                                                          customer.creditBalance),
+                                                  style: TextStyle(
+                                                    fontSize: 15,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: hasCredit
+                                                        ? Colors.grey[900]
+                                                        : Colors.grey[700],
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                           if (customer.phone != null) ...[
                                             const SizedBox(height: 2),
@@ -367,31 +391,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                               ),
                                             ),
                                           ],
-                                        ],
-                                      ),
-                                    ),
-                                    Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        FittedBox(
-                                          fit: BoxFit.scaleDown,
-                                          child: Text(
-                                            NumberFormat.currency(
-                                                    symbol: 'NPR ',
-                                                    decimalDigits: 0)
-                                                .format(customer.creditBalance),
-                                            style: TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.bold,
-                                              color: hasCredit
-                                                  ? Colors.grey[900]
-                                                  : Colors.grey[700],
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Row(
+                                          const SizedBox(height: 6),
+                                          Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                         if (atLimit)
@@ -470,7 +471,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                         ),
                                           ],
                                         ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ],
                                 ),
