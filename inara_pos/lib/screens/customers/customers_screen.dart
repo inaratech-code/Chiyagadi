@@ -347,7 +347,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                         children: [
                                           Text(
                                             customer.name,
-                                            maxLines: 1,
+                                            maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
                                             style: const TextStyle(
                                               fontWeight: FontWeight.w600,
@@ -374,19 +374,20 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                       mainAxisSize: MainAxisSize.min,
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
-                                        Text(
-                                          customer.creditBalance
-                                                  .truncateToDouble() ==
-                                              customer.creditBalance
-                                              ? '${customer.creditBalance.toInt()}'
-                                              : customer.creditBalance
-                                                  .toStringAsFixed(1),
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.bold,
-                                            color: hasCredit
-                                                ? Colors.grey[900]
-                                                : Colors.grey[700],
+                                        FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text(
+                                            NumberFormat.currency(
+                                                    symbol: 'NPR ',
+                                                    decimalDigits: 0)
+                                                .format(customer.creditBalance),
+                                            style: TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.bold,
+                                              color: hasCredit
+                                                  ? Colors.grey[900]
+                                                  : Colors.grey[700],
+                                            ),
                                           ),
                                         ),
                                         const SizedBox(height: 6),
