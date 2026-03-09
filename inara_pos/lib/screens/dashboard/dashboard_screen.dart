@@ -828,15 +828,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
           SizedBox(height: kIsWeb ? 12 : 16),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: kIsWeb ? 24 : 26,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: kIsWeb ? 24 : 26,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+              maxLines: 1,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.visible,
           ),
         ],
       ),
