@@ -330,6 +330,20 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
+  String _formatOrderTime(dynamic createdAt) {
+    if (createdAt == null) return '';
+    final ms = (createdAt is num) ? createdAt.toInt() : int.tryParse(createdAt.toString());
+    if (ms == null || ms <= 0) return '';
+    final dt = DateTime.fromMillisecondsSinceEpoch(ms);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final orderDate = DateTime(dt.year, dt.month, dt.day);
+    if (orderDate == today) {
+      return 'Today ${DateFormat.jm().format(dt)}';
+    }
+    return DateFormat('d MMM, ').format(dt) + DateFormat.jm().format(dt);
+  }
+
   String _getStatusLabel(String status) {
     switch (status) {
       case 'pending':
@@ -757,8 +771,16 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         Text(
                           order['order_number'] as String? ?? 'N/A',
                           style: const TextStyle(
-                            fontSize: 18,
+                            fontSize: 14,
                             fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _formatOrderTime(order['created_at']),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
                           ),
                         ),
                         const SizedBox(height: 4),
