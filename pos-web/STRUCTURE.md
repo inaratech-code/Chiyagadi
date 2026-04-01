@@ -11,7 +11,7 @@ pos-web/
 │   └── orders/
 │       └── page.tsx        # Example: list orders, create demo order, Sync button, badges
 ├── components/
-│   └── RegisterSW.tsx       # Client: register /sw.js on mount
+│   └── RegisterSW.tsx       # Client: register /service-worker.js on mount
 ├── context/
 │   └── NetworkContext.tsx  # isOnline, isSyncing, pendingOrderCount, lastSyncError, triggerSync; online → sync
 ├── lib/
@@ -25,7 +25,7 @@ pos-web/
 │   └── index.ts            # Order, OrderItem, LocalUser, MetaRow, SyncStatus
 ├── public/
 │   ├── manifest.json       # PWA manifest
-│   ├── sw.js               # Service worker: shell/static cache; navigate → network first, fallback offline
+│   ├── service-worker.js   # Service worker: shell/static cache; navigate → network first, fallback offline
 │   └── offline.html        # Offline fallback page
 ├── package.json
 ├── tsconfig.json

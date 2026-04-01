@@ -199,12 +199,13 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
       debugPrint('FirestoreDatabase: Firestore instance obtained');
 
-      // Web/iOS Safari often fails (or behaves inconsistently) with persistence enabled.
-      // This can surface as opaque "Null check operator used on a null value" errors on new devices.
+      // Offline-first PWA: Firestore local persistence (IndexedDB on web) enables reads/writes
+      // while offline; changes sync when the network returns.
       //
+      // Web/iOS Safari sometimes fails with persistence enabled (opaque null-check errors).
       // Strategy:
       // - On web+iOS: force persistence OFF for reliability.
-      // - Elsewhere: best-effort enable persistence; if it fails, fall back to OFF.
+      // - Elsewhere (incl. web desktop/Android): enable unlimited cache when possible.
       final isWebIOS = kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
       if (isWebIOS) {
         try {

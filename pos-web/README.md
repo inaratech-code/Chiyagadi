@@ -4,7 +4,7 @@
 - **Offline order creation** with UUID; stored in IndexedDB (Dexie); sync when online.
 - **Sync engine**: setDoc(orders, order.id) — no addDoc; last-write-wins by updatedAt.
 - **NetworkContext**: isOnline, isSyncing, pendingOrderCount, triggerSync.
-- **PWA**: `/public/sw.js` (cache shell + static; network-first for API/Firebase), `/public/manifest.json`.
+- **PWA**: `/public/service-worker.js` (cache shell + static; network-first for API/Firebase), `/public/manifest.json`.
 
 ## Setup
 
@@ -19,4 +19,4 @@
 - `services/offlineAuthService.ts` — persistSessionForOffline, offlineLogin.
 - `services/orderService.ts` — createOrder (UUID, IndexedDB, then sync if online).
 - `context/NetworkContext.tsx` — online/offline, sync on "online", pending count.
-- `public/sw.js` — service worker; `public/manifest.json` — PWA manifest.
+- `public/service-worker.js` — service worker; `public/manifest.json` — PWA manifest.

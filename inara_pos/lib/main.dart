@@ -8,6 +8,7 @@ import 'providers/auth_provider.dart' show InaraAuthProvider;
 import 'providers/unified_database_provider.dart';
 import 'providers/sync_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/connectivity_notifier.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'utils/app_messenger.dart';
@@ -16,7 +17,7 @@ import 'utils/add_admin_user.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Lock orientation to portrait mode (disable auto-rotation)
   // Only apply on mobile platforms (not web)
   if (!kIsWeb) {
@@ -56,6 +57,9 @@ class InaraPOSApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => SyncProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => ConnectivityNotifier(),
         ),
       ],
       child: Consumer<ThemeProvider>(
@@ -105,6 +109,12 @@ class _WarmStartState extends State<_WarmStart> {
       try {
         final dbProvider = context.read<UnifiedDatabaseProvider>();
         await dbProvider.init();
+
+        try {
+          await context.read<ConnectivityNotifier>().init();
+        } catch (e) {
+          debugPrint('WarmStart: ConnectivityNotifier init failed: $e');
+        }
 
         // PERF: Defer admin check so app feels instant. Run 1.5s after first paint.
         if (kIsWeb) {
@@ -226,8 +236,8 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
 
         debugPrint(
             'AuthWrapper: Firebase Auth user signed in, restoring session: ${auth.currentUser!.email}');
-        final restored = await authProvider.restoreSessionFromFirebaseUser(
-            auth.currentUser!);
+        final restored = await authProvider
+            .restoreSessionFromFirebaseUser(auth.currentUser!);
         if (restored && mounted) {
           debugPrint('AuthWrapper: Session restored successfully');
         } else if (!restored && mounted) {

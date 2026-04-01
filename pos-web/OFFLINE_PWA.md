@@ -8,7 +8,7 @@
 4. **IndexedDB** — Dexie (`lib/localDB.ts`): `users`, `orders`, `meta`, `menuItems` (v2). Orders queue with `syncStatus: pending`; `lib/syncEngine.ts` pushes to Firestore with `setDoc` (doc id = order id).
 5. **Network** — `context/NetworkContext.tsx`: `online` / `offline`, auto-sync when back online, pending order count.
 6. **UI** — `components/OfflineBanner.tsx`: sticky “Offline Mode Active” / syncing / pending counts.
-7. **Service worker** — `public/sw.js` precaches `/`, `/login`, `/menu`, `/cart`, `/orders`, `/offline.html`; cache-first for static assets; navigations network-first with offline fallback.
+7. **Service worker** — `public/service-worker.js`: install precache for shell routes; **cache-first** for `/_next/static`, images, fonts, CSS/JS, manifest/icons; **network-first** for navigations and `/api/*`; offline fallback to cached shell or `/offline.html`.
 8. **Manifest** — `public/manifest.json` (ChiyaGadi / Chiya); linked from `app/layout.tsx`.
 9. **APK** — HTTPS on Vercel + SW + manifest satisfy PWABuilder prerequisites.
 
@@ -22,12 +22,12 @@ Optional: `NEXT_PUBLIC_MENU_COLLECTION` (default `products`) for menu cache in `
 
 1. Add the same env vars in Project → Settings → Environment Variables.
 2. Build command: `npm run build` (from `pos-web` root if this is the app root, or set Root Directory to `pos-web`).
-3. Ensure `public/sw.js` is served (Next `public/` maps to `/sw.js`).
+3. Ensure `public/service-worker.js` is served (Next `public/` maps to `/service-worker.js`).
 
 ## Test offline
 
 1. Login once online (tokens + Dexie + `localStorage` updated).
-2. Open DevTools → Application → Service Workers → verify `sw.js` active.
+2. Open DevTools → Application → Service Workers → verify `service-worker.js` active.
 3. DevTools → Network → Offline; reload — shell and cached routes should load.
 4. Create orders; go online — pending orders sync via `NetworkContext` / `syncPendingOrders`.
 

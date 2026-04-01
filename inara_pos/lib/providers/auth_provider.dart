@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'unified_database_provider.dart';
+import '../services/offline_session_service.dart';
 
 class InaraAuthProvider with ChangeNotifier {
   bool _isAuthenticated = false;
@@ -521,6 +522,7 @@ class InaraAuthProvider with ChangeNotifier {
           _inactivityTimer = null;
         }
         notifyListeners();
+        await OfflineSessionService.persistCurrentUser();
         debugPrint(
             'restoreSessionFromFirebaseUser: Restored session for $trimmedEmail (${_currentUserRole})');
         return true;
@@ -1113,6 +1115,7 @@ class InaraAuthProvider with ChangeNotifier {
         debugPrint('AuthProvider: Error clearing session info: $e');
       }
     }
+    await OfflineSessionService.clear();
     try {
       await FirebaseAuth.instance.signOut();
     } catch (e) {

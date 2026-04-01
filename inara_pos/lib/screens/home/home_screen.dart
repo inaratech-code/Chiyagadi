@@ -14,6 +14,8 @@ import '../purchases/purchases_screen.dart';
 import '../expenses/expenses_screen.dart';
 import '../settings/settings_screen.dart';
 import '../../widgets/responsive_wrapper.dart';
+import '../../widgets/offline_mode_banner.dart';
+import '../../services/offline_session_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/performance.dart';
 
@@ -76,6 +78,9 @@ class _HomeScreenState extends State<HomeScreen> {
       auth.getRolePermissions(auth.currentUserRole ?? 'cashier').then((p) {
         if (mounted) setState(() => _cachedPermissions = p);
       });
+      if (kIsWeb) {
+        OfflineSessionService.persistCurrentUser();
+      }
     });
   }
 
@@ -114,7 +119,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _checkAndSelectIndex(int index) async {
     final auth = context.read<InaraAuthProvider>();
-    _cachedPermissions ??= await auth.getRolePermissions(auth.currentUserRole ?? 'cashier');
+    _cachedPermissions ??=
+        await auth.getRolePermissions(auth.currentUserRole ?? 'cashier');
     if (!mounted) return;
     if (!_cachedPermissions!.contains(index) && !auth.isAdmin) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -233,63 +239,72 @@ class _HomeScreenState extends State<HomeScreen> {
           setState(() => _selectedIndex = 0);
         }
       },
-      child: Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        appBar: _selectedIndex == 0 || _selectedIndex == 1
-            ? null
-            : AppBar(
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => setState(() => _selectedIndex = 0),
-                  tooltip: 'Back to Dashboard',
-                ),
-                title: Row(
-                  children: [
-                    Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(15),
-                        border: Border.all(
-                            color: Colors.white.withOpacity(0.7), width: 1),
+      child: Column(
+        children: [
+          const OfflineModeBanner(),
+          Expanded(
+            child: Scaffold(
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              appBar: _selectedIndex == 0 || _selectedIndex == 1
+                  ? null
+                  : AppBar(
+                      leading: IconButton(
+                        icon: const Icon(Icons.arrow_back),
+                        onPressed: () => setState(() => _selectedIndex = 0),
+                        tooltip: 'Back to Dashboard',
                       ),
-                      child: ClipOval(
-                        child: Image.asset(
-                          'assets/images/logo.jpeg',
-                          fit: BoxFit.cover,
-                          cacheWidth: 60,
-                          cacheHeight: 60,
-                          errorBuilder: (_, __, ___) =>
-                              const Icon(Icons.local_cafe, size: 18),
+                      title: Row(
+                        children: [
+                          Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(15),
+                              border: Border.all(
+                                  color: Colors.white.withOpacity(0.7),
+                                  width: 1),
+                            ),
+                            child: ClipOval(
+                              child: Image.asset(
+                                'assets/images/logo.jpeg',
+                                fit: BoxFit.cover,
+                                cacheWidth: 60,
+                                cacheHeight: 60,
+                                errorBuilder: (_, __, ___) =>
+                                    const Icon(Icons.local_cafe, size: 18),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            _screenTitles[_selectedIndex],
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      actions: [
+                        IconButton(
+                          icon: const Icon(Icons.refresh),
+                          onPressed: _refreshCurrentScreen,
+                          tooltip: 'Refresh',
                         ),
-                      ),
+                      ],
                     ),
-                    const SizedBox(width: 10),
-                    Text(
-                      _screenTitles[_selectedIndex],
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: _refreshCurrentScreen,
-                    tooltip: 'Refresh',
-                  ),
-                ],
-              ),
-        drawer: isCompact ? _buildDrawer(context, authProvider) : null,
-        body: kIsWeb
-            ? ResponsiveWrapper(
-                child: _buildOffstageStack(),
-                padding: EdgeInsets.zero, // Screens handle their own padding
-              )
-            : _buildOffstageStack(),
-        bottomNavigationBar: isCompact
-            ? _buildMobileBottomNav(authProvider)
-            : _buildWebBottomNav(authProvider),
+              drawer: isCompact ? _buildDrawer(context, authProvider) : null,
+              body: kIsWeb
+                  ? ResponsiveWrapper(
+                      child: _buildOffstageStack(),
+                      padding:
+                          EdgeInsets.zero, // Screens handle their own padding
+                    )
+                  : _buildOffstageStack(),
+              bottomNavigationBar: isCompact
+                  ? _buildMobileBottomNav(authProvider)
+                  : _buildWebBottomNav(authProvider),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -556,59 +571,59 @@ class _HomeScreenState extends State<HomeScreen> {
             child: SafeArea(
               child: SingleChildScrollView(
                 child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 12, bottom: 8),
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 8),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
-                  ),
-                  if (permissions.contains(2))
+                    if (permissions.contains(2))
+                      _buildMoreOptionTile(
+                          context, Icons.table_restaurant, 'Tables', 2),
+                    if (permissions.contains(4))
+                      _buildMoreOptionTile(
+                          context, Icons.shopping_cart, 'Sales', 4),
+                    if (permissions.contains(5))
+                      _buildMoreOptionTile(
+                          context, Icons.analytics, 'Reports', 5),
+                    if (permissions.contains(6))
+                      _buildMoreOptionTile(
+                          context, Icons.inventory_2, 'Inventory', 6),
+                    if (permissions.contains(7))
+                      _buildMoreOptionTile(
+                          context, Icons.people, 'Customers', 7),
+                    if (permissions.contains(8))
+                      _buildMoreOptionTile(
+                          context, Icons.shopping_bag, 'Purchases', 8),
+                    if (permissions.contains(9))
+                      _buildMoreOptionTile(
+                          context, Icons.payments, 'Expenses', 9),
                     _buildMoreOptionTile(
-                        context, Icons.table_restaurant, 'Tables', 2),
-                  if (permissions.contains(4))
-                    _buildMoreOptionTile(
-                        context, Icons.shopping_cart, 'Sales', 4),
-                  if (permissions.contains(5))
-                    _buildMoreOptionTile(
-                        context, Icons.analytics, 'Reports', 5),
-                  if (permissions.contains(6))
-                    _buildMoreOptionTile(
-                        context, Icons.inventory_2, 'Inventory', 6),
-                  if (permissions.contains(7))
-                    _buildMoreOptionTile(
-                        context, Icons.people, 'Customers', 7),
-                  if (permissions.contains(8))
-                    _buildMoreOptionTile(
-                        context, Icons.shopping_bag, 'Purchases', 8),
-                  if (permissions.contains(9))
-                    _buildMoreOptionTile(
-                        context, Icons.payments, 'Expenses', 9),
-                  _buildMoreOptionTile(
-                      context, Icons.settings, 'Settings', -1,
-                      isSettings: true),
-                  const Divider(height: 24),
-                  ListTile(
-                    leading: const Icon(Icons.logout, color: Colors.red),
-                    title: const Text(
-                      'Logout',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600, color: Colors.red),
+                        context, Icons.settings, 'Settings', -1,
+                        isSettings: true),
+                    const Divider(height: 24),
+                    ListTile(
+                      leading: const Icon(Icons.logout, color: Colors.red),
+                      title: const Text(
+                        'Logout',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600, color: Colors.red),
+                      ),
+                      onTap: () {
+                        Navigator.pop(context);
+                        authProvider.logout();
+                      },
                     ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      authProvider.logout();
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                ],
+                    const SizedBox(height: 24),
+                  ],
+                ),
               ),
             ),
-          ),
           );
         },
       ),
