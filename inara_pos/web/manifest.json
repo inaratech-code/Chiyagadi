@@ -1,19 +1,51 @@
 {
+    "id": "https://yagadi.vercel.app/",
     "name": "ChiyaGadi — चिया गढी",
     "short_name": "ChiyaGadi",
+    "lang": "en",
+    "dir": "ltr",
     "start_url": "/",
     "scope": "/",
     "display": "standalone",
+    "display_override": [
+        "standalone",
+        "minimal-ui",
+        "browser"
+    ],
     "background_color": "#FFFFFF",
     "theme_color": "#000000",
     "description": "ChiyaGadi — POS for cafés in Nepal. Offline-capable PWA. Powered by Inara Tech.",
     "orientation": "portrait",
     "prefer_related_applications": false,
+    "related_applications": [
+        {
+            "platform": "play",
+            "url": "https://play.google.com/store/apps/details?id=com.inaratech.chiyagadi",
+            "id": "com.inaratech.chiyagadi"
+        }
+    ],
     "categories": [
         "business",
         "productivity"
     ],
-    "screenshots": [],
+    "screenshots": [
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "ChiyaGadi app"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "form_factor": "wide",
+            "label": "ChiyaGadi app"
+        }
+    ],
+    "iarc_rating_id": "ESRB_EVERYONE",
+    "scope_extensions": [],
     "shortcuts": [
         {
             "name": "New Order",

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -47,21 +47,20 @@
     // The value below is injected by flutter build, do not touch.
     var serviceWorkerVersion = null;
   </script>
-  <!-- PWA: custom service worker (cache-first static assets). Flutter’s generated SW is disabled when serviceWorkerVersion is null. -->
+  <!-- PWA: register SW as early as possible so audits (e.g. PWABuilder) detect it. -->
   <script>
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", function () {
-        var base = document.querySelector("base");
-        var href = base && base.getAttribute("href") ? base.getAttribute("href") : "/";
-        if (href.slice(-1) !== "/") href = href + "/";
-        navigator.serviceWorker
-          .register(href + "service-worker.js", { scope: href })
-          .then(function (reg) {
-            reg.update();
-          })
-          .catch(function () {});
-      });
-    }
+    (function () {
+      if (!("serviceWorker" in navigator)) return;
+      var base = document.querySelector("base");
+      var href = base && base.getAttribute("href") ? base.getAttribute("href") : "/";
+      if (href.slice(-1) !== "/") href = href + "/";
+      navigator.serviceWorker
+        .register(href + "service-worker.js", { scope: href, updateViaCache: "none" })
+        .then(function (reg) {
+          reg.update();
+        })
+        .catch(function () {});
+    })();
   </script>
   <!-- This script adds the flutter initialization JS code -->
   <script src="flutter.js" defer></script>
