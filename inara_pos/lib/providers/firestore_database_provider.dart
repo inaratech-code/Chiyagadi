@@ -267,7 +267,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
       if (kIsWeb) {
         try {
-          await WebOfflineFirstStore.syncPendingToFirestore(_firestore!);
+          await WebOfflineFirstStore.syncOrdersOnWebOnline(_firestore!);
         } catch (e) {
           debugPrint('FirestoreDatabase: initial offline sync skipped: $e');
         }
