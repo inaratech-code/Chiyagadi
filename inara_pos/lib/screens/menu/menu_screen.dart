@@ -624,6 +624,10 @@ class _MenuScreenState extends State<MenuScreen> {
         if (!initSuccess) {
           debugPrint(
               'MenuScreen: Database still not available after all retry attempts');
+          if (kIsWeb && await WebOfflineFirstStore.hasMenuCache()) {
+            final ok = await _hydrateMenuFromWebCache();
+            if (ok) return;
+          }
           if (mounted) {
             setState(() => _isLoading = false);
             ScaffoldMessenger.of(context).showSnackBar(
@@ -730,6 +734,13 @@ class _MenuScreenState extends State<MenuScreen> {
       debugPrint(
           'MenuScreen: Parsed ${_categories.length} categories and ${_products.length} products');
 
+      // Online path can return empty while SharedPreferences still has a prior menu snapshot
+      // (e.g. navigator.onLine false-positive). Hydrate from cache when possible.
+      if (kIsWeb && _products.isEmpty && await WebOfflineFirstStore.hasMenuCache()) {
+        final ok = await _hydrateMenuFromWebCache();
+        if (ok) return;
+      }
+
       // UPDATED: Update state safely
       if (mounted) {
         setState(() {
@@ -750,6 +761,10 @@ class _MenuScreenState extends State<MenuScreen> {
     } catch (e, stackTrace) {
       debugPrint('MenuScreen: Error loading menu data: $e');
       debugPrint('MenuScreen: Stack trace: $stackTrace');
+      if (kIsWeb && await WebOfflineFirstStore.hasMenuCache()) {
+        final ok = await _hydrateMenuFromWebCache();
+        if (ok) return;
+      }
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(

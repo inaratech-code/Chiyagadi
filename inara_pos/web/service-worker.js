@@ -8,7 +8,7 @@
  * 5) Cross-origin Firebase/Google: pass-through fetch (no cache).
  */
 
-var VERSION = "v6";
+var VERSION = "v7";
 var CACHE_SHELL = "inara-shell-" + VERSION;
 var CACHE_STATIC = "inara-static-" + VERSION;
 var CACHE_RUNTIME = "inara-runtime-" + VERSION;
@@ -52,6 +52,42 @@ self.addEventListener("activate", function (e) {
       })
   );
 });
+
+/**
+ * Flutter bootstrap + engine files must be network-first when online.
+ * Cache-first .js was serving stale main.dart.js after deploy → blank white screen (Windows Chrome).
+ */
+function isFlutterBootstrapOrEngine(url) {
+  var p = url.pathname;
+  if (p === "/flutter.js" || p === "/flutter_bootstrap.js") return true;
+  if (p === "/main.dart.js" || p === "/main.dart.wasm") return true;
+  if (p.indexOf("/_flutter/") === 0) return true;
+  if (p.indexOf("/canvaskit/") === 0) return true;
+  if (p.indexOf("/flutter_service_worker.js") === 0) return true;
+  return false;
+}
+
+function networkFirstBootstrap(req) {
+  return fetch(req)
+    .then(function (res) {
+      if (res && res.status === 200) {
+        var clone = res.clone();
+        caches.open(CACHE_STATIC).then(function (c) {
+          putIfOk(c, req, clone);
+        });
+      }
+      return res;
+    })
+    .catch(function () {
+      return caches.match(req).then(function (cached) {
+        if (cached) return cached;
+        return new Response("Offline", {
+          status: 503,
+          statusText: "Service Unavailable",
+        });
+      });
+    });
+}
 
 /** Flutter web + shared static: cache-first for repeat visits and offline replay. */
 function isCacheFirstStaticAsset(url) {
@@ -198,6 +234,11 @@ self.addEventListener("fetch", function (e) {
 
   if (isNetworkFirstApi(url)) {
     e.respondWith(networkFirstRuntime(req));
+    return;
+  }
+
+  if (isFlutterBootstrapOrEngine(url)) {
+    e.respondWith(networkFirstBootstrap(req));
     return;
   }
 

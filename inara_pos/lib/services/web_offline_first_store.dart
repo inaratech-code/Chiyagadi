@@ -406,7 +406,8 @@ class WebOfflineFirstStore {
       } else if (c.contains(' = ?')) {
         final field = c.split(' = ?')[0].trim();
         final v = whereArgs[argIndex];
-        if (_fieldValue(row, field)?.toString() != v?.toString()) {
+        final fv = _fieldValue(row, field);
+        if (!_sqlFieldEquals(field, fv, v)) {
           return false;
         }
         argIndex++;
@@ -415,6 +416,33 @@ class WebOfflineFirstStore {
       }
     }
     return true;
+  }
+
+  /// Firestore/cache rows use `true`/`false`; queries use `1`/`0` (SQLite style).
+  static bool _sqlFieldEquals(String field, dynamic fv, dynamic v) {
+    if (field == 'is_sellable' && (v == 1 || v == '1')) {
+      if (fv == null) return true;
+    }
+    return _sqlValueEquals(fv, v);
+  }
+
+  static bool _sqlValueEquals(dynamic fv, dynamic v) {
+    if (fv == v) return true;
+    if (fv == null && v == null) return true;
+    bool? asBool(dynamic x) {
+      if (x == null) return null;
+      if (x is bool) return x;
+      if (x is num) return x != 0;
+      final s = x.toString().toLowerCase();
+      if (s == 'true' || s == '1') return true;
+      if (s == 'false' || s == '0') return false;
+      return null;
+    }
+
+    final fb = asBool(fv);
+    final ab = asBool(v);
+    if (fb != null && ab != null) return fb == ab;
+    return fv?.toString() == v?.toString();
   }
 
   static bool _compareNum(
@@ -588,7 +616,7 @@ class WebOfflineFirstStore {
     for (final row in rows) {
       var ok = true;
       for (final e in other) {
-        if (_fieldValue(row, e.key)?.toString() != e.value?.toString()) {
+        if (!_sqlFieldEquals(e.key, _fieldValue(row, e.key), e.value)) {
           ok = false;
           break;
         }
@@ -596,8 +624,7 @@ class WebOfflineFirstStore {
       if (!ok) continue;
       if (inField != null && inValues.isNotEmpty) {
         final fv = _fieldValue(row, inField);
-        final fvStr = fv?.toString();
-        if (!inValues.any((v) => v?.toString() == fvStr)) {
+        if (!inValues.any((v) => _sqlFieldEquals(inField, fv, v))) {
           continue;
         }
       }
