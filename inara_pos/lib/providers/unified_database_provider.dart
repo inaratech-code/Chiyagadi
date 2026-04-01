@@ -10,6 +10,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'database_provider.dart';
 import 'firestore_database_provider.dart';
 import '../firebase_options.dart';
+import '../services/web_offline_first_store.dart';
+import '../utils/web_online.dart';
 
 /// Unified database provider that uses SQLite on mobile and Firestore on web
 class UnifiedDatabaseProvider with ChangeNotifier {
@@ -512,6 +514,26 @@ class UnifiedDatabaseProvider with ChangeNotifier {
       await init();
     }
 
+    // Web offline: [isAvailable] can be false after a failed init, but orders must still
+    // persist via [WebOfflineFirstStore] (same path as FirestoreDatabaseProvider offline).
+    if (kIsWeb &&
+        !isNavigatorOnline &&
+        !isAvailable &&
+        (table == 'orders' || table == 'order_items')) {
+      debugPrint(
+          'DB: Web offline insert — DB not available, using WebOfflineFirstStore for $table');
+      try {
+        return await WebOfflineFirstStore.insertDocument(
+          table,
+          values,
+          documentId: documentId,
+        );
+      } catch (e) {
+        debugPrint('DB: WebOfflineFirstStore insert failed: $e');
+        return null;
+      }
+    }
+
     // If init failed, return null instead of throwing
     if (!isAvailable) {
       debugPrint('DB: Insert skipped - database not available');
@@ -528,6 +550,19 @@ class UnifiedDatabaseProvider with ChangeNotifier {
       }
     } catch (e) {
       debugPrint('DB: Insert error: $e');
+      if (kIsWeb &&
+          !isNavigatorOnline &&
+          (table == 'orders' || table == 'order_items')) {
+        try {
+          return await WebOfflineFirstStore.insertDocument(
+            table,
+            values,
+            documentId: documentId,
+          );
+        } catch (e2) {
+          debugPrint('DB: WebOfflineFirstStore fallback failed: $e2');
+        }
+      }
       return null; // Return null on error
     }
   }

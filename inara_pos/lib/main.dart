@@ -230,9 +230,22 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
 
       if (kIsWeb && !isNavigatorOnline) {
         authProvider.setContext(context);
-        final restored = await authProvider.restoreOfflineWebSession();
-        if (restored && mounted) {
-          debugPrint('AuthWrapper: Restored session from local storage (offline)');
+        var restored = await authProvider.restoreOfflineWebSession();
+        if (!restored && mounted) {
+          // Firebase Auth often still has currentUser in IndexedDB while offline; Firestore
+          // may serve cached users for restoreSessionFromFirebaseUser.
+          final auth = FirebaseAuth.instance;
+          if (auth.currentUser != null) {
+            restored = await authProvider
+                .restoreSessionFromFirebaseUser(auth.currentUser!);
+            if (restored && mounted) {
+              debugPrint(
+                  'AuthWrapper: Restored session from Firebase Auth + cache (offline)');
+            }
+          }
+        } else if (restored && mounted) {
+          debugPrint(
+              'AuthWrapper: Restored session from local storage (offline)');
         }
         return;
       }

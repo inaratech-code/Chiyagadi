@@ -467,9 +467,9 @@ class InaraAuthProvider with ChangeNotifier {
       final json = await OfflineSessionService.loadSessionJson();
       if (json == null) return false;
       final userDocId = json['userDocId'] as String?;
-      final role = json['role'] as String?;
+      final role = json['role'] as String? ?? 'cashier';
       final username = json['username'] as String?;
-      if (userDocId == null || role == null) return false;
+      if (userDocId == null) return false;
       final loginTime = json['loginTime'];
       if (loginTime is int) {
         const maxAgeMs = 90 * 24 * 60 * 60 * 1000;

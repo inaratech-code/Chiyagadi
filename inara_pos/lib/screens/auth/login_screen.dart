@@ -161,13 +161,13 @@ class _LoginScreenState extends State<LoginScreen>
             await OfflineSessionService.persistFullWebSession(
               user: u,
               userDocId: authProvider.currentUserId!,
-              role: authProvider.currentUserRole,
+              role: authProvider.currentUserRole ?? 'cashier',
               username: authProvider.currentUsername,
             );
           } else {
             await OfflineSessionService.persistFallbackWebProfile(
               userDocId: authProvider.currentUserId!,
-              role: authProvider.currentUserRole,
+              role: authProvider.currentUserRole ?? 'cashier',
               username: authProvider.currentUsername,
               email: email,
             );

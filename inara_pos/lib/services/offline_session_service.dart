@@ -15,7 +15,10 @@ class OfflineSessionService {
   /// Persists uid, email, token, loginTime (matches typical PWA session JSON).
   static Future<void> persistFromUser(User user) async {
     try {
-      final token = await user.getIdToken();
+      String token = '';
+      try {
+        token = await user.getIdToken() ?? '';
+      } catch (_) {}
       final prefs = await SharedPreferences.getInstance();
       final payload = <String, dynamic>{
         'uid': user.uid,
@@ -39,7 +42,11 @@ class OfflineSessionService {
   }) async {
     if (!kIsWeb) return;
     try {
-      final token = await user.getIdToken();
+      // Must not fail offline restore: getIdToken() hits the network and often throws offline.
+      String token = '';
+      try {
+        token = await user.getIdToken() ?? '';
+      } catch (_) {}
       final prefs = await SharedPreferences.getInstance();
       final payload = <String, dynamic>{
         'uid': user.uid,
@@ -47,7 +54,7 @@ class OfflineSessionService {
         'token': token,
         'loginTime': DateTime.now().millisecondsSinceEpoch,
         'userDocId': userDocId,
-        'role': role,
+        'role': role ?? 'cashier',
         'username': username,
       };
       await prefs.setString(sessionKey, jsonEncode(payload));
@@ -73,7 +80,7 @@ class OfflineSessionService {
         'token': '',
         'loginTime': DateTime.now().millisecondsSinceEpoch,
         'userDocId': userDocId,
-        'role': role,
+        'role': role ?? 'cashier',
         'username': username,
       };
       await prefs.setString(sessionKey, jsonEncode(payload));
