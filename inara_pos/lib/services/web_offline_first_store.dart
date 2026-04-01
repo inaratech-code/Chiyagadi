@@ -419,7 +419,7 @@ class WebOfflineFirstStore {
   }
 
   /// Firestore/cache rows use `true`/`false`; queries use `1`/`0` (SQLite style).
-  static bool _sqlFieldEquals(String field, dynamic fv, dynamic v) {
+  static bool _sqlFieldEquals(String? field, dynamic fv, dynamic v) {
     if (field == 'is_sellable' && (v == 1 || v == '1')) {
       if (fv == null) return true;
     }
