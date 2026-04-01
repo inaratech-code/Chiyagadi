@@ -4,7 +4,8 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  # google_fonts ^6.3.x needs Dart >=3.7; 6.2.x breaks dart2js on Dart 3.11+ (Vercel / Flutter stable).
+  sdk: '>=3.7.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -13,8 +14,7 @@ dependencies:
   # UI
   cupertino_icons: ^1.0.6
   flutter_svg: ^1.1.6
-  # Cap below 6.3.x: google_fonts 6.3.1+ requires Dart SDK >=3.7 (breaks older Flutter installs).
-  google_fonts: ">=6.2.1 <6.3.0"
+  google_fonts: ^6.3.1
   intl: ^0.19.0
   flutter_launcher_icons: ^0.13.1
 
