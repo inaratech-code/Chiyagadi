@@ -21,8 +21,9 @@ class WebOfflineFirstStore {
   /// `flutter.menu` from SharedPreferences).
   static const menuLocalStorageKey = 'menu';
 
-  /// React / Next.js only: `localStorage.setItem("pendingOrders", JSON.stringify(pending))`.
-  /// Flutter offline orders live in [_offlineDocsKey] + [_pendingSyncKey], not here.
+  /// Same key as Next.js / React:
+  /// `localStorage.setItem("pendingOrders", …)` and `localStorage.getItem("pendingOrders")`
+  /// ([loadPendingOrdersCompat] reads unprefixed storage first, then prefs).
   static const pendingOrdersLocalStorageKey = 'pendingOrders';
   static const _offlineDocsKey = 'chiyagadi_web_offline_docs_v1';
   static const _pendingSyncKey = 'chiyagadi_web_pending_sync_v1';
@@ -208,10 +209,13 @@ class WebOfflineFirstStore {
     return out;
   }
 
+  /// [reactPendingDueToErrorFallback] matches JS `catch`: push plain `order` to `pendingOrders`.
+  /// Default `false` matches offline branch: `{ ...order, offline: true, createdAt }`.
   static Future<String> insertDocument(
     String collection,
     Map<String, dynamic> data, {
     String? documentId,
+    bool reactPendingDueToErrorFallback = false,
   }) async {
     final id = documentId ?? const Uuid().v4();
     final copy = Map<String, dynamic>.from(data);
@@ -224,7 +228,73 @@ class WebOfflineFirstStore {
     await _persistCollectionMap(collection, coll);
     await _addPending(collection, id);
     debugPrint('WebOfflineFirstStore: offline insert $collection/$id');
+
+    if (kIsWeb && collection == 'orders') {
+      await _appendPendingOrderReactCompat(
+        Map<String, dynamic>.from(copy),
+        dueToErrorFallback: reactPendingDueToErrorFallback,
+      );
+    }
+
     return id;
+  }
+
+  static Future<List<Map<String, dynamic>>> _loadPendingOrdersRawList() async {
+    try {
+      var raw = ls.webLocalStorageGet(pendingOrdersLocalStorageKey);
+      if (raw == null || raw.isEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        raw = prefs.getString(pendingOrdersLocalStorageKey);
+      }
+      if (raw == null || raw.isEmpty) return [];
+      final list = jsonDecode(raw) as List<dynamic>;
+      return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (e) {
+      debugPrint('WebOfflineFirstStore: _loadPendingOrdersRawList: $e');
+      return [];
+    }
+  }
+
+  static Future<void> _savePendingOrdersRawList(
+      List<Map<String, dynamic>> list) async {
+    final encoded = jsonEncode(list);
+    ls.webLocalStorageSet(pendingOrdersLocalStorageKey, encoded);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(pendingOrdersLocalStorageKey, encoded);
+  }
+
+  /// Mirrors JS `createOrder` offline / catch `pendingOrders` queue (unprefixed localStorage).
+  static Future<void> _appendPendingOrderReactCompat(
+    Map<String, dynamic> orderDoc, {
+    required bool dueToErrorFallback,
+  }) async {
+    try {
+      final list = await _loadPendingOrdersRawList();
+      final entry = Map<String, dynamic>.from(orderDoc);
+      if (!dueToErrorFallback) {
+        entry['offline'] = true;
+        entry['createdAt'] = DateTime.now().millisecondsSinceEpoch;
+      }
+      list.add(entry);
+      await _savePendingOrdersRawList(list);
+    } catch (e) {
+      debugPrint('WebOfflineFirstStore: _appendPendingOrderReactCompat: $e');
+    }
+  }
+
+  static Future<void> _removePendingOrdersWithDocumentId(String documentId) async {
+    try {
+      final list = await _loadPendingOrdersRawList();
+      final filtered = list.where((m) {
+        final mid =
+            m['documentId']?.toString() ?? m['id']?.toString();
+        return mid != documentId;
+      }).toList();
+      if (filtered.length == list.length) return;
+      await _savePendingOrdersRawList(filtered);
+    } catch (e) {
+      debugPrint('WebOfflineFirstStore: _removePendingOrdersWithDocumentId: $e');
+    }
   }
 
   static Future<int> updateDocument(
@@ -293,15 +363,11 @@ class WebOfflineFirstStore {
     await _setPendingList(list);
   }
 
-  /// React/Next interop: read `pendingOrders` as list of maps (may be empty).
+  /// React/Next interop: read `pendingOrders` (raw localStorage first, then prefs).
   static Future<List<Map<String, dynamic>>> loadPendingOrdersCompat() async {
     if (!kIsWeb) return [];
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(pendingOrdersLocalStorageKey);
-      if (raw == null || raw.isEmpty) return [];
-      final list = jsonDecode(raw) as List<dynamic>;
-      return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      return await _loadPendingOrdersRawList();
     } catch (e) {
       debugPrint('WebOfflineFirstStore: loadPendingOrdersCompat: $e');
       return [];
@@ -597,12 +663,15 @@ class WebOfflineFirstStore {
         final copy = Map<String, dynamic>.from(order);
         copy.remove('id');
         copy.remove('documentId');
+        copy.remove('offline');
+        copy.remove('createdAt');
         await fs.collection('orders').add(copy);
       } catch (e) {
         debugPrint('WebOfflineFirstStore: add() pending order (react-style): $e');
       }
     }
     try {
+      ls.webLocalStorageRemove(pendingOrdersLocalStorageKey);
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(pendingOrdersLocalStorageKey);
     } catch (e) {

@@ -1081,6 +1081,15 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       return docRef.id;
     } catch (e) {
       debugPrint('FirestoreDatabase: Insert error: $e');
+      // JS createOrder catch: pendingOrders.push(order); localStorage.setItem(...)
+      if (kIsWeb && collection == 'orders') {
+        return WebOfflineFirstStore.insertDocument(
+          collection,
+          data,
+          documentId: documentId,
+          reactPendingDueToErrorFallback: true,
+        );
+      }
       rethrow;
     }
   }
