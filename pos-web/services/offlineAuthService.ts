@@ -1,9 +1,10 @@
-import { auth } from "../lib/firebase";
 import {
   signInWithEmailAndPassword,
   type User as FirebaseUser,
 } from "firebase/auth";
+import { getFirebaseAuth } from "../lib/firebase";
 import { db } from "../lib/localDB";
+import { saveSession, clearSession } from "../lib/session";
 import type { LocalUser } from "../types";
 
 const REAUTH_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -32,6 +33,13 @@ export async function persistSessionForOffline(
     lastLoginAt: now,
   };
   await db.users.put(local);
+  // Mirror for offline-first UX + audits (see lib/session.ts).
+  saveSession({
+    uid: firebaseUser.uid,
+    email: firebaseUser.email,
+    token,
+    loginTime: now,
+  });
 }
 
 export async function offlineLogin(
@@ -48,7 +56,8 @@ export async function offlineLogin(
 export async function getStoredUserByEmail(
   email: string
 ): Promise<LocalUser | null> {
-  return db.users.where("email").equals(email).first();
+  const u = await db.users.where("email").equals(email).first();
+  return u ?? null;
 }
 
 export async function getStoredEmails(): Promise<string[]> {
@@ -58,4 +67,5 @@ export async function getStoredEmails(): Promise<string[]> {
 
 export async function clearStoredUser(userId: string): Promise<void> {
   await db.users.delete(userId);
+  clearSession();
 }

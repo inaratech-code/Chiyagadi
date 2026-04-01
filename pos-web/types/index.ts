@@ -45,3 +45,10 @@ export interface MetaRow {
   key: string;
   value: string | number | boolean;
 }
+
+/** Cached Firestore menu/product document (IndexedDB). */
+export interface MenuRow {
+  id: string;
+  data: Record<string, unknown>;
+  updatedAt: number;
+}

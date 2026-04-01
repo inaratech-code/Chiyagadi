@@ -1,5 +1,5 @@
 import { doc, setDoc } from "firebase/firestore";
-import { firestore } from "../lib/firebase";
+import { getFirebaseFirestore } from "../lib/firebase";
 import { db, getOrCreateDeviceId } from "../lib/localDB";
 import type { Order, OrderItem } from "../types";
 import { syncPendingOrders } from "@/lib/syncEngine";
@@ -72,7 +72,7 @@ export async function listOrders(): Promise<Order[]> {
 
 /** Firestore: setDoc with order.id as doc id. Never use addDoc for orders. */
 export async function pushOrderToFirestore(order: Order): Promise<void> {
-  const ref = doc(firestore, "orders", order.id);
+  const ref = doc(getFirebaseFirestore(), "orders", order.id);
   await setDoc(ref, {
     id: order.id,
     items: order.items,

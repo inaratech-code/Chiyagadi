@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../../lib/firebase";
+import { getFirebaseAuth } from "../../lib/firebase";
 import { persistSessionForOffline, offlineLogin, getStoredEmails } from "../../services/offlineAuthService";
+import { loadSession } from "../../lib/session";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -12,6 +13,8 @@ export default function LoginPage() {
   const [storedEmails, setStoredEmails] = useState<string[]>([]);
 
   useEffect(() => {
+    const s = loadSession();
+    if (s?.email) setEmail(s.email);
     getStoredEmails().then(setStoredEmails);
   }, []);
 
@@ -19,7 +22,11 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     try {
-      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const cred = await signInWithEmailAndPassword(
+        getFirebaseAuth(),
+        email,
+        password
+      );
       await persistSessionForOffline(cred.user);
       window.location.href = "/";
     } catch (e) {

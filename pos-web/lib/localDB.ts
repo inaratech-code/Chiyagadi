@@ -1,20 +1,28 @@
 import Dexie, { type Table } from "dexie";
-import type { LocalUser, Order, MetaRow } from "../types";
+import type { LocalUser, Order, MetaRow, MenuRow } from "../types";
 
 const DB_NAME = "pos-offline-db";
-const VERSION = 1;
+const VERSION = 2;
 
 export class LocalDB extends Dexie {
   users!: Table<LocalUser, string>;
   orders!: Table<Order, string>;
   meta!: Table<MetaRow, string>;
+  /** Cached menu/products from Firestore for offline reads */
+  menuItems!: Table<MenuRow, string>;
 
   constructor() {
     super(DB_NAME);
-    this.version(VERSION).stores({
+    this.version(1).stores({
       users: "id, email, tokenExpiry",
       orders: "id, syncStatus, createdAt, updatedAt, deviceId",
       meta: "key",
+    });
+    this.version(2).stores({
+      users: "id, email, tokenExpiry",
+      orders: "id, syncStatus, createdAt, updatedAt, deviceId",
+      meta: "key",
+      menuItems: "id, updatedAt",
     });
   }
 }

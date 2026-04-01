@@ -1,9 +1,14 @@
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { firestore } from "./firebase";
+import { getFirebaseFirestore } from "./firebase";
 import { db } from "./localDB";
 import type { Order } from "../types";
 
-/** Sync pending orders to Firestore. Firestore doc id MUST equal order.id (setDoc, never addDoc). */
+/**
+ * Sync pending orders to Firestore. Firestore doc id MUST equal order.id (setDoc, never addDoc).
+ *
+ * Orders are queued in IndexedDB (Dexie) with syncStatus "pending" — the canonical offline queue.
+ * If you previously used localStorage "pendingOrders", migrate those rows into Dexie before sync.
+ */
 export async function syncPendingOrders(): Promise<{
   synced: number;
   failed: number;
@@ -14,6 +19,7 @@ export async function syncPendingOrders(): Promise<{
   let synced = 0;
   let failed = 0;
 
+  const firestore = getFirebaseFirestore();
   for (const order of pending) {
     try {
       const ref = doc(firestore, "orders", order.id);

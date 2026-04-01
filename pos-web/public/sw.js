@@ -1,8 +1,16 @@
-var CACHE_SHELL = "pos-shell-v3";
-var CACHE_STATIC = "pos-static-v3";
-var CACHE_RUNTIME = "pos-runtime-v3";
+var CACHE_SHELL = "pos-shell-v4";
+var CACHE_STATIC = "pos-static-v4";
+var CACHE_RUNTIME = "pos-runtime-v4";
 
-var PRECACHE_URLS = ["/", "/login", "/menu", "/orders", "/offline.html"];
+/** App shell + routes for offline navigation (Cache-first / network fallback). */
+var PRECACHE_URLS = [
+  "/",
+  "/login",
+  "/menu",
+  "/cart",
+  "/orders",
+  "/offline.html",
+];
 
 self.addEventListener("install", function (e) {
   e.waitUntil(
