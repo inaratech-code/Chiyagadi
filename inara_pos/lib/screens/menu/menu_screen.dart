@@ -12,6 +12,8 @@ import '../../utils/theme.dart';
 import '../../utils/inventory_category_helper.dart';
 import '../../utils/loading_constants.dart';
 import '../../utils/performance.dart';
+import '../../services/web_offline_first_store.dart';
+import '../../utils/web_online.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io' as io;
 import 'dart:convert';
@@ -525,6 +527,47 @@ class _MenuScreenState extends State<MenuScreen> {
     );
   }
 
+  /// Loads menu from SharedPreferences cache (web offline / DB unavailable).
+  Future<bool> _hydrateMenuFromWebCache() async {
+    if (!kIsWeb) return false;
+    try {
+      final categoryMaps = await WebOfflineFirstStore.loadCachedCategories();
+      final productMaps = await WebOfflineFirstStore.loadCachedProducts();
+      if (categoryMaps.isEmpty && productMaps.isEmpty) return false;
+      if (!mounted) return false;
+      _categories = categoryMaps
+          .map((map) {
+            try {
+              return Category.fromMap(map);
+            } catch (e) {
+              debugPrint('MenuScreen: Error parsing cached category: $e');
+              return null;
+            }
+          })
+          .whereType<Category>()
+          .toList();
+      _products = productMaps
+          .map((map) {
+            try {
+              return Product.fromMap(map);
+            } catch (e) {
+              debugPrint('MenuScreen: Error parsing cached product: $e');
+              return null;
+            }
+          })
+          .whereType<Product>()
+          .toList();
+      setState(() => _isLoading = false);
+      debugPrint(
+          'MenuScreen: Loaded ${_categories.length} categories and ${_products.length} products from offline cache',
+      );
+      return true;
+    } catch (e) {
+      debugPrint('MenuScreen: _hydrateMenuFromWebCache: $e');
+      return false;
+    }
+  }
+
   Future<void> _loadData() async {
     _loadDeferTimer?.cancel();
     if (mounted && _products.isEmpty && _categories.isEmpty) {
@@ -536,6 +579,13 @@ class _MenuScreenState extends State<MenuScreen> {
       final dbProvider =
           Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
+
+      if (kIsWeb &&
+          (!isNavigatorOnline || !dbProvider.isAvailable) &&
+          await WebOfflineFirstStore.hasMenuCache()) {
+        final ok = await _hydrateMenuFromWebCache();
+        if (ok) return;
+      }
 
       // Check if database is available
       if (!dbProvider.isAvailable) {

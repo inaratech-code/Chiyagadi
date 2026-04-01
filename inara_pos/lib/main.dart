@@ -4,6 +4,10 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'utils/web_online.dart';
+import 'utils/web_online_sync_stub.dart'
+    if (dart.library.html) 'utils/web_online_sync_web.dart' as web_online_sync;
+
 import 'providers/auth_provider.dart' show InaraAuthProvider;
 import 'providers/unified_database_provider.dart';
 import 'providers/sync_provider.dart';
@@ -116,6 +120,10 @@ class _WarmStartState extends State<_WarmStart> {
           debugPrint('WarmStart: ConnectivityNotifier init failed: $e');
         }
 
+        if (kIsWeb) {
+          web_online_sync.registerWebOnlineSyncListener();
+        }
+
         // PERF: Defer admin check so app feels instant. Run 1.5s after first paint.
         if (kIsWeb) {
           final authProvider = context.read<InaraAuthProvider>();
@@ -216,10 +224,20 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   Future<void> _checkAuth() async {
     // PERF: All auth checks run in background, UI shows immediately
     try {
-      final auth = FirebaseAuth.instance;
       final authProvider = context.read<InaraAuthProvider>();
 
       await authProvider.loadLockMode();
+
+      if (kIsWeb && !isNavigatorOnline) {
+        authProvider.setContext(context);
+        final restored = await authProvider.restoreOfflineWebSession();
+        if (restored && mounted) {
+          debugPrint('AuthWrapper: Restored session from local storage (offline)');
+        }
+        return;
+      }
+
+      final auth = FirebaseAuth.instance;
 
       if (auth.currentUser != null && mounted) {
         authProvider.setContext(context);

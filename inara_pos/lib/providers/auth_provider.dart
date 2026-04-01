@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'unified_database_provider.dart';
 import '../services/offline_session_service.dart';
+import '../utils/web_online.dart';
 
 class InaraAuthProvider with ChangeNotifier {
   bool _isAuthenticated = false;
@@ -459,6 +460,43 @@ class InaraAuthProvider with ChangeNotifier {
     }
   }
 
+  /// When the browser is offline, restore app auth from [SharedPreferences] only (no Firebase calls).
+  Future<bool> restoreOfflineWebSession() async {
+    if (!kIsWeb || isNavigatorOnline) return false;
+    try {
+      final json = await OfflineSessionService.loadSessionJson();
+      if (json == null) return false;
+      final userDocId = json['userDocId'] as String?;
+      final role = json['role'] as String?;
+      final username = json['username'] as String?;
+      if (userDocId == null || role == null) return false;
+      final loginTime = json['loginTime'];
+      if (loginTime is int) {
+        const maxAgeMs = 90 * 24 * 60 * 60 * 1000;
+        if (DateTime.now().millisecondsSinceEpoch - loginTime > maxAgeMs) {
+          debugPrint('restoreOfflineWebSession: session too old');
+          return false;
+        }
+      }
+      _isAuthenticated = true;
+      _currentUserId = userDocId;
+      _currentUserRole = role;
+      _currentUsername = username ?? 'user';
+      if (_lockMode == 'timeout') {
+        _resetInactivityTimer();
+      } else {
+        _inactivityTimer?.cancel();
+        _inactivityTimer = null;
+      }
+      notifyListeners();
+      debugPrint('restoreOfflineWebSession: restored for $_currentUsername');
+      return true;
+    } catch (e) {
+      debugPrint('restoreOfflineWebSession: $e');
+      return false;
+    }
+  }
+
   /// Restore session when Firebase Auth has a persisted user (e.g. after app restart).
   /// Returns true if session was restored.
   Future<bool> restoreSessionFromFirebaseUser(dynamic firebaseUser) async {
@@ -523,6 +561,19 @@ class InaraAuthProvider with ChangeNotifier {
         }
         notifyListeners();
         await OfflineSessionService.persistCurrentUser();
+        try {
+          final u = FirebaseAuth.instance.currentUser;
+          if (kIsWeb && u != null && _currentUserId != null) {
+            await OfflineSessionService.persistFullWebSession(
+              user: u,
+              userDocId: _currentUserId!,
+              role: _currentUserRole,
+              username: _currentUsername,
+            );
+          }
+        } catch (e) {
+          debugPrint('restoreSessionFromFirebaseUser: persist full session: $e');
+        }
         debugPrint(
             'restoreSessionFromFirebaseUser: Restored session for $trimmedEmail (${_currentUserRole})');
         return true;

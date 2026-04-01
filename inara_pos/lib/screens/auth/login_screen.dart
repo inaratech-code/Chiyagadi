@@ -1,9 +1,12 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../providers/auth_provider.dart' show InaraAuthProvider;
 import '../../providers/unified_database_provider.dart';
+import '../../services/offline_session_service.dart';
+import '../../utils/web_online.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -127,6 +130,15 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
+    if (kIsWeb && !isNavigatorOnline) {
+      setState(() {
+        _errorMessage =
+            'You need an internet connection to sign in. Open the app online once, then you can use it offline.';
+        _isLoading = false;
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -143,6 +155,24 @@ class _LoginScreenState extends State<LoginScreen>
       final success = await authProvider.login(email, password);
 
       if (success && mounted) {
+        if (kIsWeb && authProvider.currentUserId != null) {
+          final u = FirebaseAuth.instance.currentUser;
+          if (u != null) {
+            await OfflineSessionService.persistFullWebSession(
+              user: u,
+              userDocId: authProvider.currentUserId!,
+              role: authProvider.currentUserRole,
+              username: authProvider.currentUsername,
+            );
+          } else {
+            await OfflineSessionService.persistFallbackWebProfile(
+              userDocId: authProvider.currentUserId!,
+              role: authProvider.currentUserRole,
+              username: authProvider.currentUsername,
+              email: email,
+            );
+          }
+        }
         final prefs = await SharedPreferences.getInstance();
         if (_rememberMe) {
           await prefs.setBool('remember_me', true);

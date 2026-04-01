@@ -8,7 +8,9 @@ import 'package:flutter/foundation.dart'
         TargetPlatform;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
+import '../services/web_offline_first_store.dart';
 import '../utils/chiyagaadi_menu_seed.dart';
+import '../utils/web_online.dart';
 
 /// Firestore-based database provider for web platform
 /// Provides the same interface as DatabaseProvider but uses Firestore instead of SQLite
@@ -262,6 +264,14 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
       _isInitialized = true;
       debugPrint('FirestoreDatabase: Firestore initialized successfully');
+
+      if (kIsWeb) {
+        try {
+          await WebOfflineFirstStore.syncPendingToFirestore(_firestore!);
+        } catch (e) {
+          debugPrint('FirestoreDatabase: initial offline sync skipped: $e');
+        }
+      }
 
       // PERF: Do not block app startup on network checks / seeding.
       // We'll validate connectivity and seed defaults in the background.
@@ -595,6 +605,19 @@ class FirestoreDatabaseProvider with ChangeNotifier {
     }
   }
 
+  Future<List<Map<String, dynamic>>> _finalizeWebQuery(
+    String collection,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    if (!kIsWeb) return rows;
+    if (collection == 'categories') {
+      await WebOfflineFirstStore.cacheCategories(rows);
+    } else if (collection == 'products') {
+      await WebOfflineFirstStore.cacheProducts(rows);
+    }
+    return WebOfflineFirstStore.mergePendingIntoQueryResult(collection, rows);
+  }
+
   // Query methods compatible with DatabaseProvider interface
   Future<List<Map<String, dynamic>>> query(
     String collection, {
@@ -608,6 +631,17 @@ class FirestoreDatabaseProvider with ChangeNotifier {
     int? limit,
     int? offset,
   }) async {
+    if (kIsWeb && !isNavigatorOnline) {
+      return WebOfflineFirstStore.firestoreLikeQuery(
+        collection: collection,
+        where: where,
+        whereArgs: whereArgs,
+        orderBy: orderBy,
+        limit: limit,
+        offset: offset,
+      );
+    }
+
     if (!_isInitialized) {
       await init();
     }
@@ -626,7 +660,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         final data = snap.data() ?? <String, dynamic>{};
         data['id'] = snap.id;
         data['documentId'] = snap.id;
-        return [data];
+        return _finalizeWebQuery(collection, [data]);
       }
 
       // Optimize: support SQL-style `IN (...)` clauses by translating them to Firestore `whereIn`
@@ -643,7 +677,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
           limit: limit,
           offset: offset,
         );
-        return rows;
+        return _finalizeWebQuery(collection, rows);
       }
 
       Query query = firestore.collection(collection);
@@ -714,12 +748,13 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
       final snapshot = await query.get();
 
-      return snapshot.docs.map((doc) {
+      final rows = snapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
         data['id'] = doc.id;
         data['documentId'] = doc.id; // So Role.fromMap has documentId on web
         return data;
       }).toList();
+      return _finalizeWebQuery(collection, rows);
     } on FirebaseException catch (e) {
       // Web frequently hits "failed-precondition: requires an index" for compound queries.
       // Fallback: rerun without orderBy and sort client-side, so app remains usable without indexes.
@@ -740,7 +775,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
             whereArgs != null &&
             where.toUpperCase().contains(' IN (') &&
             whereArgs.isNotEmpty) {
-          return await _queryWithWhereIn(
+          final rows = await _queryWithWhereIn(
             collection: collection,
             where: where,
             whereArgs: whereArgs,
@@ -748,6 +783,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
             limit: limit,
             offset: offset,
           );
+          return _finalizeWebQuery(collection, rows);
         }
 
         Query fallbackQuery = firestore.collection(collection);
@@ -808,7 +844,7 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
         // Sort locally to approximate Firestore orderBy
         _sortRowsInMemory(rows, orderBy);
-        return rows;
+        return _finalizeWebQuery(collection, rows);
       } catch (fallbackError) {
         debugPrint('FirestoreDatabase: Query fallback failed: $fallbackError');
         rethrow;
@@ -965,9 +1001,9 @@ class FirestoreDatabaseProvider with ChangeNotifier {
     final start = (offset ?? 0).clamp(0, rows.length);
     final sliced = rows.skip(start);
     if (limit != null) {
-      return sliced.take(limit).toList();
+      return _finalizeWebQuery(collection, sliced.take(limit).toList());
     }
-    return sliced.toList();
+    return _finalizeWebQuery(collection, sliced.toList());
   }
 
   static void _sortRowsInMemory(
@@ -1003,6 +1039,14 @@ class FirestoreDatabaseProvider with ChangeNotifier {
 
   Future<String> insert(String collection, Map<String, dynamic> data,
       {String? documentId}) async {
+    if (kIsWeb && !isNavigatorOnline) {
+      return WebOfflineFirstStore.insertDocument(
+        collection,
+        data,
+        documentId: documentId,
+      );
+    }
+
     if (!_isInitialized) {
       await init();
     }
@@ -1047,6 +1091,15 @@ class FirestoreDatabaseProvider with ChangeNotifier {
     String? where,
     List<Object?>? whereArgs,
   }) async {
+    if (kIsWeb && !isNavigatorOnline) {
+      return WebOfflineFirstStore.updateDocument(
+        collection,
+        data: data,
+        where: where,
+        whereArgs: whereArgs,
+      );
+    }
+
     if (!_isInitialized) {
       await init();
     }
@@ -1106,6 +1159,14 @@ class FirestoreDatabaseProvider with ChangeNotifier {
     String? where,
     List<Object?>? whereArgs,
   }) async {
+    if (kIsWeb && !isNavigatorOnline) {
+      return WebOfflineFirstStore.deleteDocument(
+        collection,
+        where: where,
+        whereArgs: whereArgs,
+      );
+    }
+
     if (!_isInitialized) {
       await init();
     }

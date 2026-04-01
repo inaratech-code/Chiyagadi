@@ -30,6 +30,59 @@ class OfflineSessionService {
     }
   }
 
+  /// Web PWA: full snapshot so the app can restore role/username without Firebase when offline.
+  static Future<void> persistFullWebSession({
+    required User user,
+    required String userDocId,
+    required String? role,
+    required String? username,
+  }) async {
+    if (!kIsWeb) return;
+    try {
+      final token = await user.getIdToken();
+      final prefs = await SharedPreferences.getInstance();
+      final payload = <String, dynamic>{
+        'uid': user.uid,
+        'email': user.email,
+        'token': token,
+        'loginTime': DateTime.now().millisecondsSinceEpoch,
+        'userDocId': userDocId,
+        'role': role,
+        'username': username,
+      };
+      await prefs.setString(sessionKey, jsonEncode(payload));
+      debugPrint('OfflineSessionService: full web session saved');
+    } catch (e) {
+      debugPrint('OfflineSessionService: persistFullWebSession failed: $e');
+    }
+  }
+
+  /// When login succeeded without a Firebase [User] (e.g. admin fallback), still persist offline profile.
+  static Future<void> persistFallbackWebProfile({
+    required String userDocId,
+    required String? role,
+    required String? username,
+    required String email,
+  }) async {
+    if (!kIsWeb) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final payload = <String, dynamic>{
+        'uid': userDocId,
+        'email': email,
+        'token': '',
+        'loginTime': DateTime.now().millisecondsSinceEpoch,
+        'userDocId': userDocId,
+        'role': role,
+        'username': username,
+      };
+      await prefs.setString(sessionKey, jsonEncode(payload));
+      debugPrint('OfflineSessionService: fallback web profile saved');
+    } catch (e) {
+      debugPrint('OfflineSessionService: persistFallbackWebProfile failed: $e');
+    }
+  }
+
   /// Saves current [FirebaseAuth.instance.currentUser] if any (e.g. after Home opens).
   static Future<void> persistCurrentUser() async {
     if (!kIsWeb) return;
