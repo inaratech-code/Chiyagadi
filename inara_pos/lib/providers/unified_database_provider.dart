@@ -675,6 +675,29 @@ class UnifiedDatabaseProvider with ChangeNotifier {
       await init();
     }
 
+    // Web offline: deletes must reach WebOfflineFirstStore when Firebase is unavailable.
+    if (kIsWeb &&
+        !isNavigatorOnline &&
+        !isAvailable &&
+        (table == 'orders' ||
+            table == 'order_items' ||
+            table == 'payments' ||
+            table == 'credit_transactions' ||
+            table == 'customers')) {
+      debugPrint(
+          'DB: Web offline delete — DB not available, using WebOfflineFirstStore for $table');
+      try {
+        return await WebOfflineFirstStore.deleteDocument(
+          table,
+          where: where,
+          whereArgs: whereArgs,
+        );
+      } catch (e) {
+        debugPrint('DB: WebOfflineFirstStore delete failed: $e');
+        return 0;
+      }
+    }
+
     // If init failed, return 0 instead of throwing
     if (!isAvailable) {
       debugPrint('DB: Delete skipped - database not available');
@@ -689,6 +712,23 @@ class UnifiedDatabaseProvider with ChangeNotifier {
       );
     } catch (e) {
       debugPrint('DB: Delete error: $e');
+      if (kIsWeb &&
+          !isNavigatorOnline &&
+          (table == 'orders' ||
+              table == 'order_items' ||
+              table == 'payments' ||
+              table == 'credit_transactions' ||
+              table == 'customers')) {
+        try {
+          return await WebOfflineFirstStore.deleteDocument(
+            table,
+            where: where,
+            whereArgs: whereArgs,
+          );
+        } catch (e2) {
+          debugPrint('DB: WebOfflineFirstStore delete fallback failed: $e2');
+        }
+      }
       return 0; // Return 0 on error (no rows deleted)
     }
   }
