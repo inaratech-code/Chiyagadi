@@ -130,15 +130,6 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-    if (kIsWeb && !isNavigatorOnline) {
-      setState(() {
-        _errorMessage =
-            'You need an internet connection to sign in. Open the app online once, then you can use it offline.';
-        _isLoading = false;
-      });
-      return;
-    }
-
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -156,6 +147,7 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (success && mounted) {
         if (kIsWeb && authProvider.currentUserId != null) {
+          await OfflineSessionService.persistOfflineLoginVerifier(email, password);
           final u = FirebaseAuth.instance.currentUser;
           if (u != null) {
             await OfflineSessionService.persistFullWebSession(
@@ -185,18 +177,24 @@ class _LoginScreenState extends State<LoginScreen>
         }
       } else {
         setState(() {
-          _errorMessage = 'Invalid email or password. Please try again.';
+          _errorMessage = kIsWeb && !isNavigatorOnline
+              ? 'Offline sign-in failed. Use the same email and password as your last online sign-in on this device, or sign in online once.'
+              : 'Invalid email or password. Please try again.';
           _isLoading = false;
         });
       }
     } on FirebaseAuthException {
       setState(() {
-        _errorMessage = 'Invalid email or password. Please try again.';
+        _errorMessage = kIsWeb && !isNavigatorOnline
+            ? 'Offline sign-in failed. Use the same email and password as your last online sign-in on this device, or sign in online once.'
+            : 'Invalid email or password. Please try again.';
         _isLoading = false;
       });
     } catch (e) {
       setState(() {
-        _errorMessage = 'Invalid email or password. Please try again.';
+        _errorMessage = kIsWeb && !isNavigatorOnline
+            ? 'Offline sign-in failed. Use the same email and password as your last online sign-in on this device, or sign in online once.'
+            : 'Invalid email or password. Please try again.';
         _isLoading = false;
       });
     }

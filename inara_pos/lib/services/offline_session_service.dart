@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,6 +12,42 @@ class OfflineSessionService {
   OfflineSessionService._();
 
   static const String sessionKey = 'chiyagadi_session';
+
+  /// SHA-256 of email+password (salted) for offline re-login after one online sign-in.
+  static const String _offlineVerifierKey = 'chiyagadi_offline_login_sha256_v1';
+
+  static String _hashOfflineCredential(String email, String password) {
+    final normalized = email.trim().toLowerCase();
+    final payload = 'chiyagadi_web_offline_v1|$normalized|$password';
+    return sha256.convert(utf8.encode(payload)).toString();
+  }
+
+  /// Call after a successful online login so the same email/password works offline.
+  static Future<void> persistOfflineLoginVerifier(
+      String email, String password) async {
+    if (!kIsWeb) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+          _offlineVerifierKey, _hashOfflineCredential(email, password));
+    } catch (e) {
+      debugPrint('OfflineSessionService: persistOfflineLoginVerifier: $e');
+    }
+  }
+
+  /// Returns true if [password] matches the last saved verifier for [email].
+  static Future<bool> verifyOfflineLogin(String email, String password) async {
+    if (!kIsWeb) return false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getString(_offlineVerifierKey);
+      if (stored == null || stored.isEmpty) return false;
+      return stored == _hashOfflineCredential(email, password);
+    } catch (e) {
+      debugPrint('OfflineSessionService: verifyOfflineLogin: $e');
+      return false;
+    }
+  }
 
   /// Persists uid, email, token, loginTime (matches typical PWA session JSON).
   static Future<void> persistFromUser(User user) async {
@@ -115,6 +152,7 @@ class OfflineSessionService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(sessionKey);
+      await prefs.remove(_offlineVerifierKey);
     } catch (e) {
       debugPrint('OfflineSessionService: clear failed: $e');
     }

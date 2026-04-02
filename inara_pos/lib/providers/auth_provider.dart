@@ -460,6 +460,57 @@ class InaraAuthProvider with ChangeNotifier {
     }
   }
 
+  /// Web offline: sign in with the same email/password as the last successful online login
+  /// on this device (verifier + session JSON in SharedPreferences).
+  Future<bool> _tryOfflineCredentialLogin(
+      String trimmedEmail, String password) async {
+    if (!kIsWeb || isNavigatorOnline) return false;
+    try {
+      final verified =
+          await OfflineSessionService.verifyOfflineLogin(trimmedEmail, password);
+      if (!verified) {
+        debugPrint(
+            'Offline login: no verifier or password mismatch (sign in online once)');
+        return false;
+      }
+      final json = await OfflineSessionService.loadSessionJson();
+      if (json == null) return false;
+      final storedEmail = (json['email'] as String?)?.trim().toLowerCase();
+      if (storedEmail == null || storedEmail != trimmedEmail) {
+        debugPrint('Offline login: session email does not match');
+        return false;
+      }
+      final userDocId = json['userDocId'] as String?;
+      final role = json['role'] as String? ?? 'cashier';
+      final username = json['username'] as String?;
+      if (userDocId == null || userDocId.isEmpty) return false;
+      final loginTime = json['loginTime'];
+      if (loginTime is int) {
+        const maxAgeMs = 90 * 24 * 60 * 60 * 1000;
+        if (DateTime.now().millisecondsSinceEpoch - loginTime > maxAgeMs) {
+          debugPrint('Offline login: session too old');
+          return false;
+        }
+      }
+      _isAuthenticated = true;
+      _currentUserId = userDocId;
+      _currentUserRole = role;
+      _currentUsername = username ?? 'user';
+      if (_lockMode == 'timeout') {
+        _resetInactivityTimer();
+      } else {
+        _inactivityTimer?.cancel();
+        _inactivityTimer = null;
+      }
+      notifyListeners();
+      debugPrint('Offline login: success for $trimmedEmail');
+      return true;
+    } catch (e) {
+      debugPrint('Offline login: $e');
+      return false;
+    }
+  }
+
   /// When the browser is offline, restore app auth from [SharedPreferences] only (no Firebase calls).
   Future<bool> restoreOfflineWebSession() async {
     if (!kIsWeb || isNavigatorOnline) return false;
@@ -626,8 +677,33 @@ class InaraAuthProvider with ChangeNotifier {
       return false;
     }
 
+    final trimmedEmail = email.trim().toLowerCase();
+
+    if (kIsWeb && !isNavigatorOnline) {
+      final offlineOk =
+          await _tryOfflineCredentialLogin(trimmedEmail, password);
+      if (offlineOk) return true;
+      final adminOffline = _isAdminCredentials(trimmedEmail, password);
+      if (adminOffline) {
+        debugPrint(
+            'Login: Offline — admin credentials (dart-define) — allowing login');
+        _isAuthenticated = true;
+        _currentUserId = 'dSc8mQzHPsftOpqb200d7xPhS7K2';
+        _currentUserRole = 'admin';
+        _currentUsername = 'admin';
+        if (_lockMode == 'timeout') {
+          _resetInactivityTimer();
+        } else {
+          _inactivityTimer?.cancel();
+          _inactivityTimer = null;
+        }
+        notifyListeners();
+        return true;
+      }
+      return false;
+    }
+
     try {
-      final trimmedEmail = email.trim().toLowerCase();
       debugPrint(
           'Login: Attempting Firebase Auth login for email: $trimmedEmail');
       debugPrint('Login: Password length: ${password.length}');
