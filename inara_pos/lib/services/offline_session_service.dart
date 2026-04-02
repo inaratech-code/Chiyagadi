@@ -50,6 +50,11 @@ class OfflineSessionService {
   }
 
   /// Persists uid, email, token, loginTime (matches typical PWA session JSON).
+  ///
+  /// **Important:** If a full web session was already saved ([persistFullWebSession]),
+  /// we **merge** and keep `userDocId`, `role`, and `username`. Otherwise
+  /// [persistCurrentUser] on Home would overwrite offline login data and break
+  /// [_tryOfflineCredentialLogin] / [restoreOfflineWebSession].
   static Future<void> persistFromUser(User user) async {
     try {
       String token = '';
@@ -57,12 +62,22 @@ class OfflineSessionService {
         token = await user.getIdToken() ?? '';
       } catch (_) {}
       final prefs = await SharedPreferences.getInstance();
+      final existing = await loadSessionJson();
+      final emailRaw = user.email ?? existing?['email'] as String?;
+      final emailNorm = emailRaw?.trim().toLowerCase();
       final payload = <String, dynamic>{
         'uid': user.uid,
-        'email': user.email,
+        if (emailNorm != null && emailNorm.isNotEmpty) 'email': emailNorm,
         'token': token,
         'loginTime': DateTime.now().millisecondsSinceEpoch,
       };
+      final existingDocId = existing?['userDocId'] as String?;
+      if (existingDocId != null && existingDocId.isNotEmpty) {
+        payload['userDocId'] = existingDocId;
+        payload['role'] = existing!['role'] ?? 'cashier';
+        final un = existing['username'];
+        if (un != null) payload['username'] = un;
+      }
       await prefs.setString(sessionKey, jsonEncode(payload));
       debugPrint('OfflineSessionService: session snapshot saved');
     } catch (e) {
@@ -85,9 +100,11 @@ class OfflineSessionService {
         token = await user.getIdToken() ?? '';
       } catch (_) {}
       final prefs = await SharedPreferences.getInstance();
+      final emailNorm =
+          (user.email ?? '').trim().toLowerCase();
       final payload = <String, dynamic>{
         'uid': user.uid,
-        'email': user.email,
+        if (emailNorm.isNotEmpty) 'email': emailNorm,
         'token': token,
         'loginTime': DateTime.now().millisecondsSinceEpoch,
         'userDocId': userDocId,
@@ -111,9 +128,10 @@ class OfflineSessionService {
     if (!kIsWeb) return;
     try {
       final prefs = await SharedPreferences.getInstance();
+      final emailNorm = email.trim().toLowerCase();
       final payload = <String, dynamic>{
         'uid': userDocId,
-        'email': email,
+        'email': emailNorm,
         'token': '',
         'loginTime': DateTime.now().millisecondsSinceEpoch,
         'userDocId': userDocId,
