@@ -469,6 +469,28 @@ class UnifiedDatabaseProvider with ChangeNotifier {
       }
 
       if (!isAvailable) {
+        // Web offline: Firestore may be unavailable, but orders/menu/customers can still
+        // be served from WebOfflineFirstStore (read cache + pending docs).
+        if (kIsWeb && !isNavigatorOnline) {
+          try {
+            debugPrint(
+                'DB: Web offline query — DB not available, using offline store path');
+            return await _provider.query(
+              table,
+              distinct: distinct,
+              columns: columns,
+              where: where,
+              whereArgs: whereArgs,
+              groupBy: groupBy,
+              having: having,
+              orderBy: orderBy,
+              limit: limit,
+              offset: offset,
+            );
+          } catch (e) {
+            debugPrint('DB: Web offline query fallback failed: $e');
+          }
+        }
         debugPrint(
             'DB: Query skipped - database still not available after reinit');
         return [];
@@ -519,7 +541,11 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     if (kIsWeb &&
         !isNavigatorOnline &&
         !isAvailable &&
-        (table == 'orders' || table == 'order_items')) {
+        (table == 'orders' ||
+            table == 'order_items' ||
+            table == 'payments' ||
+            table == 'credit_transactions' ||
+            table == 'customers')) {
       debugPrint(
           'DB: Web offline insert — DB not available, using WebOfflineFirstStore for $table');
       try {
@@ -552,7 +578,11 @@ class UnifiedDatabaseProvider with ChangeNotifier {
       debugPrint('DB: Insert error: $e');
       if (kIsWeb &&
           !isNavigatorOnline &&
-          (table == 'orders' || table == 'order_items')) {
+          (table == 'orders' ||
+              table == 'order_items' ||
+              table == 'payments' ||
+              table == 'credit_transactions' ||
+              table == 'customers')) {
         try {
           return await WebOfflineFirstStore.insertDocument(
             table,
@@ -575,6 +605,23 @@ class UnifiedDatabaseProvider with ChangeNotifier {
   }) async {
     if (!_isInitialized) {
       await init();
+    }
+
+    // Web offline: payment completion updates orders/customers even if Firebase init failed.
+    if (kIsWeb && !isNavigatorOnline && !isAvailable) {
+      debugPrint(
+          'DB: Web offline update — DB not available, using WebOfflineFirstStore for $table');
+      try {
+        return await WebOfflineFirstStore.updateDocument(
+          table,
+          data: values,
+          where: where,
+          whereArgs: whereArgs,
+        );
+      } catch (e) {
+        debugPrint('DB: WebOfflineFirstStore update failed: $e');
+        return 0;
+      }
     }
 
     // If init failed, return 0 instead of throwing
@@ -603,6 +650,18 @@ class UnifiedDatabaseProvider with ChangeNotifier {
       );
     } catch (e) {
       debugPrint('DB: Update error: $e');
+      if (kIsWeb && !isNavigatorOnline) {
+        try {
+          return await WebOfflineFirstStore.updateDocument(
+            table,
+            data: values,
+            where: where,
+            whereArgs: whereArgs,
+          );
+        } catch (e2) {
+          debugPrint('DB: WebOfflineFirstStore update fallback failed: $e2');
+        }
+      }
       return 0; // Return 0 on error (no rows updated)
     }
   }

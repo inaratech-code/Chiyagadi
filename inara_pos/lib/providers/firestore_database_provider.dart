@@ -620,6 +620,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
     // Cache after merge so offline list matches last online view (incl. unsynced orders).
     if (collection == 'orders') {
       await WebOfflineFirstStore.mergeOrdersIntoReadCache(merged);
+    } else if (collection == 'customers') {
+      await WebOfflineFirstStore.mergeCustomersIntoReadCache(merged);
     }
     return merged;
   }
