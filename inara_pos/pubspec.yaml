@@ -32,8 +32,8 @@ dependencies:
   provider: ^6.1.1
   shared_preferences: ^2.2.2
 
-  # Network & Connectivity
-  connectivity_plus: ^5.0.2
+  # Network & Connectivity (7.x aligns js with pwa_install ^0.0.6)
+  connectivity_plus: ^7.1.0
   dio: ^5.4.0
 
   # Printing (commented out - can add later when printer is available)

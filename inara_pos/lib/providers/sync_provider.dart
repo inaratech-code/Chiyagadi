@@ -19,13 +19,15 @@ class SyncProvider with ChangeNotifier {
   int get pendingSyncs => _pendingSyncs;
 
   Future<void> init() async {
-    // Check connectivity
-    final connectivityResult = await Connectivity().checkConnectivity();
-    _isOnline = connectivityResult != ConnectivityResult.none;
+    // Check connectivity (connectivity_plus 6+ returns List<ConnectivityResult>)
+    final results = await Connectivity().checkConnectivity();
+    _isOnline =
+        results.isNotEmpty && results.any((r) => r != ConnectivityResult.none);
 
     // Listen to connectivity changes
-    Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
-      _isOnline = result != ConnectivityResult.none;
+    Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
+      _isOnline =
+          results.isNotEmpty && results.any((r) => r != ConnectivityResult.none);
       if (_isOnline && !_isSyncing) {
         _syncPendingData();
       }
