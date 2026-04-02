@@ -615,7 +615,13 @@ class FirestoreDatabaseProvider with ChangeNotifier {
     } else if (collection == 'products') {
       await WebOfflineFirstStore.cacheProducts(rows);
     }
-    return WebOfflineFirstStore.mergePendingIntoQueryResult(collection, rows);
+    final merged =
+        await WebOfflineFirstStore.mergePendingIntoQueryResult(collection, rows);
+    // Cache after merge so offline list matches last online view (incl. unsynced orders).
+    if (collection == 'orders') {
+      await WebOfflineFirstStore.mergeOrdersIntoReadCache(merged);
+    }
+    return merged;
   }
 
   // Query methods compatible with DatabaseProvider interface
