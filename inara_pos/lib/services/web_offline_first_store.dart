@@ -657,6 +657,11 @@ class WebOfflineFirstStore {
         payload.remove('documentId');
         await fs.collection(collection).doc(id).set(payload);
         await _removePending(collection, id);
+        // Flutter orders were also mirrored into pendingOrders JSON; remove so the React
+        // flush below does not add() a duplicate document.
+        if (collection == 'orders') {
+          await _removePendingOrdersWithDocumentId(id);
+        }
         coll.remove(id);
         await _persistCollectionMap(collection, coll);
         debugPrint('WebOfflineFirstStore: synced $collection/$id');
