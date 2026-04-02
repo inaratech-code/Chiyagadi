@@ -1,0 +1,8 @@
+{
+  "json.schemas": [
+    {
+      "fileMatch": ["inara_pos/web/manifest.json"],
+      "url": "./inara_pos/web/manifest.schema.json"
+    }
+  ]
+}

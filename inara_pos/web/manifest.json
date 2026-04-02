@@ -44,6 +44,42 @@
             "label": "ChiyaGadi app"
         }
     ],
+    "launch_handler": {
+        "client_mode": "navigate-existing"
+    },
+    "share_target": {
+        "action": "/",
+        "method": "GET",
+        "enctype": "application/x-www-form-urlencoded",
+        "params": {
+            "title": "title",
+            "text": "text",
+            "url": "url"
+        }
+    },
+    "file_handlers": [
+        {
+            "action": "/",
+            "accept": {
+                "text/csv": [".csv"],
+                "text/plain": [".txt"]
+            }
+        }
+    ],
+    "protocol_handlers": [
+        {
+            "protocol": "web+chiyagadi",
+            "url": "/?from=%s"
+        }
+    ],
+    "scope_extensions": [],
+    "edge_side_panel": {
+        "preferred_width": 400
+    },
+    "note_taking": {
+        "new_note_url": "/"
+    },
+    "widgets": [],
     "shortcuts": [
         {
             "name": "New Order",

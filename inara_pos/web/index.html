@@ -33,6 +33,7 @@
   <link rel="apple-touch-icon" sizes="512x512" href="icons/Icon-512.png">
   
   <!-- Android/Chrome meta tags -->
+  <!-- iarc_rating_id: set in manifest only after obtaining a real ID from https://www.globalratings.com (Microsoft Store) -->
   <meta name="theme-color" content="#D4A574">
   <meta name="msapplication-TileColor" content="#D4A574">
   <meta name="msapplication-TileImage" content="icons/Icon-192.png">
@@ -66,6 +67,32 @@
   <script src="flutter.js" defer></script>
 </head>
 <body>
+  <!-- pwa_install: capture beforeinstallprompt + launch mode (see package README) -->
+  <script>
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      deferredPrompt = e;
+    });
+    function promptInstall() {
+      if (deferredPrompt) deferredPrompt.prompt();
+    }
+    window.addEventListener('appinstalled', function () {
+      deferredPrompt = null;
+      if (typeof appInstalled === 'function') appInstalled();
+    });
+    function getLaunchMode() {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+      if (deferredPrompt && typeof hasPrompt === 'function') hasPrompt();
+      if (document.referrer && document.referrer.startsWith('android-app://')) {
+        if (typeof appLaunchedAsTWA === 'function') appLaunchedAsTWA();
+      } else if (navigator.standalone || isStandalone) {
+        if (typeof appLaunchedAsPWA === 'function') appLaunchedAsPWA();
+      } else {
+        if (typeof appLaunchedInBrowser === 'function') appLaunchedInBrowser();
+      }
+    }
+  </script>
   <script>
     window.addEventListener('load', function(ev) {
       // Download main.dart.js

@@ -1,0 +1,8 @@
+{
+  "json.schemas": [
+    {
+      "fileMatch": ["web/manifest.json"],
+      "url": "./web/manifest.schema.json"
+    }
+  ]
+}

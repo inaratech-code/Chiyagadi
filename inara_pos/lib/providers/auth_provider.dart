@@ -462,9 +462,12 @@ class InaraAuthProvider with ChangeNotifier {
 
   /// Web offline: sign in with the same email/password as the last successful online login
   /// on this device (verifier + session JSON in SharedPreferences).
+  ///
+  /// Does **not** require `navigator.onLine === false` — that flag is often true on mobile
+  /// even without real connectivity; we also call this after Firebase network failures.
   Future<bool> _tryOfflineCredentialLogin(
       String trimmedEmail, String password) async {
-    if (!kIsWeb || isNavigatorOnline) return false;
+    if (!kIsWeb) return false;
     try {
       final json = await OfflineSessionService.loadSessionJson();
       final candidates = <String>{trimmedEmail};
@@ -516,12 +519,23 @@ class InaraAuthProvider with ChangeNotifier {
     }
   }
 
-  /// When the browser is offline, restore app auth from [SharedPreferences] only (no Firebase calls).
+  /// Restore app auth from [SharedPreferences] when Firestore/Firebase is unavailable.
+  /// Safe when [FirebaseAuth.instance.currentUser] exists: only restores if session email matches.
   Future<bool> restoreOfflineWebSession() async {
-    if (!kIsWeb || isNavigatorOnline) return false;
+    if (!kIsWeb) return false;
     try {
       final json = await OfflineSessionService.loadSessionJson();
       if (json == null) return false;
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser != null) {
+        final fu = firebaseUser.email?.trim().toLowerCase();
+        final se = (json['email'] as String?)?.trim().toLowerCase();
+        if (fu != null && se != null && fu.isNotEmpty && se.isNotEmpty && fu != se) {
+          debugPrint(
+              'restoreOfflineWebSession: session email does not match Firebase user');
+          return false;
+        }
+      }
       final userDocId = json['userDocId'] as String?;
       final role = json['role'] as String? ?? 'cashier';
       final username = json['username'] as String?;
@@ -673,6 +687,43 @@ class InaraAuthProvider with ChangeNotifier {
     return email.trim().toLowerCase() == adminEmail && password == adminPassword;
   }
 
+  /// Best-effort FirebaseAuth error code (web/minified-safe).
+  static String? _firebaseAuthErrorCode(Object e) {
+    try {
+      final dynamic d = e;
+      final c = d.code;
+      if (c is String) return c.toLowerCase();
+    } catch (_) {}
+    return null;
+  }
+
+  /// True when Firebase Auth likely failed due to no network / unreachable (not wrong password).
+  static bool _shouldAttemptOfflineAfterFirebaseFailure(Object e) {
+    final code = _firebaseAuthErrorCode(e);
+    if (code == 'network-request-failed') return true;
+    if (code == 'unavailable') return true;
+    if (code == 'internal-error') return true;
+    final s = e.toString().toLowerCase();
+    if (s.contains('wrong-password')) return false;
+    if (s.contains('user-not-found')) return false;
+    if (s.contains('invalid-email')) return false;
+    if (s.contains('user-disabled')) return false;
+    if (s.contains('invalid-credential') && s.contains('wrong')) return false;
+    return s.contains('network-request-failed') ||
+        s.contains('failed to fetch') ||
+        s.contains('network error') ||
+        (s.contains('fetch') && s.contains('failed')) ||
+        s.contains('connection') ||
+        s.contains('timeout') ||
+        s.contains('unreachable') ||
+        s.contains('internet') ||
+        s.contains('offline') ||
+        s.contains('host lookup') ||
+        s.contains('socket') ||
+        s.contains('aborted') ||
+        s.contains('cors');
+  }
+
   /// Login using Firebase Authentication
   /// Connects to Firestore document with ID dSc8mQzHPsftOpqb200d7xPhS7K2 for admin
   /// FALLBACK: If Firebase Auth fails but credentials match secure admin config, allow login.
@@ -766,6 +817,17 @@ class InaraAuthProvider with ChangeNotifier {
         // So we catch all errors and check the error message/type dynamically
         final errorStr = e.toString();
         debugPrint('Login: Firebase Auth error: $e');
+
+        // navigator.onLine is often true without real internet — try saved offline login.
+        if (kIsWeb && _shouldAttemptOfflineAfterFirebaseFailure(e)) {
+          final offlineOk =
+              await _tryOfflineCredentialLogin(trimmedEmail, password);
+          if (offlineOk) {
+            debugPrint(
+                'Login: Firebase unreachable — offline credential login succeeded');
+            return true;
+          }
+        }
 
         // Check if it's a Firebase Auth error by examining the error string
         if (errorStr.contains('user-not-found') ||

@@ -42,6 +42,9 @@ dependencies:
   # network_info_plus: ^4.0.2
   # Alternative: bluetooth_print: ^4.0.0 or esc_pos_printer: ^1.0.0
 
+  # PWA (web): install prompt helpers; see https://pub.dev/packages/pwa_install
+  pwa_install: ^0.0.6
+
   # Utils
   uuid: ^4.2.1
   csv: ^6.0.0

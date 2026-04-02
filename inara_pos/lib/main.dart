@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:pwa_install/pwa_install.dart';
 
 import 'utils/web_online.dart';
 import 'utils/web_online_sync_stub.dart'
@@ -21,6 +22,12 @@ import 'utils/add_admin_user.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (kIsWeb) {
+    PWAInstall().setup(installCallback: () {
+      debugPrint('ChiyaGadi: PWA installed');
+    });
+  }
 
   // Lock orientation to portrait mode (disable auto-rotation)
   // Only apply on mobile platforms (not web)
@@ -274,10 +281,28 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
         } else if (!restored && mounted) {
           debugPrint(
               'AuthWrapper: Could not restore session (user not in DB or disabled)');
+          // Firestore may be unreachable while navigator.onLine is still true — use cached session.
+          final offline = await authProvider.restoreOfflineWebSession();
+          if (offline && mounted) {
+            debugPrint(
+                'AuthWrapper: Restored session from local storage (cache, Firestore unavailable)');
+          }
         }
       }
     } catch (e) {
       debugPrint('Error checking Firebase Auth: $e');
+    }
+
+    // navigator.onLine can be true without internet; no Firebase user yet — still try cached session.
+    if (kIsWeb && mounted) {
+      final authProvider = context.read<InaraAuthProvider>();
+      if (!authProvider.isAuthenticated) {
+        final recovered = await authProvider.restoreOfflineWebSession();
+        if (recovered && mounted) {
+          debugPrint(
+              'AuthWrapper: Restored session from local storage (no Firebase user / flaky online)');
+        }
+      }
     }
   }
 
