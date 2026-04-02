@@ -466,20 +466,25 @@ class InaraAuthProvider with ChangeNotifier {
       String trimmedEmail, String password) async {
     if (!kIsWeb || isNavigatorOnline) return false;
     try {
-      final verified =
-          await OfflineSessionService.verifyOfflineLogin(trimmedEmail, password);
+      final json = await OfflineSessionService.loadSessionJson();
+      final candidates = <String>{trimmedEmail};
+      if (json != null) {
+        final se = (json['email'] as String?)?.trim().toLowerCase();
+        if (se != null && se.isNotEmpty) candidates.add(se);
+      }
+      var verified = false;
+      for (final e in candidates) {
+        if (await OfflineSessionService.verifyOfflineLogin(e, password)) {
+          verified = true;
+          break;
+        }
+      }
       if (!verified) {
         debugPrint(
             'Offline login: no verifier or password mismatch (sign in online once)');
         return false;
       }
-      final json = await OfflineSessionService.loadSessionJson();
       if (json == null) return false;
-      final storedEmail = (json['email'] as String?)?.trim().toLowerCase();
-      if (storedEmail == null || storedEmail != trimmedEmail) {
-        debugPrint('Offline login: session email does not match');
-        return false;
-      }
       final userDocId = json['userDocId'] as String?;
       final role = json['role'] as String? ?? 'cashier';
       final username = json['username'] as String?;
@@ -620,6 +625,7 @@ class InaraAuthProvider with ChangeNotifier {
               userDocId: _currentUserId!,
               role: _currentUserRole,
               username: _currentUsername,
+              emailOverride: trimmedEmail,
             );
           }
         } catch (e) {

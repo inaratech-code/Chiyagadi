@@ -147,23 +147,28 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (success && mounted) {
         if (kIsWeb && authProvider.currentUserId != null) {
-          await OfflineSessionService.persistOfflineLoginVerifier(email, password);
           final u = FirebaseAuth.instance.currentUser;
+          // Verifier hash must use the same email Firebase Auth uses (canonical), not only the
+          // text field — otherwise offline verify fails when they differ slightly.
+          final canonicalEmail = (u?.email ?? email).trim().toLowerCase();
           if (u != null) {
             await OfflineSessionService.persistFullWebSession(
               user: u,
               userDocId: authProvider.currentUserId!,
               role: authProvider.currentUserRole ?? 'cashier',
               username: authProvider.currentUsername,
+              emailOverride: canonicalEmail,
             );
           } else {
             await OfflineSessionService.persistFallbackWebProfile(
               userDocId: authProvider.currentUserId!,
               role: authProvider.currentUserRole ?? 'cashier',
               username: authProvider.currentUsername,
-              email: email,
+              email: canonicalEmail,
             );
           }
+          await OfflineSessionService.persistOfflineLoginVerifier(
+              canonicalEmail, password);
         }
         final prefs = await SharedPreferences.getInstance();
         if (_rememberMe) {

@@ -86,11 +86,15 @@ class OfflineSessionService {
   }
 
   /// Web PWA: full snapshot so the app can restore role/username without Firebase when offline.
+  ///
+  /// [emailOverride] — use the same string you pass to [persistOfflineLoginVerifier] (Firebase
+  /// canonical email). Ensures session JSON always has an email when [user.email] is null.
   static Future<void> persistFullWebSession({
     required User user,
     required String userDocId,
     required String? role,
     required String? username,
+    String? emailOverride,
   }) async {
     if (!kIsWeb) return;
     try {
@@ -101,7 +105,7 @@ class OfflineSessionService {
       } catch (_) {}
       final prefs = await SharedPreferences.getInstance();
       final emailNorm =
-          (user.email ?? '').trim().toLowerCase();
+          (emailOverride ?? user.email ?? '').trim().toLowerCase();
       final payload = <String, dynamic>{
         'uid': user.uid,
         if (emailNorm.isNotEmpty) 'email': emailNorm,
