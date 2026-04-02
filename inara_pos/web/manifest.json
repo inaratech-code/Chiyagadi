@@ -45,7 +45,10 @@
         }
     ],
     "iarc_rating_id": "ESRB_EVERYONE",
-    "scope_extensions": [],
+    "serviceworker": {
+        "src": "/service-worker.js",
+        "scope": "/"
+    },
     "shortcuts": [
         {
             "name": "New Order",
