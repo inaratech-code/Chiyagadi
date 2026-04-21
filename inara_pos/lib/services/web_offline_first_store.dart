@@ -226,6 +226,25 @@ class WebOfflineFirstStore {
     }
   }
 
+  /// Call after an order is successfully deleted on Firestore while online. Without this,
+  /// [loadOrdersReadCache] can still contain the order, so it reappears when the app goes offline.
+  static Future<void> applyOrderDeletionToLocalCache(String documentId) async {
+    if (!kIsWeb || documentId.isEmpty) return;
+    try {
+      await removeOrderFromReadCache(documentId);
+      await rememberDeletedOrderId(documentId);
+      await _removePendingOrdersWithDocumentId(documentId);
+      final coll = await _loadCollectionMap('orders');
+      if (coll.containsKey(documentId)) {
+        coll.remove(documentId);
+        await _persistCollectionMap('orders', coll);
+      }
+      await _removePending('orders', documentId);
+    } catch (e) {
+      debugPrint('WebOfflineFirstStore: applyOrderDeletionToLocalCache: $e');
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> _filterOutDeletedOrders(
     List<Map<String, dynamic>> rows,
   ) async {

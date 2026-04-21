@@ -1195,12 +1195,15 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         // FIXED: Handle documentId queries directly (for Firestore)
         if (where.contains('documentId = ?') && whereArgs.isNotEmpty) {
           // Direct delete by document ID
-          final docId = whereArgs[0] as String;
+          final docId = whereArgs[0].toString();
           final docRef = firestore.collection(collection).doc(docId);
           await docRef.delete();
           count = 1;
           debugPrint(
               'FirestoreDatabase: Deleted document $docId from $collection');
+          if (kIsWeb && collection == 'orders') {
+            await WebOfflineFirstStore.applyOrderDeletionToLocalCache(docId);
+          }
         } else {
           // Find documents matching where clause
           final docs =
@@ -1217,6 +1220,14 @@ class FirestoreDatabaseProvider with ChangeNotifier {
           await batch.commit();
           debugPrint(
               'FirestoreDatabase: Deleted $count documents from $collection');
+          if (kIsWeb && collection == 'orders') {
+            for (final doc in docs) {
+              final id = (doc['documentId'] ?? doc['id'])?.toString();
+              if (id != null && id.isNotEmpty) {
+                await WebOfflineFirstStore.applyOrderDeletionToLocalCache(id);
+              }
+            }
+          }
         }
       } else {
         // Delete all documents (use with caution)
