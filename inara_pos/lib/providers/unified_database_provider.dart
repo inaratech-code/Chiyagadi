@@ -705,11 +705,23 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     }
 
     try {
-      return await _provider.delete(
+      final n = await _provider.delete(
         table,
         where: where,
         whereArgs: whereArgs,
       );
+      // Belt-and-suspenders: keep web read cache / tombstones in sync if provider omitted it.
+      if (kIsWeb &&
+          n > 0 &&
+          table == 'orders' &&
+          where != null &&
+          where.contains('documentId = ?') &&
+          whereArgs != null &&
+          whereArgs.isNotEmpty) {
+        await WebOfflineFirstStore.applyOrderDeletionToLocalCache(
+            whereArgs[0].toString());
+      }
+      return n;
     } catch (e) {
       debugPrint('DB: Delete error: $e');
       if (kIsWeb &&

@@ -124,6 +124,14 @@ class WebOfflineFirstStore {
   static const _deletedOrderIdsKey = 'chiyagadi_web_deleted_order_ids_v1';
   static const int _deletedOrderIdsMax = 500;
 
+  /// Stable Firestore/local id for an order row (handles documentId vs id vs document_id).
+  static String? orderRowDocumentId(Map<String, dynamic> r) {
+    final v = r['documentId'] ?? r['id'] ?? r['document_id'];
+    if (v == null) return null;
+    final s = v.toString().trim();
+    return s.isEmpty ? null : s;
+  }
+
   static const _customersReadCacheKey = 'chiyagadi_web_customers_read_cache_v1';
   static const int _customersReadCacheMax = 500;
 
@@ -135,14 +143,14 @@ class WebOfflineFirstStore {
       final tomb = await _loadDeletedOrderIds();
       final byId = <String, Map<String, dynamic>>{};
       for (final r in await loadOrdersReadCache()) {
-        final id = (r['documentId'] ?? r['id'])?.toString();
-        if (id != null && id.isNotEmpty && !tomb.contains(id)) {
+        final id = orderRowDocumentId(r);
+        if (id != null && !tomb.contains(id)) {
           byId[id] = Map<String, dynamic>.from(r);
         }
       }
       for (final r in rows) {
-        final id = (r['documentId'] ?? r['id'])?.toString();
-        if (id == null || id.isEmpty || tomb.contains(id)) continue;
+        final id = orderRowDocumentId(r);
+        if (id == null || tomb.contains(id)) continue;
         byId[id] = Map<String, dynamic>.from(r);
       }
       var list = byId.values.toList();
@@ -162,6 +170,7 @@ class WebOfflineFirstStore {
   }
 
   /// Cached order rows from last successful online queries (newest first).
+  /// Drops tombstoned ids and persists the compacted list so merges cannot resurrect ghosts.
   static Future<List<Map<String, dynamic>>> loadOrdersReadCache() async {
     if (!kIsWeb) return [];
     try {
@@ -169,7 +178,20 @@ class WebOfflineFirstStore {
       final raw = prefs.getString(_ordersReadCacheKey);
       if (raw == null || raw.isEmpty) return [];
       final list = jsonDecode(raw) as List<dynamic>;
-      return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      var rows =
+          list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      final tomb = await _loadDeletedOrderIds();
+      if (tomb.isEmpty) return rows;
+      final filtered = rows.where((r) {
+        final id = orderRowDocumentId(r);
+        return id == null || !tomb.contains(id);
+      }).toList();
+      if (filtered.length < rows.length) {
+        await prefs.setString(_ordersReadCacheKey, jsonEncode(filtered));
+        debugPrint(
+            'WebOfflineFirstStore: loadOrdersReadCache removed ${rows.length - filtered.length} tombstoned row(s)');
+      }
+      return filtered;
     } catch (e) {
       debugPrint('WebOfflineFirstStore: loadOrdersReadCache: $e');
       return [];
@@ -192,10 +214,11 @@ class WebOfflineFirstStore {
 
   /// Remember an order removed offline so [firestoreLikeQuery] does not show it again after merges.
   static Future<void> rememberDeletedOrderId(String documentId) async {
-    if (!kIsWeb || documentId.isEmpty) return;
+    final id = documentId.trim();
+    if (!kIsWeb || id.isEmpty) return;
     try {
       final set = await _loadDeletedOrderIds();
-      set.add(documentId);
+      set.add(id);
       var list = set.toList();
       if (list.length > _deletedOrderIdsMax) {
         list = list.sublist(list.length - _deletedOrderIdsMax);
@@ -209,12 +232,12 @@ class WebOfflineFirstStore {
 
   /// Drops one order row from the read cache by [documentId]. Returns true if a row was removed.
   static Future<bool> removeOrderFromReadCache(String documentId) async {
-    if (!kIsWeb || documentId.isEmpty) return false;
+    final target = documentId.trim();
+    if (!kIsWeb || target.isEmpty) return false;
     try {
       final rows = await loadOrdersReadCache();
       final next = rows
-          .where((r) =>
-              (r['documentId'] ?? r['id'])?.toString() != documentId)
+          .where((r) => orderRowDocumentId(r) != target)
           .toList();
       if (next.length == rows.length) return false;
       final prefs = await SharedPreferences.getInstance();
@@ -229,17 +252,29 @@ class WebOfflineFirstStore {
   /// Call after an order is successfully deleted on Firestore while online. Without this,
   /// [loadOrdersReadCache] can still contain the order, so it reappears when the app goes offline.
   static Future<void> applyOrderDeletionToLocalCache(String documentId) async {
-    if (!kIsWeb || documentId.isEmpty) return;
+    final id = documentId.trim();
+    if (!kIsWeb || id.isEmpty) return;
     try {
-      await removeOrderFromReadCache(documentId);
-      await rememberDeletedOrderId(documentId);
-      await _removePendingOrdersWithDocumentId(documentId);
+      await removeOrderFromReadCache(id);
+      await rememberDeletedOrderId(id);
+      await _removePendingOrdersWithDocumentId(id);
       final coll = await _loadCollectionMap('orders');
-      if (coll.containsKey(documentId)) {
-        coll.remove(documentId);
+      var collChanged = false;
+      if (coll.remove(id) != null) {
+        collChanged = true;
+      }
+      final orphanKeys = coll.entries
+          .where((e) => orderRowDocumentId(e.value) == id)
+          .map((e) => e.key)
+          .toList();
+      for (final k in orphanKeys) {
+        coll.remove(k);
+        collChanged = true;
+      }
+      if (collChanged) {
         await _persistCollectionMap('orders', coll);
       }
-      await _removePending('orders', documentId);
+      await _removePending('orders', id);
     } catch (e) {
       debugPrint('WebOfflineFirstStore: applyOrderDeletionToLocalCache: $e');
     }
@@ -251,8 +286,8 @@ class WebOfflineFirstStore {
     final tomb = await _loadDeletedOrderIds();
     if (tomb.isEmpty) return rows;
     return rows.where((r) {
-      final id = (r['documentId'] ?? r['id'])?.toString();
-      return id == null || id.isEmpty || !tomb.contains(id);
+      final id = orderRowDocumentId(r);
+      return id == null || !tomb.contains(id);
     }).toList();
   }
 
@@ -308,8 +343,9 @@ class WebOfflineFirstStore {
   }
 
   static Future<Map<String, dynamic>?> _findOrderInReadCache(String id) async {
+    final needle = id.trim();
     for (final r in await loadOrdersReadCache()) {
-      if ((r['documentId'] ?? r['id'])?.toString() == id) {
+      if (orderRowDocumentId(r) == needle) {
         return Map<String, dynamic>.from(r);
       }
     }
@@ -360,9 +396,14 @@ class WebOfflineFirstStore {
     if (raw == null || raw.isEmpty) return [];
     try {
       final list = jsonDecode(raw) as List<dynamic>;
-      return list
-          .map((e) => Map<String, dynamic>.from(e as Map))
-          .toList();
+      // Backward compatible: older entries were {collection,id}. New entries add {op}.
+      return list.map((e) {
+        final m = Map<String, dynamic>.from(e as Map);
+        m['op'] = (m['op']?.toString().trim().isNotEmpty ?? false)
+            ? m['op'].toString().trim()
+            : 'set';
+        return m;
+      }).toList();
     } catch (_) {
       return [];
     }
@@ -377,12 +418,18 @@ class WebOfflineFirstStore {
     }
   }
 
-  static Future<void> _addPending(String collection, String id) async {
+  static Future<void> _addPending(
+    String collection,
+    String id, {
+    String op = 'set', // 'set' or 'delete'
+  }) async {
     final list = await _pendingList();
-    final key = '$collection::$id';
-    final exists = list.any((m) => '${m['collection']}::${m['id']}' == key);
+    final normalizedOp = op.trim().isEmpty ? 'set' : op.trim();
+    final key = '$collection::$id::$normalizedOp';
+    final exists = list.any(
+        (m) => '${m['collection']}::${m['id']}::${m['op']}' == key);
     if (!exists) {
-      list.add({'collection': collection, 'id': id});
+      list.add({'collection': collection, 'id': id, 'op': normalizedOp});
       await _setPendingList(list);
     }
   }
@@ -395,7 +442,8 @@ class WebOfflineFirstStore {
     if (!kIsWeb) return serverRows;
     final pending = await _pendingList();
     final ids = pending
-        .where((m) => m['collection'] == collection)
+        .where((m) =>
+            m['collection'] == collection && (m['op']?.toString() ?? 'set') == 'set')
         .map((m) => m['id'] as String?)
         .whereType<String>()
         .toSet();
@@ -434,7 +482,7 @@ class WebOfflineFirstStore {
     final coll = await _loadCollectionMap(collection);
     coll[id] = copy;
     await _persistCollectionMap(collection, coll);
-    await _addPending(collection, id);
+    await _addPending(collection, id, op: 'set');
     debugPrint('WebOfflineFirstStore: offline insert $collection/$id');
 
     if (kIsWeb && collection == 'orders') {
@@ -529,7 +577,7 @@ class WebOfflineFirstStore {
           data['updated_at'] ?? DateTime.now().millisecondsSinceEpoch;
       coll[id] = merged;
       await _persistCollectionMap(collection, coll);
-      await _addPending(collection, id);
+      await _addPending(collection, id, op: 'set');
       if (collection == 'orders') {
         await mergeOrdersIntoReadCache([merged]);
       } else if (collection == 'customers') {
@@ -548,7 +596,7 @@ class WebOfflineFirstStore {
             data['updated_at'] ?? DateTime.now().millisecondsSinceEpoch;
         docs[entry.key] = merged;
         count++;
-        await _addPending(collection, entry.key);
+        await _addPending(collection, entry.key, op: 'set');
       }
     }
     if (count > 0) await _persistCollectionMap(collection, docs);
@@ -591,7 +639,8 @@ class WebOfflineFirstStore {
         await _persistCollectionMap(collection, coll);
         removedFromMap = true;
       }
-      await _removePending(collection, id);
+      // Queue a server-side delete for when we're back online.
+      await _addPending(collection, id, op: 'delete');
 
       if (collection == 'orders') {
         await removeOrderFromReadCache(id);
@@ -759,7 +808,7 @@ class WebOfflineFirstStore {
         final offline = coll[id];
         if (offline != null) return [Map<String, dynamic>.from(offline)];
         for (final r in await loadOrdersReadCache()) {
-          if ((r['documentId'] ?? r['id'])?.toString() == id) {
+          if (orderRowDocumentId(r) == id) {
             return [Map<String, dynamic>.from(r)];
           }
         }
@@ -791,17 +840,17 @@ class WebOfflineFirstStore {
       final tomb = await _loadDeletedOrderIds();
       final byId = <String, Map<String, dynamic>>{};
       for (final r in await loadOrdersReadCache()) {
-        final oid = (r['documentId'] ?? r['id'])?.toString();
-        if (oid != null &&
-            oid.isNotEmpty &&
-            !tomb.contains(oid)) {
+        final oid = orderRowDocumentId(r);
+        if (oid != null && !tomb.contains(oid)) {
           byId[oid] = Map<String, dynamic>.from(r);
         }
       }
       final m = await _loadCollectionMap('orders');
       for (final e in m.entries) {
         if (tomb.contains(e.key)) continue;
-        byId[e.key] = Map<String, dynamic>.from(e.value);
+        final rowId = orderRowDocumentId(e.value) ?? e.key;
+        if (tomb.contains(rowId)) continue;
+        byId[rowId] = Map<String, dynamic>.from(e.value);
       }
       base = await _filterOutDeletedOrders(byId.values.toList());
     } else if (collection == 'customers') {
@@ -946,9 +995,26 @@ class WebOfflineFirstStore {
     for (final p in List<Map<String, dynamic>>.from(pending)) {
       final collection = p['collection'] as String?;
       final id = p['id'] as String?;
+      final op = (p['op']?.toString().trim().isNotEmpty ?? false)
+          ? p['op'].toString().trim()
+          : 'set';
       if (collection == null || id == null) continue;
 
       try {
+        if (op == 'delete') {
+          await fs.collection(collection).doc(id).delete();
+          await _removePending(collection, id);
+          if (collection == 'orders') {
+            await _removePendingOrdersWithDocumentId(id);
+          }
+          // Ensure local caches are consistent post-sync.
+          if (collection == 'orders') {
+            await applyOrderDeletionToLocalCache(id);
+          }
+          debugPrint('WebOfflineFirstStore: synced delete $collection/$id');
+          continue;
+        }
+
         final coll = await _loadCollectionMap(collection);
         final doc = coll[id];
         if (doc == null) {
