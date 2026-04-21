@@ -169,6 +169,36 @@ class WebOfflineFirstStore {
     }
   }
 
+  /// Replaces the `orders` read cache with the latest online query result.
+  ///
+  /// This prevents "ghost" orders from reappearing offline after they were deleted online
+  /// (because a merge would keep older cached rows that no longer exist server-side).
+  static Future<void> replaceOrdersReadCache(List<Map<String, dynamic>> rows) async {
+    if (!kIsWeb) return;
+    try {
+      final tomb = await _loadDeletedOrderIds();
+      final byId = <String, Map<String, dynamic>>{};
+      for (final r in rows) {
+        final id = orderRowDocumentId(r);
+        if (id == null || tomb.contains(id)) continue;
+        byId[id] = Map<String, dynamic>.from(r);
+      }
+      var list = byId.values.toList();
+      list.sort((a, b) {
+        final ta = (a['created_at'] as num?)?.toInt() ?? 0;
+        final tb = (b['created_at'] as num?)?.toInt() ?? 0;
+        return tb.compareTo(ta);
+      });
+      if (list.length > _ordersReadCacheMax) {
+        list = list.take(_ordersReadCacheMax).toList();
+      }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_ordersReadCacheKey, jsonEncode(list));
+    } catch (e) {
+      debugPrint('WebOfflineFirstStore: replaceOrdersReadCache: $e');
+    }
+  }
+
   /// Cached order rows from last successful online queries (newest first).
   /// Drops tombstoned ids and persists the compacted list so merges cannot resurrect ghosts.
   static Future<List<Map<String, dynamic>>> loadOrdersReadCache() async {
