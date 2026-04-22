@@ -137,38 +137,49 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           alignment: Alignment.centerLeft,
           child: Text('Order ${widget.orderNumber}'),
         ),
-        actions: [
-          if (showOfflineBadge)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: Colors.orange.withOpacity(0.55),
-                    width: 1,
-                  ),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.cloud_off, size: 16, color: Colors.orange),
-                    SizedBox(width: 6),
-                    Text(
-                      'Offline mode',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.orange,
+        bottom: showOfflineBadge
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(34),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                    child: IgnorePointer(
+                      ignoring: true,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: Colors.orange.withOpacity(0.55),
+                            width: 1,
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.cloud_off,
+                                size: 16, color: Colors.orange),
+                            SizedBox(width: 6),
+                            Text(
+                              'Offline mode',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.orange,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
+              )
+            : null,
+        actions: [
           // Save / Push changes for roles with Orders permission
           if (_hasOrdersPermission == true)
             IconButton(
