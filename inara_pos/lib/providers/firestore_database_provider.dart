@@ -618,6 +618,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       await WebOfflineFirstStore.mergeExpensesIntoReadCache(rows);
     } else if (collection == 'credit_transactions') {
       await WebOfflineFirstStore.mergeCreditTransactionsIntoReadCache(rows);
+    } else if (collection == 'order_items') {
+      await WebOfflineFirstStore.mergeOrderItemsIntoReadCache(rows);
     }
     final merged =
         await WebOfflineFirstStore.mergePendingIntoQueryResult(collection, rows);
@@ -631,6 +633,8 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       await WebOfflineFirstStore.mergeExpensesIntoReadCache(merged);
     } else if (collection == 'credit_transactions') {
       await WebOfflineFirstStore.mergeCreditTransactionsIntoReadCache(merged);
+    } else if (collection == 'order_items') {
+      await WebOfflineFirstStore.mergeOrderItemsIntoReadCache(merged);
     }
     return merged;
   }

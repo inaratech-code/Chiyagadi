@@ -7,6 +7,7 @@ import '../../models/product.dart';
 import '../../services/order_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/performance.dart';
+import '../../utils/web_online.dart';
 import 'package:intl/intl.dart';
 import '../dashboard/dashboard_screen.dart';
 
@@ -128,6 +129,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final showOfflineBadge = kIsWeb && !isNavigatorOnline;
     return Scaffold(
       appBar: AppBar(
         title: FittedBox(
@@ -136,6 +138,37 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           child: Text('Order ${widget.orderNumber}'),
         ),
         actions: [
+          if (showOfflineBadge)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: Colors.orange.withOpacity(0.55),
+                    width: 1,
+                  ),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.cloud_off, size: 16, color: Colors.orange),
+                    SizedBox(width: 6),
+                    Text(
+                      'Offline mode',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.orange,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           // Save / Push changes for roles with Orders permission
           if (_hasOrdersPermission == true)
             IconButton(

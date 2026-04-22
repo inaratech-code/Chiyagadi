@@ -214,6 +214,10 @@ class WebOfflineFirstStore {
       'chiyagadi_web_credit_transactions_read_cache_v1';
   static const int _creditTxReadCacheMax = 1000;
 
+  static const _orderItemsReadCacheKey =
+      'chiyagadi_web_order_items_read_cache_v1';
+  static const int _orderItemsReadCacheMax = 2500;
+
   /// Merges server `orders` rows into local cache so [firestoreLikeQuery] can list recent
   /// history while offline (e.g. today's orders after at least one online load).
   static Future<void> mergeOrdersIntoReadCache(List<Map<String, dynamic>> rows) async {
@@ -543,6 +547,78 @@ class WebOfflineFirstStore {
     }
   }
 
+  static Future<void> mergeOrderItemsIntoReadCache(
+      List<Map<String, dynamic>> rows) async {
+    if (!kIsWeb || rows.isEmpty) return;
+    try {
+      final byId = <String, Map<String, dynamic>>{};
+      for (final r in await loadOrderItemsReadCache()) {
+        final id = (r['documentId'] ?? r['id'])?.toString();
+        if (id != null && id.isNotEmpty) {
+          byId[id] = Map<String, dynamic>.from(r);
+        }
+      }
+      for (final r in rows) {
+        final id = (r['documentId'] ?? r['id'])?.toString();
+        if (id == null || id.isEmpty) continue;
+        byId[id] = Map<String, dynamic>.from(r);
+      }
+      var list = byId.values.toList();
+      list.sort((a, b) {
+        final ta = (a['created_at'] as num?)?.toInt() ?? 0;
+        final tb = (b['created_at'] as num?)?.toInt() ?? 0;
+        return tb.compareTo(ta);
+      });
+      if (list.length > _orderItemsReadCacheMax) {
+        list = list.take(_orderItemsReadCacheMax).toList();
+      }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_orderItemsReadCacheKey, jsonEncode(list));
+    } catch (e) {
+      debugPrint('WebOfflineFirstStore: mergeOrderItemsIntoReadCache: $e');
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> loadOrderItemsReadCache() async {
+    if (!kIsWeb) return [];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_orderItemsReadCacheKey);
+      if (raw == null || raw.isEmpty) return [];
+      final list = jsonDecode(raw) as List<dynamic>;
+      return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (e) {
+      debugPrint('WebOfflineFirstStore: loadOrderItemsReadCache: $e');
+      return [];
+    }
+  }
+
+  static Future<Map<String, dynamic>?> _findOrderItemInReadCache(String id) async {
+    final needle = id.trim();
+    if (needle.isEmpty) return null;
+    for (final r in await loadOrderItemsReadCache()) {
+      final rid = (r['documentId'] ?? r['id'])?.toString();
+      if (rid == needle) return Map<String, dynamic>.from(r);
+    }
+    return null;
+  }
+
+  static Future<void> applyOrderItemDeletionToLocalCache(String documentId) async {
+    final id = documentId.trim();
+    if (!kIsWeb || id.isEmpty) return;
+    try {
+      final rows = await loadOrderItemsReadCache();
+      final next = rows
+          .where((r) => (r['documentId'] ?? r['id'])?.toString() != id)
+          .toList();
+      if (next.length == rows.length) return;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_orderItemsReadCacheKey, jsonEncode(next));
+    } catch (e) {
+      debugPrint('WebOfflineFirstStore: applyOrderItemDeletionToLocalCache: $e');
+    }
+  }
+
   static Future<Map<String, dynamic>?> _findOrderInReadCache(String id) async {
     final needle = id.trim();
     for (final r in await loadOrdersReadCache()) {
@@ -770,6 +846,8 @@ class WebOfflineFirstStore {
         existing = await _findOrderInReadCache(id);
       } else if (existing == null && collection == 'customers') {
         existing = await _findCustomerInReadCache(id);
+      } else if (existing == null && collection == 'order_items') {
+        existing = await _findOrderItemInReadCache(id);
       }
       if (existing == null) return 0;
       final merged = Map<String, dynamic>.from(existing);
@@ -785,6 +863,8 @@ class WebOfflineFirstStore {
         await mergeCustomersIntoReadCache([merged]);
       } else if (collection == 'products') {
         await applyProductUpsertToMenuCache(merged);
+      } else if (collection == 'order_items') {
+        await mergeOrderItemsIntoReadCache([merged]);
       }
       return 1;
     }
@@ -853,6 +933,10 @@ class WebOfflineFirstStore {
       }
       if (collection == 'products') {
         await applyProductDeletionToMenuCache(id);
+        return 1;
+      }
+      if (collection == 'order_items') {
+        await applyOrderItemDeletionToLocalCache(id);
         return 1;
       }
       return removedFromMap ? 1 : 0;
@@ -1060,6 +1144,19 @@ class WebOfflineFirstStore {
         byId[rowId] = Map<String, dynamic>.from(e.value);
       }
       base = await _filterOutDeletedOrders(byId.values.toList());
+    } else if (collection == 'order_items') {
+      final byId = <String, Map<String, dynamic>>{};
+      for (final r in await loadOrderItemsReadCache()) {
+        final id = (r['documentId'] ?? r['id'])?.toString();
+        if (id != null && id.isNotEmpty) {
+          byId[id] = Map<String, dynamic>.from(r);
+        }
+      }
+      final m = await _loadCollectionMap('order_items');
+      for (final e in m.entries) {
+        byId[e.key] = Map<String, dynamic>.from(e.value);
+      }
+      base = byId.values.toList();
     } else if (collection == 'customers') {
       final byId = <String, Map<String, dynamic>>{};
       for (final r in await loadCustomersReadCache()) {
@@ -1250,6 +1347,9 @@ class WebOfflineFirstStore {
           }
           if (collection == 'products') {
             await applyProductDeletionToMenuCache(id);
+          }
+          if (collection == 'order_items') {
+            await applyOrderItemDeletionToLocalCache(id);
           }
           debugPrint('WebOfflineFirstStore: synced delete $collection/$id');
           continue;
