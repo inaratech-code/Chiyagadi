@@ -60,11 +60,11 @@ class _MenuScreenState extends State<MenuScreen> {
   List<Map<String, dynamic>> _pendingCartItems =
       []; // [{product: Product, quantity: int}]
 
-  // NEW: Delete menu item (soft delete)
+  // Delete menu item.
   //
-  // SECURITY/DATA INTEGRITY:
-  // We intentionally do NOT hard-delete products because historical orders may reference them.
-  // Instead we mark the product inactive + not sellable, which removes it from the menu.
+  // We prefer a real DB delete so the item disappears everywhere (online + offline caches).
+  // If a hard-delete is blocked (e.g. foreign key constraints from historical orders),
+  // we fall back to the existing soft-delete (inactive + not sellable).
   Future<void> _deleteMenuItem(Product product) async {
     final auth = Provider.of<InaraAuthProvider>(context, listen: false);
     if (!auth.isAdmin) return;
@@ -100,16 +100,30 @@ class _MenuScreenState extends State<MenuScreen> {
       final id = kIsWeb ? product.documentId : product.id;
       if (id == null) throw Exception('Missing product id');
 
-      await dbProvider.update(
-        'products',
-        values: {
-          'is_active': 0,
-          'is_sellable': 0,
-          'updated_at': now,
-        },
-        where: where,
-        whereArgs: [id],
-      );
+      var didHardDelete = false;
+      try {
+        final n = await dbProvider.delete(
+          'products',
+          where: where,
+          whereArgs: [id],
+        );
+        didHardDelete = n > 0;
+      } catch (_) {
+        // Fall back below.
+      }
+
+      if (!didHardDelete) {
+        await dbProvider.update(
+          'products',
+          values: {
+            'is_active': 0,
+            'is_sellable': 0,
+            'updated_at': now,
+          },
+          where: where,
+          whereArgs: [id],
+        );
+      }
 
       if (!mounted) return;
       setState(() {
@@ -119,7 +133,11 @@ class _MenuScreenState extends State<MenuScreen> {
         });
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Menu item deleted')),
+        SnackBar(
+          content: Text(didHardDelete
+              ? 'Menu item deleted'
+              : 'Menu item removed from menu'),
+        ),
       );
     } catch (e) {
       if (!mounted) return;

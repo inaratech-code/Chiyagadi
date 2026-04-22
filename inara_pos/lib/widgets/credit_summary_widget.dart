@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/database_provider.dart';
+import '../providers/unified_database_provider.dart';
 import '../screens/customers/customers_screen.dart';
 import '../utils/performance.dart';
 import 'package:intl/intl.dart';
@@ -24,8 +24,11 @@ class _CreditSummaryWidgetState extends State<CreditSummaryWidget> {
   }
 
   Future<void> _loadCreditSummary() async {
+    if (_isLoading) return;
+    if (mounted) setState(() => _isLoading = true);
     try {
-      final dbProvider = Provider.of<DatabaseProvider>(context, listen: false);
+      final dbProvider =
+          Provider.of<UnifiedDatabaseProvider>(context, listen: false);
       await dbProvider.init();
 
       final customers = await dbProvider.query('customers');

@@ -614,6 +614,10 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       await WebOfflineFirstStore.cacheCategories(rows);
     } else if (collection == 'products') {
       await WebOfflineFirstStore.cacheProducts(rows);
+    } else if (collection == 'expenses') {
+      await WebOfflineFirstStore.mergeExpensesIntoReadCache(rows);
+    } else if (collection == 'credit_transactions') {
+      await WebOfflineFirstStore.mergeCreditTransactionsIntoReadCache(rows);
     }
     final merged =
         await WebOfflineFirstStore.mergePendingIntoQueryResult(collection, rows);
@@ -623,6 +627,10 @@ class FirestoreDatabaseProvider with ChangeNotifier {
       await WebOfflineFirstStore.replaceOrdersReadCache(merged);
     } else if (collection == 'customers') {
       await WebOfflineFirstStore.mergeCustomersIntoReadCache(merged);
+    } else if (collection == 'expenses') {
+      await WebOfflineFirstStore.mergeExpensesIntoReadCache(merged);
+    } else if (collection == 'credit_transactions') {
+      await WebOfflineFirstStore.mergeCreditTransactionsIntoReadCache(merged);
     }
     return merged;
   }
@@ -1087,6 +1095,16 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         debugPrint(
             'FirestoreDatabase: Inserted document ${docRef.id} into $collection');
       }
+
+      // Keep web offline menu cache in sync for products.
+      if (kIsWeb && collection == 'products') {
+        final merged = <String, dynamic>{
+          ...dataToInsert,
+          'id': docRef.id,
+          'documentId': docRef.id,
+        };
+        await WebOfflineFirstStore.applyProductUpsertToMenuCache(merged);
+      }
       return docRef.id;
     } catch (e) {
       debugPrint('FirestoreDatabase: Insert error: $e');
@@ -1138,6 +1156,21 @@ class FirestoreDatabaseProvider with ChangeNotifier {
           count = 1;
           debugPrint(
               'FirestoreDatabase: Updated document $docId in $collection');
+
+          if (kIsWeb && collection == 'products') {
+            try {
+              final snap = await docRef.get();
+              if (snap.exists) {
+                final row = Map<String, dynamic>.from(snap.data() ?? {});
+                row['id'] = snap.id;
+                row['documentId'] = snap.id;
+                await WebOfflineFirstStore.applyProductUpsertToMenuCache(row);
+              }
+            } catch (e) {
+              debugPrint(
+                  'FirestoreDatabase: Failed to refresh product cache after update: $e');
+            }
+          }
         } else {
           // Find documents matching where clause
           final docs =
@@ -1152,6 +1185,14 @@ class FirestoreDatabaseProvider with ChangeNotifier {
             count++;
           }
           await batch.commit();
+
+          if (kIsWeb && collection == 'products' && docs.isNotEmpty) {
+            for (final d in docs) {
+              final merged = Map<String, dynamic>.from(d);
+              merged.addAll(dataToUpdate);
+              await WebOfflineFirstStore.applyProductUpsertToMenuCache(merged);
+            }
+          }
         }
       } else {
         // Update all documents (use with caution)
@@ -1205,6 +1246,9 @@ class FirestoreDatabaseProvider with ChangeNotifier {
           if (kIsWeb && collection == 'orders') {
             await WebOfflineFirstStore.applyOrderDeletionToLocalCache(docId);
           }
+          if (kIsWeb && collection == 'products') {
+            await WebOfflineFirstStore.applyProductDeletionToMenuCache(docId);
+          }
         } else {
           // Find documents matching where clause
           final docs =
@@ -1226,6 +1270,14 @@ class FirestoreDatabaseProvider with ChangeNotifier {
               final id = (doc['documentId'] ?? doc['id'])?.toString();
               if (id != null && id.isNotEmpty) {
                 await WebOfflineFirstStore.applyOrderDeletionToLocalCache(id);
+              }
+            }
+          }
+          if (kIsWeb && collection == 'products') {
+            for (final doc in docs) {
+              final id = (doc['documentId'] ?? doc['id'])?.toString();
+              if (id != null && id.isNotEmpty) {
+                await WebOfflineFirstStore.applyProductDeletionToMenuCache(id);
               }
             }
           }
