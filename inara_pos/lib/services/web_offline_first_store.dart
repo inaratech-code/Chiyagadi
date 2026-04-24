@@ -28,6 +28,69 @@ class WebOfflineFirstStore {
   static const _offlineDocsKey = 'chiyagadi_web_offline_docs_v1';
   static const _pendingSyncKey = 'chiyagadi_web_pending_sync_v1';
 
+  /// Clears local offline caches/queues for admin data wipes.
+  ///
+  /// This is important on web because we keep last-known-online read caches
+  /// (orders/customers/credits/menu) to support offline mode. When the admin
+  /// clears server data, we must also clear these local caches so deleted data
+  /// doesn't keep showing up offline.
+  static Future<void> clearLocalCachesForCollections(
+    Set<String> collections,
+  ) async {
+    if (!kIsWeb) return;
+    if (collections.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Drop read caches for known collections.
+      if (collections.contains('orders')) {
+        await prefs.remove(_ordersReadCacheKey);
+        await prefs.remove(_deletedOrderIdsKey);
+        try {
+          ls.webLocalStorageRemove(pendingOrdersLocalStorageKey);
+        } catch (_) {}
+        try {
+          await prefs.remove(pendingOrdersLocalStorageKey);
+        } catch (_) {}
+      }
+      if (collections.contains('customers')) {
+        await prefs.remove(_customersReadCacheKey);
+      }
+      if (collections.contains('credit_transactions')) {
+        await prefs.remove(_creditTxReadCacheKey);
+      }
+      if (collections.contains('order_items')) {
+        await prefs.remove(_orderItemsReadCacheKey);
+      }
+
+      // Remove offline docs payloads for these collections.
+      final rawDocs = prefs.getString(_offlineDocsKey);
+      if (rawDocs != null && rawDocs.isNotEmpty) {
+        final outer = Map<String, dynamic>.from(jsonDecode(rawDocs) as Map);
+        var changed = false;
+        for (final c in collections) {
+          if (outer.remove(c) != null) changed = true;
+        }
+        if (changed) {
+          await prefs.setString(_offlineDocsKey, jsonEncode(outer));
+        }
+      }
+
+      // Remove pending sync entries for these collections.
+      final pending = await _pendingList();
+      if (pending.isNotEmpty) {
+        final next = pending
+            .where((m) => !collections.contains(m['collection']?.toString()))
+            .toList();
+        if (next.length != pending.length) {
+          await _setPendingList(next);
+        }
+      }
+    } catch (e) {
+      debugPrint('WebOfflineFirstStore: clearLocalCachesForCollections: $e');
+    }
+  }
+
   static Future<void> cacheCategories(List<Map<String, dynamic>> rows) async {
     if (!kIsWeb) return;
     try {

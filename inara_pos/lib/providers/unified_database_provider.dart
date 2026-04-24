@@ -801,6 +801,24 @@ class UnifiedDatabaseProvider with ChangeNotifier {
     }
   }
 
+  /// Clears orders + customers + credit transactions (Settings wipe).
+  Future<void> clearOrdersCustomersAndCredits() async {
+    if (!_isInitialized) {
+      await init();
+    }
+    if (!isAvailable) {
+      debugPrint(
+          'DB: Clear orders/customers/credits skipped - database not available');
+      return;
+    }
+    try {
+      await _provider.clearOrdersCustomersAndCredits();
+    } catch (e) {
+      debugPrint('DB: Clear orders/customers/credits error: $e');
+      rethrow;
+    }
+  }
+
   /// Clears business data created/entered through the app while keeping
   /// authentication/users and settings intact.
   ///

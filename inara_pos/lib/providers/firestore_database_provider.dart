@@ -1385,6 +1385,38 @@ class FirestoreDatabaseProvider with ChangeNotifier {
         'FirestoreDatabase: Cleared orders data. Deleted $totalDeleted documents');
   }
 
+  /// Clears orders + customers + credit transactions.
+  ///
+  /// This matches Settings "Clear Orders" expectation for web offline mode:
+  /// remove orders and also clear customers/credits.
+  Future<void> clearOrdersCustomersAndCredits() async {
+    if (!_isInitialized) {
+      await init();
+    }
+    final collections = <String>[
+      'credit_transactions',
+      'payments',
+      'order_items',
+      'orders',
+      'customers',
+    ];
+    int totalDeleted = 0;
+    for (final name in collections) {
+      totalDeleted += await _deleteCollectionInBatches(name);
+    }
+    debugPrint(
+        'FirestoreDatabase: Cleared orders+customers+credits. Deleted $totalDeleted documents');
+    if (kIsWeb) {
+      await WebOfflineFirstStore.clearLocalCachesForCollections({
+        'credit_transactions',
+        'payments',
+        'order_items',
+        'orders',
+        'customers',
+      });
+    }
+  }
+
   /// Clears business data created/entered through the app while keeping
   /// authentication/users and settings intact.
   ///

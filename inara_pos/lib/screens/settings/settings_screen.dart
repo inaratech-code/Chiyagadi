@@ -558,9 +558,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ListTile(
                               leading: const Icon(Icons.delete_forever,
                                   color: AppTheme.errorColor),
-                              title: const Text('Clear Orders'),
+                              title: const Text('Clear Orders + Customers'),
                               subtitle: const Text(
-                                  'Delete all orders, order items, and payments only'),
+                                  'Delete orders + customers + credit history (credits)'),
                               onTap: () => _showResetDialog(),
                             ),
                           ],
@@ -587,18 +587,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 confirmController.text.trim().toUpperCase() == 'RESET';
 
             return AlertDialog(
-              title: const Text('Clear Orders?'),
+              title: const Text('Clear Orders + Customers?'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'This will permanently delete only the order section:\n'
+                      'This will permanently delete:\n'
                       '- All orders\n'
                       '- All order items\n'
-                      '- All payments\n\n'
-                      'Products, inventory, customers, purchases, and other data will be kept.\n'
+                      '- All payments\n'
+                      '- All customers\n'
+                      '- All credit transactions\n\n'
+                      'Products, inventory, purchases, and other data will be kept.\n'
                       'This action cannot be undone.',
                     ),
                     const SizedBox(height: 16),
@@ -646,7 +648,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               dialogContext,
                               listen: false,
                             );
-                            await dbProvider.clearOrdersData();
+                            await dbProvider.clearOrdersCustomersAndCredits();
                             if (dialogContext.mounted) {
                               Navigator.pop(dialogContext, true);
                             }
@@ -661,7 +663,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.errorColor,
                   ),
-                  child: const Text('Clear Orders'),
+                  child: const Text('Clear Data'),
                 ),
               ],
             );
@@ -674,7 +676,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (confirm == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Orders cleared successfully'),
+          content: Text('Orders + customers cleared successfully'),
           backgroundColor: Colors.red,
         ),
       );

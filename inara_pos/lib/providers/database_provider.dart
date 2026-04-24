@@ -727,6 +727,30 @@ CREATE TABLE IF NOT EXISTS expenses (
     });
   }
 
+  /// Clears order-section data PLUS customers + credit transactions.
+  ///
+  /// Requested behavior for Settings "Clear Orders": also clear credits/customers.
+  /// Keeps products, inventory, purchases, and other business data.
+  Future<void> clearOrdersCustomersAndCredits() async {
+    if (kIsWeb) {
+      throw UnsupportedError('SQLite is not supported on web.');
+    }
+    final db = await database;
+    await db.transaction((txn) async {
+      // Delete in foreign-key-safe order.
+      const tables = <String>[
+        'credit_transactions',
+        'payments',
+        'order_items',
+        'orders',
+        'customers',
+      ];
+      for (final table in tables) {
+        await txn.delete(table);
+      }
+    });
+  }
+
   /// Clears only the business data created through the app, keeping `users` and
   /// `settings` intact. Optionally reseeds default categories/products.
   Future<void> clearBusinessData({bool seedDefaults = true}) async {
